@@ -7,7 +7,7 @@ const abstractActionPattern = /\b(mover,? cubrir o negociar posición|mover,? cu
 const genericLinePattern = /la decisión deja una marca clara|la decision deja una marca clara|obliga al grupo a moverse con cuidado|oposición aprovecha la repetición|oposicion aprovecha la repeticion|el peligro sube porque|la tensión aumenta|el peligro gana terreno|algo cambia/i;
 const physicalDangerPattern = /turba|salida|puerta|piedra|campana|bestia|bosque|golpea|cierra|avanza|bloquea|soga|antorcha|aldeanos|grito/i;
 const costPattern = /pero|coste|pierde|mancha|rompe|separa|cierra|bloquea|sube|daña|expone|retrocede|arranca|quita|tapa/i;
-const advantagePattern = /admite|encuentra|nota|confirma|abre|protege|gana|limpia|revela|bloquea|separa|contradice|entrega|desvía|desvia|cae|aparta/i;
+const advantagePattern = /admite|encuentra|nota|confirma|abre|protege|gana|limpia|revela|bloquea|separa|contradice|entrega|desvía|desvia|cae|aparta|obliga|expone|muestra|conserva/i;
 
 function issue(level: ContextCoherenceIssue["level"], code: string, message: string, evidence?: string): ContextCoherenceIssue {
   return { level, code, message, evidence };
@@ -34,6 +34,12 @@ export function concretizeActionText(action: string, planLike: Pick<ResolutionPl
   if (/negociar|presión|presion/i.test(action)) return `${actor} encara a ${npc} y exige una respuesta delante de todos.`;
   if (/arriesgada|coste|situación|situacion|ventaja/i.test(action)) return `${actor} bloquea la puerta más cercana para ganar tiempo real en ${planLike.scene.location}.`;
   return `${actor} convierte la intención en un gesto visible sobre ${object}.`;
+}
+
+export function safeNpcReference(plan: Pick<ResolutionPlan, "validContext" | "npcDirectives">, npcId?: string, name?: string) {
+  if (npcId && plan.validContext.presentNpcIds.includes(npcId)) return name ?? plan.npcDirectives.find((npc) => npc.npcId === npcId)?.name ?? "un testigo";
+  const present = plan.npcDirectives.find((npc) => plan.validContext.presentNpcIds.includes(npc.npcId));
+  return present?.name ?? "un testigo";
 }
 
 function combinedOutputText(output: DungeonNarrationOutput) {

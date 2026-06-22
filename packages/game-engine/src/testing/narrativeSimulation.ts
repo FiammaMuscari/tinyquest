@@ -112,7 +112,7 @@ function localNarrationFromResolution(resolution: ActionResolution): NarrationRe
     : result === "partial"
       ? [`${actor} avanza con coste: ${consequence}`, `${actor} consigue una mitad útil, pero paga posición: ${consequence}`, `${actor} sostiene la acción y algo se daña alrededor: ${consequence}`][variantSeed % 3]
       : [`${actor} falla y la complicación se vuelve física: ${consequence}`, `${actor} pierde el pulso del momento: ${consequence}`, `${actor} no logra imponer la acción y el mundo responde: ${consequence}`][variantSeed % 3];
-  const narration = `${resultLine}\n\n${pressure}`.trim();
+  const narration = resultLine.trim();
   const speaker = plan?.npcDirectives.find((npc) => npc.canSpeak);
   const npcDialogue = speaker ? [`${speaker.name}: “Todavía no terminó.”`] : [];
   const options = resolution.narrationRequest.structuredOptions?.slice(0, 3).map((option) => option.label) ?? [];
