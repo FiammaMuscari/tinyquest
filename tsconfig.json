@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": false,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@tiny-quest/game-engine": ["./packages/game-engine/src/index.ts"],
+      "@tiny-quest/ai-master": ["./packages/ai-master/src/index.ts"],
+      "@tiny-quest/atmosphere": ["./packages/atmosphere/src/index.ts"]
+    }
+  },
+  "include": ["apps", "packages"]
+}

@@ -1,0 +1,65 @@
+export type BlueprintGenre = "mystery" | "fantasy" | "horror" | "school" | "pirates" | "dungeon" | "adventure" | "social_intrigue";
+export type CharacterArchetype = "ally" | "victim" | "suspect" | "authority" | "rival" | "traitor" | "mentor" | "monster" | "comic_relief" | "innocent";
+export type LocationFunction = "crime_scene" | "safe_place" | "danger_zone" | "social_hub" | "hidden_room" | "final_stage" | "transition";
+export type ObjectKind = "evidence" | "weapon" | "key" | "relic" | "tool" | "decoy" | "treasure" | "curse_item" | "document";
+export type ThreatType = "social" | "physical" | "magical" | "time" | "moral" | "environmental";
+export type EndingKind = "good_costly" | "partial" | "tragic" | "secret" | "false_victory" | "sacrifice" | "corruption" | "escape";
+export type StoryNodeKind = "setup" | "investigation" | "social_pressure" | "npc_interaction" | "route_choice" | "danger_encounter" | "object_discovery" | "revelation" | "moral_decision" | "combat" | "escape" | "final_confrontation" | "ending";
+export type UniversalActionType = "interrogar_npc" | "confrontar_npc" | "investigar_objeto" | "comparar_evidencia" | "abrir_ruta" | "usar_objeto" | "proteger_aliado" | "combatir" | "negociar" | "mentir" | "sacrificar_recurso" | "decision_moral" | "presentar_prueba" | "descansar";
+
+export type Condition = { kind: "flag" | "clue" | "character" | "object" | "route" | "clock" | "score"; id: string; op?: "eq" | "neq" | "gte" | "lte"; value?: string | number | boolean };
+export type CharacterSeed = { id: string; name: string; role: string; archetype: CharacterArchetype; wants: string; fears: string; secretIds: string[]; startingLocationId: string; startingAttitude: string; relationshipHooks: string[] };
+export type FactionSeed = { id: string; name: string; agenda: string; pressure?: string };
+export type LocationSeed = { id: string; name: string; mood: string; function: LocationFunction; connectedLocationIds: string[]; availableObjectIds: string[]; presentCharacterIds: string[] };
+export type ObjectSeed = { id: string; name: string; kind: ObjectKind; startingLocationId: string; relatedClueIds: string[]; possibleStates: string[]; useCases: string[] };
+export type ClueSeed = { id: string; text: string; sourceType: "character" | "object" | "location" | "event"; sourceId: string; supports: string[]; contradicts: string[]; unlocks: string[] };
+export type SecretSeed = { id: string; text: string; holderIds: string[]; revealedByClueIds?: string[] };
+export type ThreatSeed = { id: string; name: string; type: ThreatType; pressure: string; escalationSteps: string[] };
+export type ClockSeed = { id: string; name: string; max: number; startsAt: number; meaning: string; onMax: string };
+export type EndingSeed = { id: string; title: string; kind: EndingKind; conditions: Condition[]; resultSummary: string };
+export type CampaignRuleSeed = { id: string; text: string };
+
+export type CampaignBlueprint = {
+  id: string;
+  title: string;
+  genre: BlueprintGenre;
+  tone: string[];
+  premise: string;
+  centralConflict: string;
+  dramaticQuestion: string;
+  estimatedMinutes: number;
+  targetSceneCount: number;
+  playerGoal: string;
+  failurePressure: string;
+  cast: CharacterSeed[];
+  factions: FactionSeed[];
+  locations: LocationSeed[];
+  objects: ObjectSeed[];
+  clues: ClueSeed[];
+  secrets: SecretSeed[];
+  threats: ThreatSeed[];
+  clocks: ClockSeed[];
+  endings: EndingSeed[];
+  rules?: CampaignRuleSeed[];
+};
+
+export type ActionOutcomeTemplate = { outcomeId: string; kind: string; factualSummary: string; visibleConsequence: string; patch: UniversalStatePatch; unlockActions?: string[]; lockActions?: string[]; unlockRoutes?: string[]; nextSceneHint?: string; narrationHints: NarrationHints };
+export type NarrationHints = { mustMention: string[]; mustNotMention: string[]; style: string };
+export type StoryAction = { actionId: string; label: string; actionType: UniversalActionType; targetId: string; stat: string; difficulty: number; energyCost: number; tags: string[]; priority: number; once: boolean; mutatesInto?: string[]; prerequisites: Condition[]; forbiddenIf: Condition[]; success: ActionOutcomeTemplate; partial: ActionOutcomeTemplate; failure: ActionOutcomeTemplate };
+export type EscalationEvent = { eventId: string; trigger: Condition[]; patch: UniversalStatePatch; visibleConsequence: string };
+export type SceneNode = { sceneId: string; nodeId: string; kind: StoryNodeKind; title: string; locationId: string; dramaticQuestion: string; objective: string; pressure: string; entryCondition?: Condition[]; exitConditions: Condition[]; defaultNextSceneId?: string; possibleNextSceneIds: string[]; actionPool: StoryAction[]; escalationTable: EscalationEvent[] };
+export type StoryGraph = { campaignId: string; title: string; startNodeId: string; nodes: Record<string, SceneNode>; blueprint: CampaignBlueprint };
+
+export type CharacterRuntimeState = { characterId: string; name: string; role: string; locationId: string; attitude: string; trust: number; fear: number; knowsClueIds: string[]; revealedClueIds: string[]; secrets: string[]; protectedBy?: string; threatenedBy?: string; flags: string[] };
+export type ObjectRuntimeState = { objectId: string; name: string; locationId: string; status: string; holderId?: string; clueIds: string[]; flags: string[] };
+export type ClueRuntimeState = { clueId: string; text: string; status: "hidden" | "revealed" | "confirmed" | "contested"; sourceId: string; revealedBy?: string[] };
+export type LocationRuntimeState = { locationId: string; visited: boolean; presentCharacterIds: string[]; presentObjectIds: string[]; flags: string[] };
+export type RouteRuntimeState = { routeId: string; fromSceneId: string; toSceneId: string; status: "locked" | "available" | "used" | "blocked" | "dangerous"; discoveredBy?: string; risk: number; requiredClueIds?: string[] };
+export type ClockRuntimeState = { clockId: string; value: number; max: number; meaning: string; onMax: string };
+export type RelationshipState = { fromId: string; toId: string; trust: number; tension: number; flags: string[] };
+export type ChoiceRuntimeState = { choiceId: string; baseTemplateId?: string; usedCount: number; lastResult?: "success" | "partial" | "failure"; status: "available" | "used" | "exhausted" | "mutated" | "locked"; producedClueIds: string[]; producedObjectChanges: string[]; producedNpcChanges: string[] };
+export type TurnMemory = { choiceId: string; result: "success" | "partial" | "failure"; patch: UniversalStatePatch; summary: string };
+export type StoryGraphRuntime = { campaignId: string; currentNodeId: string; visitedNodeIds: string[]; flags: Record<string, boolean | number | string>; characterStates: Record<string, CharacterRuntimeState>; objectStates: Record<string, ObjectRuntimeState>; clueStates: Record<string, ClueRuntimeState>; locationStates: Record<string, LocationRuntimeState>; routeStates: Record<string, RouteRuntimeState>; clocks: Record<string, ClockRuntimeState>; relationships: Record<string, RelationshipState>; activeBranches: string[]; closedBranches: string[]; pendingQuestions: string[]; choiceMemory: Record<string, ChoiceRuntimeState>; endingScores: Record<string, number>; lastTurn?: TurnMemory };
+export type UniversalStatePatch = { flags?: Record<string, boolean | number | string>; characterChanges?: Partial<CharacterRuntimeState>[]; objectChanges?: Partial<ObjectRuntimeState>[]; clueChanges?: Partial<ClueRuntimeState>[]; routeChanges?: Partial<RouteRuntimeState>[]; clockChanges?: Array<{ clockId: string; delta: number }>; openBranches?: string[]; closeBranches?: string[]; pendingQuestions?: string[]; endingScoreDelta?: Record<string, number>; nextNodeId?: string };
+export type AvailableChoice = { choiceId: string; label: string; type: UniversalActionType; targetIds: string[]; energyCost: number; risk: "low" | "medium" | "high"; reasonAvailable: string; unlockedBy: string[]; previewHint: string; templateId: string; outcome: { success: ActionOutcomeTemplate; partial: ActionOutcomeTemplate; failure: ActionOutcomeTemplate } };
+export type StoryDebugState = { node: { id: string; title: string; kind: StoryNodeKind }; location: string; npcsPresent: string[]; objectsPresent: string[]; clues: Array<{ id: string; status: string; text: string }>; choices: Array<{ id: string; label: string; reason: string }>; usedChoices: string[]; flags: Record<string, boolean | number | string>; clocks: Record<string, { value: number; max: number; meaning: string }>; branches: { active: string[]; closed: string[]; pendingQuestions: string[] }; endingScores: Record<string, number>; lastPatch?: UniversalStatePatch };

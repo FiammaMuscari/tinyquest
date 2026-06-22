@@ -1,0 +1,100 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import ts from "typescript";
+
+const dir = join(tmpdir(), `tinyquest-llm-budget-${process.pid}`);
+await mkdir(dir, { recursive: true });
+let source = await readFile(new URL("../packages/ai-master/src/llm-budget.ts", import.meta.url), "utf8");
+const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } });
+await writeFile(join(dir, "llm-budget.mjs"), outputText);
+const budget = await import(`file://${join(dir, "llm-budget.mjs")}`);
+
+function plan(overrides = {}) {
+  return {
+    turnId: "turn-1",
+    actorId: "player-1",
+    actorName: "Fiamy",
+    actorKind: "player",
+    actionText: "Interrogar a Tomás sobre la campana",
+    roll: { die: "d20", value: 8, total: 10, dc: 12, result: "partial" },
+    scene: { id: "chapel", title: "Capilla", location: "capilla", phase: "pressure", dangerBefore: 5, dangerAfter: 6 },
+    validContext: { presentNpcIds: ["tomas"], presentObjectIds: ["bell"], knownClueIds: [], availableClueIds: ["bell-after-death"], allowedStats: ["mind"], allowedTargetKinds: ["npc"], targetKind: "npc", targetId: "tomas", usedObjectIds: ["bell"] },
+    mustHappen: ["Tomás se contradice sobre la campana."],
+    mustNotHappen: ["No revelar que Nicolás es inocente todavía."],
+    consequence: { summary: "Tomás mira la campana antes de responder y contradice su horario.", physicalChange: "La campana queda bajo sospecha.", socialChange: "Tomás pierde seguridad.", emotionalChange: "Fiamy gana iniciativa." },
+    cluePolicy: { canRevealNewClue: true, allowedClueIds: ["bell-after-death"], forbiddenClueIds: [], clueRevealMode: "partial" },
+    npcDirectives: [{ npcId: "tomas", name: "Tomás", canSpeak: true, allowedIntentions: ["dudar"], forbiddenClaims: [] }],
+    botDirectives: [{ botId: "bot-1", name: "Belo", emotionalState: "alerta", allowedActions: ["Belo bloquea la puerta"], botIntent: "protect", botEmotion: "loyal" }],
+    uiFocus: { mainEvent: "Tomás se contradice", highlight: "dialogue", showAs: "social_pressure" },
+    memoryPatch: { factsToRemember: [], factsToUpdate: [] },
+    continuityWarnings: [],
+    ...overrides
+  };
+}
+
+test("1) shouldCallGroq bloquea si no hay API key", () => {
+  const oldGroq = process.env.GROQ_API_KEY;
+  const oldVite = process.env.VITE_GROQ_API_KEY;
+  delete process.env.GROQ_API_KEY;
+  delete process.env.VITE_GROQ_API_KEY;
+  try {
+    const decision = budget.shouldCallGroq(plan(), budget.DEFAULT_CHEAP_LLM_POLICY, budget.createLlmBudgetState());
+    assert.equal(decision.allowed, false);
+    assert.equal(decision.reason, "missing-groq-api-key");
+  } finally {
+    if (oldGroq) process.env.GROQ_API_KEY = oldGroq;
+    if (oldVite) process.env.VITE_GROQ_API_KEY = oldVite;
+  }
+});
+
+test("2) shouldCallGroq bloquea bots por default", () => {
+  const decision = budget.shouldCallGroq(plan({ actorId: "bot-1", actorKind: "bot" }), budget.DEFAULT_CHEAP_LLM_POLICY, budget.createLlmBudgetState(), true);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "bot-turns-disabled");
+});
+
+test("3) shouldCallGroq permite turno player major", () => {
+  const decision = budget.shouldCallGroq(plan(), budget.DEFAULT_CHEAP_LLM_POLICY, budget.createLlmBudgetState(), true);
+  assert.equal(decision.allowed, true);
+});
+
+test("4) shouldCallGroq bloquea maxCallsPerRun", () => {
+  const state = budget.createLlmBudgetState({ callsUsed: 3 });
+  const decision = budget.shouldCallGroq(plan(), budget.DEFAULT_CHEAP_LLM_POLICY, state, true);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "max-calls-per-run");
+});
+
+test("5) shouldCallGroq bloquea maxCallsPerScene", () => {
+  const state = budget.createLlmBudgetState({ callsUsed: 1, callsUsedByScene: { chapel: 2 } });
+  const decision = budget.shouldCallGroq(plan(), budget.DEFAULT_CHEAP_LLM_POLICY, state, true);
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "max-calls-per-scene");
+});
+
+test("6-8) prompt compacto contiene contrato y respeta maxPromptChars", () => {
+  const prompt = budget.buildCompactGroqPrompt(plan());
+  assert.match(prompt, /Tomás se contradice/);
+  assert.match(prompt, /No revelar/);
+  assert.match(prompt, /Tomás mira la campana/);
+  assert.ok(prompt.length <= budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars);
+  assert.doesNotMatch(prompt, /recentSessionLog|sessionLog|memorySummary|campaignStory/);
+});
+
+test("9) cacheKey cambia si cambia consequence.summary", () => {
+  const one = budget.getNarrationCacheKey(plan());
+  const two = budget.getNarrationCacheKey(plan({ consequence: { ...plan().consequence, summary: "Otra consecuencia concreta." } }));
+  assert.notEqual(one, two);
+});
+
+test("10) recordSkippedCall registra fallback esperado cuando Groq no está permitido", () => {
+  const state = budget.createLlmBudgetState();
+  const p = plan({ actorId: "bot-1", actorKind: "bot" });
+  const decision = budget.shouldCallGroq(p, budget.DEFAULT_CHEAP_LLM_POLICY, state, true);
+  assert.equal(decision.allowed, false);
+  budget.recordSkippedCall(state, p, decision.reason);
+  assert.deepEqual(state.skippedCalls[0], { reason: "bot-turns-disabled", actorId: "bot-1", sceneId: "chapel", turnId: "turn-1" });
+});
