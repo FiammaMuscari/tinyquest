@@ -1,4 +1,4 @@
-import type { ResolutionPlan } from "@tiny-quest/game-engine";
+import type { NarrationRequest, ResolutionPlan } from "@tiny-quest/game-engine";
 
 export interface LlmBudgetPolicy {
   enabled: boolean;
@@ -26,13 +26,13 @@ export interface LlmBudgetState {
 
 export const DEFAULT_CHEAP_LLM_POLICY: LlmBudgetPolicy = {
   enabled: true,
-  maxCallsPerRun: 3,
-  maxCallsPerScene: 2,
-  maxPromptChars: 6000,
-  maxOutputChars: 2500,
+  maxCallsPerRun: 16,
+  maxCallsPerScene: 6,
+  maxPromptChars: 6500,
+  maxOutputChars: 3200,
   useGroqForPlayerTurns: true,
   useGroqForBotTurns: false,
-  useGroqForMajorMomentsOnly: true,
+  useGroqForMajorMomentsOnly: false,
   cacheEnabled: true,
   retryOnInvalidJson: false
 };
@@ -79,7 +79,40 @@ function short(value: string | undefined, max = 220) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_CHEAP_LLM_POLICY.maxPromptChars) {
+function buildNarrativeStoryContext(input: NarrationRequest) {
+  const campaign = input.selectedCampaign;
+  const memory = input.memorySummary;
+  if (!campaign) return undefined;
+  const sceneClueIds = input.currentScene.clueIds ?? [];
+  const sceneObjects = campaign.storyObjects
+    ?.filter((o) => sceneClueIds.some((c) => o.relatedClues?.includes(c)) || o.location?.toLowerCase().includes(input.currentScene.id))
+    .slice(0, 3)
+    .map((o) => ({ name: o.name, desc: short(o.description, 90), status: o.status }));
+  const activeTwist = memory.currentTwist ? short(memory.currentTwist, 140) : undefined;
+  const pendingTwists = campaign.twists
+    ?.filter((t) => !input.storyFlags.includes(`twist:${t.id}:revealed`))
+    .slice(0, 2)
+    .map((t) => ({ trigger: t.trigger, hint: short(t.reveal, 100) }));
+  const narrativeDirective = activeTwist
+    ? "Giro activo: tejelo como señal oblicua en la narración, nunca revelación directa."
+    : pendingTwists?.length
+      ? "Hay giros pendientes: genera tensión que insinúe revelaciones futuras sin revelarlas."
+      : "Narrá con objeto físico de la escena, tensión emocional entre personajes y riesgo concreto.";
+  return {
+    sceneObjects: sceneObjects?.length ? sceneObjects : undefined,
+    activeTwist,
+    pendingTwists: pendingTwists?.length ? pendingTwists : undefined,
+    moralPressure: short(campaign.moralDilemmas?.[0], 140),
+    graveConsequence: short(campaign.graveConsequences?.[0], 110),
+    openThreads: memory.unresolvedThreads?.slice(0, 2),
+    bonds: memory.bonds?.slice(0, 2),
+    suspects: memory.suspects?.slice(0, 2),
+    narrativeDirective
+  };
+}
+
+export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input?: NarrationRequest) {
+  const storyContext = input ? buildNarrativeStoryContext(input) : undefined;
   const payload = {
     contract: "DungeonNarrationOutput JSON only",
     actor: { id: plan.actorId, name: plan.actorName, kind: plan.actorKind },
@@ -94,11 +127,13 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     botDirectives: plan.botDirectives.slice(0, 2).map((bot) => ({ botId: bot.botId, name: bot.name, allowedActions: bot.allowedActions.slice(0, 2), intent: bot.botIntent, emotion: bot.botEmotion })),
     npcDirectives: plan.npcDirectives.slice(0, 3).map((npc) => ({ npcId: npc.npcId, name: npc.name, canSpeak: npc.canSpeak, allowedIntentions: npc.allowedIntentions.slice(0, 3) })),
     uiFocus: plan.uiFocus,
-    rules: ["Obedecer consequence.summary exacto.", "No inventar NPCs, objetos, pistas ni ubicaciones.", "No cambiar dado ni resultado.", "No revelar mustNotHappen.", "No usar clueReveals si cluePolicy.canRevealNewClue=false."]
+    storyContext,
+    rules: ["Obedecer consequence.summary exacto.", "No inventar NPCs, objetos, pistas ni ubicaciones.", "No cambiar dado ni resultado.", "No revelar mustNotHappen.", "No usar clueReveals si cluePolicy.canRevealNewClue=false.", "Usar storyContext para enriquecer narración: objetos físicos, giros oblicuos, tensión emocional entre personajes."]
   };
   const text = JSON.stringify(payload);
   if (text.length <= maxChars) return text;
-  return JSON.stringify({ ...payload, mustHappen: payload.mustHappen.slice(0, 2), mustNotHappen: payload.mustNotHappen.slice(0, 2), botDirectives: [], npcDirectives: payload.npcDirectives.slice(0, 2) }).slice(0, maxChars);
+  const slim = { ...payload, storyContext: storyContext ? { narrativeDirective: storyContext.narrativeDirective, activeTwist: storyContext.activeTwist } : undefined, mustHappen: payload.mustHappen.slice(0, 2), mustNotHappen: payload.mustNotHappen.slice(0, 2), botDirectives: [], npcDirectives: payload.npcDirectives.slice(0, 2) };
+  return JSON.stringify(slim).slice(0, maxChars);
 }
 
 export function getNarrationCacheKey(plan: ResolutionPlan): string {
