@@ -868,13 +868,11 @@ export function App() {
       <HelpButton open={showHelp} setOpen={setShowHelp} />
       {room.sessionComplete && <FinalBanner room={room} onBackToCampaigns={() => setRoom(null)} onReplayRoute={startSolo} />}
       <section className="gameFrame">
-        <TurnQueue room={room} draft={draft} />
+        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         <section className="centerColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} danger={scene.danger} hasCombat={Boolean(scene.hasCombat)} enemyName={room.campaign.enemies.find((enemy) => scene.enemyIds?.includes(enemy.id))?.name} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={isBotTurn(room) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} atmosphereTags={scene.atmosphere.atmosphereTags} energy={currentCharacter.energy} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={isBotTurn(room) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy} botTurnPaused={botTurnPaused} turnError={turnError} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={() => runTurn()} runBot={runBotTurn} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
-          <SceneMemoryPanel room={room} sceneClue={scene.mysteryClue} />
-          <AmbienceControl audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         </section>
         <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
       </section>
@@ -965,7 +963,7 @@ function StatusPill({ label, value, accent = false }: { label: string; value: st
   return <div className={`statusPill ${accent ? "accent" : ""}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function TurnQueue({ room, draft }: { room: GameRoom | null; draft: Character }) {
+function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume }: { room: GameRoom | null; draft: Character; audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (v: boolean) => void; volume: number; setVolume: (v: number) => void }) {
   const players = room?.players ?? [{ id: "preview", name: draft.name, type: "human" as const, character: draft, temporaryItems: [] }];
   return (
     <aside className="panel turnQueue">
@@ -981,25 +979,32 @@ function TurnQueue({ room, draft }: { room: GameRoom | null; draft: Character })
           </article>
         );
       })}
+      <div className="queueAudio">
+        <audio ref={audioRef} src={audioUrl} onError={() => setPlaying(false)} />
+        <button className="iconButton queueAudioBtn" type="button" onClick={() => setPlaying(!isPlaying)} title={isPlaying ? "Pausar" : "Reproducir"}>
+          {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+        </button>
+        <div className="queueAudioInfo">
+          <strong>{ambienceName}</strong>
+          <span>{mood.slice(0, 60)}</span>
+        </div>
+        <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="queueAudioVol" />
+      </div>
     </aside>
   );
 }
 
-function ScenePanel({ sceneTitle, objective, danger, hasCombat, enemyName, clues, choices, selectedActionDraftId, onChoice, imageUrl, atmosphereTags, energy }: { sceneTitle: string; objective: string; danger: string; hasCombat: boolean; enemyName?: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; atmosphereTags: string[]; energy: number }) {
-  const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.78), rgba(5,8,18,.18)), url(${imageUrl})`;
+function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number }) {
+  const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.22)), url(${imageUrl})`;
   return (
     <section className="panel scenePanel">
-      <PanelTitle title="Escena" icon={<Sparkles size={17} />} />
       <div className="sceneImage" style={{ backgroundImage: sceneBg }}>
-        <div><h2>{sceneTitle}</h2><p>{objective}</p></div>
+        <div>
+          <h2>{sceneTitle}</h2>
+          <p>{objective}</p>
+          {clues[0] && <span className="sceneClueInline">🔍 {clues[0]}</span>}
+        </div>
       </div>
-      <div className="sceneBriefGrid">
-        <div><strong>Objetivo</strong><p>{objective}</p></div>
-        <div><strong>Pista</strong><p>{clues[0] ?? "Todavía no hay pista segura."}</p></div>
-        <div><strong>{hasCombat ? "Combate" : "Peligro"}</strong><p>{hasCombat ? `Puede estallar contra ${enemyName ?? "una amenaza"}. Atacar y defender tienen resolución propia.` : danger}</p></div>
-      </div>
-      {clues.length > 1 && <div className="clueRow">{clues.slice(1).map((clue) => <span key={clue}>{clue}</span>)}</div>}
-      <div className="tagRow">{atmosphereTags.map((tag) => <span key={tag}>{tag}</span>)}</div>
       <div className="choiceGrid">
         {choices.map((choice) => {
           const energyCost = getActionEnergyCost(choice);
@@ -1076,12 +1081,6 @@ function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "
             <label className="statSelectCompact">Stat<select value={props.selectedStat} onChange={(event) => props.setSelectedStat(event.target.value as StatKey)} disabled={isBot || props.busy}>{allowedStats.map((stat) => <option key={stat} value={stat}>{statLabels[stat]} +{props.character.stats[stat]}</option>)}</select></label>
             <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy} /> Mascota d4</label>
             <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={!isBot && (props.busy || !canPaySelectedAction)}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Resolviendo..." : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : "Tirar dados"}</button>
-          </div>
-          <div className="diceRuleHint compactRules">
-            <span><strong>d20</strong> acción + stat</span>
-            <span><strong>energía</strong> coste {selectedEnergyCost}</span>
-            <span><strong>d4</strong> {willRollD4 ? "activo" : "creatividad/mascota"}</span>
-            <span><strong>d6</strong> coste narrativo</span>
           </div>
           {props.turnError && <p className="turnError">{props.turnError}</p>}
         </>
@@ -1244,15 +1243,14 @@ function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTur
           </>}
       {botTurnPaused && <button className="primaryButton dmContinueButton" type="button" onClick={onContinueBot}>Continuar turno del bot</button>}
       <NarrativeHistory room={room} />
-      {plotBeat && <details className="dmMinorDetails"><summary>Beat narrativo</summary><PlotBeatPanel beat={plotBeat} /></details>}
-      <details className="dmMinorDetails"><summary>Memoria / pistas</summary><MemoryPanel room={room} /></details>
+      <details className="dmMinorDetails" open><summary>Memoria / pistas</summary><MemoryPanel room={room} /></details>
       {finalRecap && <NarratorSection title="Recap" text={finalRecap} />}
     </aside>
   );
 }
 
 function TurnStoryCard({ turn, sceneTitle, dice }: { turn: CinematicTurn; sceneTitle: string; dice: DiceSnapshot | null }) {
-  const narration = getTurnNarration(turn);
+  const narration = turn.event?.narration ?? getTurnNarration(turn);
   const paragraphs = narration.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean);
   const dialogueLines = getTurnDialogue(turn);
   const clues = getTurnClueReveals(turn);
@@ -1269,11 +1267,11 @@ function TurnStoryCard({ turn, sceneTitle, dice }: { turn: CinematicTurn; sceneT
       )}
       <DiceOutcomeCard turn={turn} dice={dice} />
       <div className="turnNarrationText cinematicNarration">
-        {paragraphs.slice(0, 2).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+        {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
       </div>
       {dialogueLines.length > 0 && (
         <div className="inlineDialogue">
-          {dialogueLines.slice(0, 2).map((line, index) => (
+          {dialogueLines.map((line, index) => (
             <p key={index}><strong>{line.speaker}:</strong> "{line.line.replace(/^[""]|[""]$/g, "")}"</p>
           ))}
         </div>
@@ -1549,54 +1547,55 @@ function DiceResultBar({ dice, activePlayerId }: { dice: DiceSnapshot | null; ac
   if (!dice) {
     return (
       <section className="panel diceBar diceBarEmpty">
-        <PanelTitle title="Resolución actual" icon={<Dices size={17} />} />
-        <div className="emptyResolution">
-          <strong>Elegí una acción y tirá dados.</strong>
-          <span>Después de tirar vas a ver acá el d20, el bonus d4 si aplica, el coste d6 y el total contra dificultad.</span>
-        </div>
+        <PanelTitle title="Resolución" icon={<Dices size={17} />} />
+        <p className="diceBarHint">Elegí una acción y tirá dados.</p>
       </section>
     );
   }
 
   const d20 = dice.check.d20.value;
-  const d4 = dice.check.creativeBonus?.value ?? "-";
-  const d6 = dice.consequenceRoll ?? "-";
+  const d4val = dice.check.creativeBonus?.value ?? null;
+  const d6val = dice.consequenceRoll ?? null;
   const breakdown = dice.check.rollBreakdown;
-  const hasCostRoll = Boolean(dice.consequenceRoll);
   const formula = `${breakdown.d20} d20 +${breakdown.statModifier} ${statLabels[dice.stat]} +${breakdown.d4Bonus} d4 = ${breakdown.total} vs ${dice.check.difficulty}`;
 
   return (
     <section className="panel diceBar">
       <PanelTitle title={isPreviousTurn ? "Última resolución" : "Resolución actual"} icon={<Dices size={17} />} />
-      <div className="resolutionBoard">
-        <div className="resolutionMeta">
-          <strong>{dice.player}{isPreviousTurn ? " · turno anterior" : ""}</strong>
-          <span>{statLabels[dice.stat]}</span>
-          <small>{dice.action}</small>
+      <div className="diceBarInner">
+        <div className="diceBarLeft">
+          <strong>{dice.player}{isPreviousTurn ? " · anterior" : ""}</strong>
+          <span className={`statChip stat-${dice.stat}`}>{statLabels[dice.stat]}</span>
         </div>
-        <DiceTile kind="d20" label="d20" value={d20} reason="Acción" />
-        <DiceTile kind="d4" label="d4" value={d4} muted={!dice.check.creativeBonus} reason={dice.check.creativeBonus ? "Bonus" : "Sin bonus"} />
-        <DiceTile kind="d6" label="d6" value={d6} muted={!hasCostRoll} reason={hasCostRoll ? "Coste" : "Sin coste"} />
-        <div className="resolutionTotal"><span>Total</span><strong>{dice.check.total}</strong><small>vs {dice.check.difficulty}</small></div>
-        <div className={`resolutionOutcome ${dice.check.outcome}`}><span>{translateOutcome(dice.check.outcome)}</span></div>
-        <p className="resolutionNote">
-          {formula} → {translateOutcome(dice.check.outcome)}.
-          {dice.combatNote ? ` ${dice.combatNote}` : dice.consequence ? ` Coste d6: ${dice.consequence}` : ""}
-        </p>
+        <div className="diceBarFaces">
+          <DiceBadge kind="d20" value={d20} />
+          <DiceBadge kind="d4" value={d4val ?? "—"} muted={!d4val} />
+          <DiceBadge kind="d6" value={d6val ?? "—"} muted={!d6val} />
+        </div>
+        <div className="diceBarTotal">
+          <strong>{dice.check.total}</strong>
+          <small>vs {dice.check.difficulty}</small>
+        </div>
+        <div className={`diceBarOutcome ${dice.check.outcome}`}>
+          {translateOutcome(dice.check.outcome)}
+        </div>
+      </div>
+      <div className="diceBarFormula">
+        <small>{dice.action}</small>
+        <code>{formula}{dice.combatNote ? ` · ${dice.combatNote}` : dice.consequence ? ` · coste d6: ${dice.consequence}` : ""}</code>
       </div>
     </section>
   );
 }
 
-
-function DiceTile({ kind, label, value, reason, muted = false }: { kind: "d20" | "d4" | "d6"; label: string; value: number | string; reason: string; muted?: boolean }) {
+function DiceBadge({ kind, value, muted = false }: { kind: "d20" | "d4" | "d6"; value: number | string; muted?: boolean }) {
   return (
-    <span className={`diceTile ${kind} ${muted ? "muted" : ""}`}>
-      <span className="diceImageWrap">
+    <span className={`diceBadge ${kind} ${muted ? "muted" : ""}`}>
+      <span className="diceBadgeWrap">
         <img src={`/assets/dice/${kind}.webp`} alt="" aria-hidden="true" />
         <strong>{value}</strong>
       </span>
-      <span className="diceText"><small>{label}</small><em>{reason}</em></span>
+      <small>{kind}</small>
     </span>
   );
 }
