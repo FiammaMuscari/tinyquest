@@ -47,11 +47,19 @@ const statLabels: Record<StatKey, string> = {
   luck: "suerte"
 };
 
+const statAbbr: Record<StatKey, string> = {
+  body: "CUE",
+  mind: "MEN",
+  charm: "CAR",
+  creativity: "CRE",
+  courage: "COR",
+  focus: "ENF",
+  luck: "SUE"
+};
+
 const avatarOptions = ["/assets/avatars/avatar-1.webp", "/assets/avatars/avatar-2.webp", "/assets/avatars/avatar-3.webp", "/assets/avatars/avatar-4.webp", "/assets/avatars/avatar-5.webp"];
 
 const DICE_REVEAL_MS = 1250;
-const BOT_TURN_DELAY_MS = 1750;
-
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
@@ -187,22 +195,22 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
   const successLines: Record<string, string[]> = {
     investigation: [
       `${playerName}${roleHint} levanta ${texture.object} ${place} y limpia el barro con el borde de la manga. Aparecen ${texture.sign}; ${texture.witness}.${petHint}`,
-      `${playerName} examina ${texture.object} sin mover el cadaver. ${texture.sign} quedan a la vista, y ${texture.witness}.`
+      `${playerName} examina ${texture.object} sin mover el cadáver. ${texture.sign} quedan a la vista, y ${texture.witness}.`
     ],
     occult: [
       `${playerName} sigue el rastro invisible hasta donde la magia empieza a parecer culpa. La señal no nombra al asesino, pero separa la mentira del ruido.${petHint}`,
-      `${playerName} obliga al hechizo a mostrar su borde. Por un instante, el bosque parece recordar quien lo uso como coartada.`
+      `${playerName} obliga al hechizo a mostrar su borde. Por un instante, el bosque parece recordar quién lo usó como coartada.`
     ],
     combat: [
-      `${playerName} enfrenta la amenaza sin romper la escena. La bestia retrocede lo justo para revelar que no es el unico monstruo de esta historia.`,
-      `${playerName} clava los pies entre raices mojadas y obliga a la criatura a torcer el salto. En la corteza queda una astilla negra que no pertenece a ningun animal.`
+      `${playerName} enfrenta la amenaza sin romper la escena. La bestia retrocede lo justo para revelar que no es el único monstruo de esta historia.`,
+      `${playerName} clava los pies entre raíces mojadas y obliga a la criatura a torcer el salto. En la corteza queda una astilla negra que no pertenece a ningún animal.`
     ],
     social: [
-      `${playerName} baja la violencia de la sala lo suficiente para que una verdad respire. Nadie perdona todavia, pero alguien deja de mentir con tanta seguridad.`,
+      `${playerName} baja la violencia de la sala lo suficiente para que una verdad respire. Nadie perdona todavía, pero alguien deja de mentir con tanta seguridad.`,
       `${playerName} compra silencio, y el silencio compra tiempo. La multitud no se vuelve justa, pero por un momento vuelve a escuchar.`
     ],
     defense: [
-      `${playerName} protege lo unico que no puede defenderse: la prueba. Desde ese gesto, la acusacion pierde parte de su teatro.`,
+      `${playerName} protege lo único que no puede defenderse: la prueba. Desde ese gesto, la acusación pierde parte de su teatro.`,
       `${playerName} pone el cuerpo entre la escena y quienes quieren deformarla. La verdad queda maltrecha, pero sigue viva.`
     ],
     mystery: [
@@ -210,13 +218,13 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
       `${playerName} fuerza ${texture.path}; ${texture.placeDetail} cambia de manos y deja una marca visible para el grupo.`
     ],
     route: [
-      `${playerName} cruza ${texture.path} y encuentra ${texture.sign}. ${capitalizeSentence(texture.placeDetail)}; la salida queda abierta, pero alguien la habia usado antes.`,
+      `${playerName} cruza ${texture.path} y encuentra ${texture.sign}. ${capitalizeSentence(texture.placeDetail)}; la salida queda abierta, pero alguien la había usado antes.`,
       `${playerName} aparta ${texture.object} del paso y descubre una marca reciente. ${capitalizeSentence(texture.witness)}. No fueron los primeros en usar esa salida.`
     ]
   };
   const partialLines: Record<string, string[]> = {
     investigation: [
-      `${playerName} distingue parte de ${texture.sign} ${place}, pero el barro tapa el resto. ${texture.witness}, aunque todavia no se atreve a hablar.`,
+      `${playerName} distingue parte de ${texture.sign} ${place}, pero el barro tapa el resto. ${texture.witness}, aunque todavía no se atreve a hablar.`,
       `${playerName} rescata ${texture.object} antes de que lo pisen. Sirve como indicio, no como sentencia: falta compararlo con una voz viva.`
     ],
     occult: [
@@ -224,7 +232,7 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
       `La magia responde a ${playerName} con una obediencia torcida. Muestra el camino, aunque no promete que el camino quiera ser seguido.`
     ],
     combat: [
-      `${playerName} sobrevive al choque y arranca una ventaja pequena. La bestia no cae; aprende el ritmo del grupo.`,
+      `${playerName} sobrevive al choque y arranca una ventaja pequeña. La bestia no cae; aprende el ritmo del grupo.`,
       `El combate no termina, pero cambia de dueño por un instante. ${playerName} gana aire, y la amenaza gana memoria.`
     ],
     social: [
@@ -232,34 +240,34 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
       `La palabra de ${playerName} calma una llama y enciende otra. La aldea concede tiempo, no inocencia.`
     ],
     defense: [
-      `${playerName} salva parte de la escena, no toda. Lo perdido dolera despues; lo conservado todavia puede salvar a alguien.`,
-      `La defensa aguanta, pero deja una marca. Quienes miran ya saben donde tendran que golpear la proxima vez.`
+      `${playerName} salva parte de la escena, no toda. Lo perdido dolerá después; lo conservado todavía puede salvar a alguien.`,
+      `La defensa aguanta, pero deja una marca. Quienes miran ya saben dónde tendrán que golpear la próxima vez.`
     ],
     mystery: [
-      `${playerName} obtiene una mitad util: ${texture.sign}. ${texture.witness} exige algo antes de dejarla valer como prueba.`,
+      `${playerName} obtiene una mitad útil: ${texture.sign}. ${texture.witness} exige algo antes de dejarla valer como prueba.`,
       `${subject} deja una salida incompleta; ${texture.placeDetail} permite avanzar, pero alguien puede contaminar la pista.`
     ],
     route: [
       `${playerName} abre paso por ${texture.path}, aunque una rama baja arranca tela y deja rastro. La ruta existe, pero ya no es secreta.`,
-      `${playerName} encuentra el giro estrecho entre ${texture.object} y barro fresco. Sirve para avanzar; tambien delata que alguien lo uso antes.`
+      `${playerName} encuentra el giro estrecho entre ${texture.object} y barro fresco. Sirve para avanzar; también delata que alguien lo usó antes.`
     ]
   };
   const failureLines: Record<string, string[]> = {
     investigation: [
-      `${playerName} mueve ${texture.object} y ${texture.damage} sobre ${texture.sign}. La prueba no desaparece, pero queda facil de negar.`,
+      `${playerName} mueve ${texture.object} y ${texture.damage} sobre ${texture.sign}. La prueba no desaparece, pero queda fácil de negar.`,
       `${playerName} busca una marca limpia y solo encuentra agua sucia. ${texture.witness}, aprovechando el ruido, retrocede hacia la gente.`
     ],
     occult: [
       `${playerName} fuerza el rastro y la magia se cierra como una mano. Nada desaparece, pero todo queda menos dispuesto a hablar.${petHint}`,
-      `El hechizo no se deja leer; castiga la prisa con silencio. ${playerName} entiende que la verdad tambien sabe esconderse.`
+      `El hechizo no se deja leer; castiga la prisa con silencio. ${playerName} entiende que la verdad también sabe esconderse.`
     ],
     combat: [
-      `${playerName} entra al choque y la amenaza aprende demasiado. No es derrota final, pero si una leccion que el enemigo usara.`,
+      `${playerName} entra al choque y la amenaza aprende demasiado. No es derrota final, pero sí una lección que el enemigo usará.`,
       `La bestia no vence por fuerza, sino por tiempo: se mueve, mide al grupo y deja el miedo trabajando por ella.`
     ],
     social: [
       `${playerName} hace la pregunta en voz alta, pero la sala ya eligió a quién creer. El miedo pesa más que la duda.`,
-      `La conversacion falla donde mas dolia: nadie cambia de bando, solo de mascara.`
+      `La conversación falla donde más dolía: nadie cambia de bando, solo de máscara.`
     ],
     defense: [
       `${playerName} llega un instante tarde. Algo queda protegido, pero otra cosa se rompe en manos de quienes necesitaban destruirla.`,
@@ -408,55 +416,55 @@ function nextLocalOptions(sceneTitle = "") {
 function narrativeBeatLine(mood: string, outcome: CheckResult["outcome"], count: number, playerName: string) {
   const step = Math.min(count, 3);
   const combat = [
-    "El primer choque mide fuerzas; todavia nadie entiende por completo que quiere la criatura.",
+    "El primer choque mide fuerzas; todavía nadie entiende por completo qué quiere la criatura.",
     "La amenaza ya reconoce el ritmo del grupo y empieza a atacar sus dudas, no solo sus cuerpos.",
     outcome === "success"
-      ? "La herida o la retirada abre una lectura nueva: la bestia fue empujada a actuar por alguien mas."
-      : "La criatura conserva la iniciativa y obliga al grupo a decidir si perseguirla o proteger lo que ya gano.",
-    "Este combate ya no puede estirarse sin costo: debe cerrar una verdad, una huida o una perdida."
+      ? "La herida o la retirada abre una lectura nueva: la bestia fue empujada a actuar por alguien más."
+      : "La criatura conserva la iniciativa y obliga al grupo a decidir si perseguirla o proteger lo que ya ganó.",
+    "Este combate ya no puede estirarse sin costo: debe cerrar una verdad, una huida o una pérdida."
   ];
   const investigation = [
-    "La primera pieza separa sospecha de supersticion.",
-    "La segunda repeticion ya no descubre lo mismo: confirma que hubo preparacion y no impulso.",
+    "La primera pieza separa sospecha de superstición.",
+    "La segunda repetición ya no descubre lo mismo: confirma que hubo preparación y no impulso.",
     outcome === "success"
-      ? "Con esa confirmacion, la pista deja de ser indicio y empieza a ser acusacion posible."
-      : "La prueba queda cerca de volverse acusacion, pero aun le falta una voz, un objeto o una contradiccion.",
+      ? "Con esa confirmación, la pista deja de ser indicio y empieza a ser acusación posible."
+      : "La prueba queda cerca de volverse acusación, pero aún le falta una voz, un objeto o una contradicción.",
     "Insistir sobre la misma pista ahora debe abrir una nueva ruta o bloquearse como agotada."
   ];
   const occult = [
     "El primer contacto con la magia revela una firma, no una respuesta.",
-    "El rastro se estrecha: ya no apunta al bosque entero, sino a una voluntad que lo uso.",
+    "El rastro se estrecha: ya no apunta al bosque entero, sino a una voluntad que lo usó.",
     outcome === "success"
-      ? "La magia deja de ser ambiente y se vuelve testimonio: alguien la invoco con proposito."
+      ? "La magia deja de ser ambiente y se vuelve testimonio: alguien la invocó con propósito."
       : "El hechizo cobra precio por cada lectura y empieza a reconocer a quienes lo persiguen.",
-    "Seguir forzando la misma magia debe llevar a una revelacion mayor o a una consecuencia irreversible."
+    "Seguir forzando la misma magia debe llevar a una revelación mayor o a una consecuencia irreversible."
   ];
   const social = [
     "La primera palabra compra tiempo.",
     "La segunda cambia alianzas: alguien calla menos y otro escucha demasiado.",
-    "La conversacion ya tiene bandos; lo que se diga ahora puede salvar o condenar a alguien.",
-    "La sala no aceptara mas demora: exige promesa, prueba o sacrificio."
+    "La conversación ya tiene bandos; lo que se diga ahora puede salvar o condenar a alguien.",
+    "La sala no aceptará más demora: exige promesa, prueba o sacrificio."
   ];
   const defense = [
     "La primera defensa conserva margen.",
-    "La segunda obliga al enemigo a mostrar por donde queria entrar.",
-    "La proteccion ya tiene forma politica: defender la prueba tambien acusa a quien queria tocarla.",
+    "La segunda obliga al enemigo a mostrar por dónde quería entrar.",
+    "La protección ya tiene forma política: defender la prueba también acusa a quien quería tocarla.",
     "A partir de ahora, defender sin avanzar solo compra segundos caros."
   ];
   const mystery = [
-    "La primera marca separa supersticion de montaje.",
-    "La prueba repetida ya exige testigo, objeto o contradiccion: mirarla otra vez no alcanza.",
+    "La primera marca separa superstición de montaje.",
+    "La prueba repetida ya exige testigo, objeto o contradicción: mirarla otra vez no alcanza.",
     outcome === "success"
-      ? "La confirmacion permite acusar una mano concreta, no una sombra conveniente."
-      : "La pista sobrevive, pero necesita proteccion antes de que alguien la vuelva inutil.",
-    "Insistir sin cambiar de metodo agotara la accion y forzara una ruta mas cara."
+      ? "La confirmación permite acusar una mano concreta, no una sombra conveniente."
+      : "La pista sobrevive, pero necesita protección antes de que alguien la vuelva inútil.",
+    "Insistir sin cambiar de método agotará la acción y forzará una ruta más cara."
   ];
   const route = [
-    "El paso nuevo no es limpio: deja barro removido y una decision atras.",
+    "El paso nuevo no es limpio: deja barro removido y una decisión atrás.",
     "La ruta descubierta cambia la escena porque conecta objeto, testigo y riesgo inmediato.",
     outcome === "success"
-      ? "El grupo ya puede avanzar, pero la ruta revela que alguien la habia preparado antes."
-      : "La ruta queda cerca, no segura; abrirla otra vez costara peligro u objeto.",
+      ? "El grupo ya puede avanzar, pero la ruta revela que alguien la había preparado antes."
+      : "La ruta queda cerca, no segura; abrirla otra vez costará peligro u objeto.",
     "El camino no debe repetirse: ahora toca entrar, sellarlo o usarlo como cebo."
   ];
   return ({ combat, investigation, occult, social, defense, mystery, route } as Record<string, string[]>)[mood]?.[step] ?? `${playerName} deja una consecuencia visible en la escena.`;
@@ -554,6 +562,7 @@ export function App() {
   const scene = sceneList[room?.currentSceneIndex ?? 0];
   const visibleChoices = useMemo(() => room ? getVisibleActionChoices(scene, room) : scene.actionChoices, [room, scene]);
   const activePlayer = room?.players[room.activePlayerIndex];
+  const botTurnPaused = Boolean(room && activePlayer?.type === "bot" && !busy && !turnInFlightRef.current && !room.sessionComplete);
   const selectedActionDraft = isHumanTurn(room) || !room ? (visibleChoices.find((choice) => choice.id === selectedActionDraftId) ?? visibleChoices[0] ?? scene.actionChoices[0]) : undefined;
   const selectedChoice = selectedActionDraft ?? visibleChoices[0] ?? scene.actionChoices[0];
   const currentCharacter = activePlayer?.character ?? draft;
@@ -838,11 +847,6 @@ export function App() {
     await runTurn(chooseVisibleBotAction(bot, scene, room), stat);
   }
 
-  useEffect(() => {
-    if (!room || !isBotTurn(room) || busy || turnInFlightRef.current || room.sessionComplete) return;
-    const timeout = window.setTimeout(() => { void runBotTurn(); }, BOT_TURN_DELAY_MS);
-    return () => window.clearTimeout(timeout);
-  }, [room?.activePlayerIndex, room?.turn, room?.currentSceneIndex, busy]);
 
   if (!room) {
     return (
@@ -864,15 +868,13 @@ export function App() {
       <HelpButton open={showHelp} setOpen={setShowHelp} />
       {room.sessionComplete && <FinalBanner room={room} onBackToCampaigns={() => setRoom(null)} onReplayRoute={startSolo} />}
       <section className="gameFrame">
-        <TurnQueue room={room} draft={draft} />
+        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         <section className="centerColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} danger={scene.danger} hasCombat={Boolean(scene.hasCombat)} enemyName={room.campaign.enemies.find((enemy) => scene.enemyIds?.includes(enemy.id))?.name} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={isBotTurn(room) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} atmosphereTags={scene.atmosphere.atmosphereTags} energy={currentCharacter.energy} />}
-          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy} turnError={turnError} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={() => runTurn()} runBot={runBotTurn} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={isBotTurn(room) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} />}
+          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy} botTurnPaused={botTurnPaused} turnError={turnError} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={() => runTurn()} runBot={runBotTurn} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
-          <SceneMemoryPanel room={room} sceneClue={scene.mysteryClue} />
-          <AmbienceControl audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         </section>
-        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} options={nextOptions} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
+        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
       </section>
     </main>
   );
@@ -961,7 +963,7 @@ function StatusPill({ label, value, accent = false }: { label: string; value: st
   return <div className={`statusPill ${accent ? "accent" : ""}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function TurnQueue({ room, draft }: { room: GameRoom | null; draft: Character }) {
+function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume }: { room: GameRoom | null; draft: Character; audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (v: boolean) => void; volume: number; setVolume: (v: number) => void }) {
   const players = room?.players ?? [{ id: "preview", name: draft.name, type: "human" as const, character: draft, temporaryItems: [] }];
   return (
     <aside className="panel turnQueue">
@@ -977,25 +979,32 @@ function TurnQueue({ room, draft }: { room: GameRoom | null; draft: Character })
           </article>
         );
       })}
+      <div className="queueAudio">
+        <audio ref={audioRef} src={audioUrl} onError={() => setPlaying(false)} />
+        <button className="iconButton queueAudioBtn" type="button" onClick={() => setPlaying(!isPlaying)} title={isPlaying ? "Pausar" : "Reproducir"}>
+          {isPlaying ? <Pause size={13} /> : <Play size={13} />}
+        </button>
+        <div className="queueAudioInfo">
+          <strong>{ambienceName}</strong>
+          <span>{mood.slice(0, 60)}</span>
+        </div>
+        <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="queueAudioVol" />
+      </div>
     </aside>
   );
 }
 
-function ScenePanel({ sceneTitle, objective, danger, hasCombat, enemyName, clues, choices, selectedActionDraftId, onChoice, imageUrl, atmosphereTags, energy }: { sceneTitle: string; objective: string; danger: string; hasCombat: boolean; enemyName?: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; atmosphereTags: string[]; energy: number }) {
-  const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.78), rgba(5,8,18,.18)), url(${imageUrl})`;
+function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number }) {
+  const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.22)), url(${imageUrl})`;
   return (
     <section className="panel scenePanel">
-      <PanelTitle title="Escena" icon={<Sparkles size={17} />} />
       <div className="sceneImage" style={{ backgroundImage: sceneBg }}>
-        <div><h2>{sceneTitle}</h2><p>{objective}</p></div>
+        <div>
+          <h2>{sceneTitle}</h2>
+          <p>{objective}</p>
+          {clues[0] && <span className="sceneClueInline">🔍 {clues[0]}</span>}
+        </div>
       </div>
-      <div className="sceneBriefGrid">
-        <div><strong>Objetivo</strong><p>{objective}</p></div>
-        <div><strong>Pista</strong><p>{clues[0] ?? "Todavía no hay pista segura."}</p></div>
-        <div><strong>{hasCombat ? "Combate" : "Peligro"}</strong><p>{hasCombat ? `Puede estallar contra ${enemyName ?? "una amenaza"}. Atacar y defender tienen resolución propia.` : danger}</p></div>
-      </div>
-      {clues.length > 1 && <div className="clueRow">{clues.slice(1).map((clue) => <span key={clue}>{clue}</span>)}</div>}
-      <div className="tagRow">{atmosphereTags.map((tag) => <span key={tag}>{tag}</span>)}</div>
       <div className="choiceGrid">
         {choices.map((choice) => {
           const energyCost = getActionEnergyCost(choice);
@@ -1003,8 +1012,14 @@ function ScenePanel({ sceneTitle, objective, danger, hasCombat, enemyName, clues
           return (
             <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button">
               <strong>{choice.label}</strong>
-              <span className="choiceStats">{choice.recommendedStats.map((stat) => statLabels[stat]).join(" / ")}</span>
-              <span className="choiceCost"><Zap size={12} /> Energía {energyCost}{disabled ? ` · te falta ${energyCost - energy}` : ""}</span>
+              <div className="choiceMeta">
+                <div className="choiceStats">
+                  {choice.recommendedStats.map((stat) => (
+                    <span key={stat} className={`statChip stat-${stat}`}>{statLabels[stat]}</span>
+                  ))}
+                </div>
+                <span className="choiceCost"><Zap size={10} />{energyCost}{disabled ? <em>−{energyCost - energy}</em> : null}</span>
+              </div>
             </button>
           );
         })}
@@ -1045,7 +1060,7 @@ function AmbienceControl({ audioRef, audioUrl, ambienceName, mood, isPlaying, se
   );
 }
 
-function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void }) {
+function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void }) {
   const allowedStats = Array.from(new Set(props.sceneChoices.flatMap((choice) => choice.recommendedStats)));
   const isBot = props.activeType === "bot";
   const willRollD4 = !isBot && props.selectedChoice ? shouldGrantCreativeBonus(props.selectedChoice.action, props.selectedStat, props.usePet) : false;
@@ -1056,7 +1071,7 @@ function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "
       <PanelTitle title="Tirada" icon={<Dices size={17} />} />
       {!props.room ? <p className="empty">Crea tu personaje e inicia solo para probar una sesión completa con bots.</p> : (
         <>
-          {isBot && <p className="empty">Turno bot: resolviendo automáticamente...</p>}
+          {isBot && <p className="empty">Turno bot: leé la escena y hacé clic para continuar.</p>}
           <div className="actionCompactGrid">
             <div className="actionCompactText">
               <small>{isBot ? "Agente automático" : "Acción elegida"}</small>
@@ -1065,13 +1080,7 @@ function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "
             </div>
             <label className="statSelectCompact">Stat<select value={props.selectedStat} onChange={(event) => props.setSelectedStat(event.target.value as StatKey)} disabled={isBot || props.busy}>{allowedStats.map((stat) => <option key={stat} value={stat}>{statLabels[stat]} +{props.character.stats[stat]}</option>)}</select></label>
             <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy} /> Mascota d4</label>
-            <button className="primaryButton" onClick={props.runHuman} disabled={isBot || props.busy || !canPaySelectedAction}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Resolviendo..." : isBot ? "Automático" : !canPaySelectedAction ? "Sin energía" : "Tirar dados"}</button>
-          </div>
-          <div className="diceRuleHint compactRules">
-            <span><strong>d20</strong> acción + stat</span>
-            <span><strong>energía</strong> coste {selectedEnergyCost}</span>
-            <span><strong>d4</strong> {willRollD4 ? "activo" : "creatividad/mascota"}</span>
-            <span><strong>d6</strong> coste narrativo</span>
+            <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={!isBot && (props.busy || !canPaySelectedAction)}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Resolviendo..." : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : "Tirar dados"}</button>
           </div>
           {props.turnError && <p className="turnError">{props.turnError}</p>}
         </>
@@ -1209,7 +1218,7 @@ function getTurnRoll(turn: CinematicTurn) {
   return { total, dc, result, label: `${translateOutcome(turn.event?.outcome ?? result)}: ${total}${dc ? ` vs ${dc}` : ""}` };
 }
 
-function DungeonMasterPanel({ room, narration, latestTurnNarration, sections, plotBeat, dialogue, options, finalRecap, warnings }: { room: GameRoom; narration: string; latestTurnNarration?: NarrationResponse; sections?: NarrationResponse["sections"]; plotBeat?: NarrationResponse["plotBeat"]; dialogue: string[]; options: string[]; finalRecap?: string; warnings: string[] }) {
+function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTurnPaused, onContinueBot, sections, plotBeat, dialogue, finalRecap, warnings }: { room: GameRoom; narration: string; latestTurnNarration?: NarrationResponse; dice: DiceSnapshot | null; botTurnPaused: boolean; onContinueBot: () => void; sections?: NarrationResponse["sections"]; plotBeat?: NarrationResponse["plotBeat"]; dialogue: string[]; finalRecap?: string; warnings: string[] }) {
   const shownNarration = sections?.narration ?? cleanSection(narration, "Narracion");
   const shownDialogue = sections?.dialogue ?? dialogue.join(" ");
   const shownConsequence = sections?.consequence ?? extractConsequence(narration);
@@ -1226,48 +1235,89 @@ function DungeonMasterPanel({ room, narration, latestTurnNarration, sections, pl
     <aside className="panel dmPanel">
       <PanelTitle title="Dungeon Master IA" icon={<Sparkles size={17} />} />
       {warnings.map((warning) => <div className="warning" key={warning}>{warning}</div>)}
-      <NarratorSection title="Escena actual" text={`${currentScene.title} · fase ${room.phase}. ${currentScene.objective}`} />
       {hasTurnHistory
-        ? <TurnStoryCard turn={latestTurn} sceneTitle={currentScene.title} />
-        : <CurrentTurnPanel narration={shownNarration} dialogue={shownDialogue} consequence={shownConsequence} />}
-      <OptionsPanel options={options} />
-      <TurnHistoryCollapsed room={room} />
-      {plotBeat && <PlotBeatPanel beat={plotBeat} />}
-      <MemoryPanel room={room} />
+        ? <TurnStoryCard turn={latestTurn} sceneTitle={currentScene.title} dice={dice} />
+        : <>
+            {dice && <DiceOutcomeCard turn={latestTurn} dice={dice} />}
+            <CurrentTurnPanel narration={shownNarration} dialogue={shownDialogue} consequence={shownConsequence} />
+          </>}
+      {botTurnPaused && <button className="primaryButton dmContinueButton" type="button" onClick={onContinueBot}>Continuar turno del bot</button>}
+      <NarrativeHistory room={room} />
+      <details className="dmMinorDetails" open><summary>Memoria / pistas</summary><MemoryPanel room={room} /></details>
       {finalRecap && <NarratorSection title="Recap" text={finalRecap} />}
     </aside>
   );
 }
 
-function TurnStoryCard({ turn, sceneTitle }: { turn: CinematicTurn; sceneTitle: string }) {
-  const narration = getTurnNarration(turn);
+function TurnStoryCard({ turn, sceneTitle, dice }: { turn: CinematicTurn; sceneTitle: string; dice: DiceSnapshot | null }) {
+  const narration = turn.event?.narration ?? getTurnNarration(turn);
   const paragraphs = narration.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean);
+  const dialogueLines = getTurnDialogue(turn);
+  const clues = getTurnClueReveals(turn);
+  const danger = getTurnDangerChange(turn);
+  const dangerChanged = danger && danger.before !== danger.after;
+  const actionLabel = getStructuredTurn(turn)?.immediateAction.text ?? turn.event?.actionLabel ?? cleanActionText(turn.event?.action ?? "");
   return (
     <section className="turnStoryCard">
-      <div className="turnStoryHeader">
-        <span>Último momento</span>
-        <strong>{turn.event?.sceneTitle ?? sceneTitle}</strong>
+      {actionLabel && (
+        <div className="turnActionChip">
+          <small>{turn.event?.isBot ? "Bot" : "Vos"}</small>
+          <span>{actionLabel}</span>
+        </div>
+      )}
+      <DiceOutcomeCard turn={turn} dice={dice} />
+      <div className="turnNarrationText cinematicNarration">
+        {paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
       </div>
-      <div className="turnNarrationText cinematicNarration">{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
-      <DiceOutcomeCard turn={turn} />
-      <div className="turnActionLine"><small>Acción</small><p>{getStructuredTurn(turn)?.immediateAction.text ?? turn.event?.actionLabel ?? turn.event?.action ?? "Acción resuelta"}</p></div>
-      <DialogueStrip turn={turn} />
-      <CompanionMomentCard turn={turn} />
-      <ConsequenceCard turn={turn} />
-      <DangerChangeCard turn={turn} />
-      <ClueRevealCard turn={turn} />
+      {dialogueLines.length > 0 && (
+        <div className="inlineDialogue">
+          {dialogueLines.map((line, index) => (
+            <p key={index}><strong>{line.speaker}:</strong> "{line.line.replace(/^[""]|[""]$/g, "")}"</p>
+          ))}
+        </div>
+      )}
+      {(clues.length > 0 || dangerChanged) && (
+        <div className="turnChips">
+          {dangerChanged && <span className="chipDanger">⚠ Peligro {danger.before}→{danger.after}</span>}
+          {clues.map((clue) => <span key={clue.clueId} className="chipClue">🔍 {clue.title}</span>)}
+        </div>
+      )}
     </section>
   );
 }
 
-function DiceOutcomeCard({ turn }: { turn: CinematicTurn }) {
+function DiceOutcomeCard({ turn, dice }: { turn: CinematicTurn; dice: DiceSnapshot | null }) {
   const roll = getTurnRoll(turn);
   if (!roll) return null;
+  const eventDice = turn.event?.dice;
+  const d20 = dice?.check.d20.value ?? eventDice?.d20.value;
+  const d4 = dice?.check.creativeBonus?.value ?? eventDice?.creativeBonus?.value;
+  const d6 = dice?.consequenceRoll;
   return (
     <div className={`diceOutcomeCard ${roll.result}`}>
-      <span>🎲 Resultado</span>
-      <strong>{roll.label || `${roll.total} vs ${roll.dc}`}</strong>
+      <div className="diceOutcomeMain">
+        <span>Resultado</span>
+        <strong>{roll.label || `${roll.total} vs ${roll.dc}`}</strong>
+      </div>
+      <div className="dmMiniDice" aria-label="Dados del turno">
+        <MiniDiceFace kind="d20" label="d20" value={d20 ?? "—"} />
+        <MiniDiceFace kind="d4" label="d4" value={d4 ?? "—"} />
+        <MiniDiceFace kind="d6" label="d6" value={d6 ?? "—"} />
+      </div>
     </div>
+  );
+}
+
+
+function MiniDiceFace({ kind, label, value }: { kind: "d20" | "d4" | "d6"; label: string; value: number | string }) {
+  return (
+    <span className={`miniDiceFace ${kind}`}>
+      <span className="miniDiceImageWrap">
+        <img src={`/assets/dice/${kind}.webp`} alt="" aria-hidden="true" />
+        <strong>{value}</strong>
+      </span>
+      <small>{label}</small>
+    </span>
   );
 }
 
@@ -1372,42 +1422,49 @@ function MemoryPanel({ room }: { room: GameRoom }) {
   );
 }
 
-function NarrativeHistory({ room, currentNarration, currentDialogue, currentConsequence }: { room: GameRoom; currentNarration: string; currentDialogue: string; currentConsequence: string }) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+function NarrativeHistory({ room }: { room: GameRoom }) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [onlyMine, setOnlyMine] = useState(false);
   const humanPlayer = room.players.find((player) => player.type === "human") ?? room.players[0];
-  const historyText = useMemo(() => {
-    const initialScene = getRoomScenes(room)[0];
-    const opening = buildOpeningBeat(room.campaign, initialScene.title, initialScene.objective);
-    const intro = [
-      `Inicio - ${room.campaign.title}`,
-      opening.sections.narration,
-      opening.sections.dialogue,
-      opening.sections.consequence
-    ].filter(Boolean).join("\n");
-    const visibleEvents = onlyMine ? room.sessionLog.filter((event) => event.playerName === humanPlayer.name) : room.sessionLog;
-    const turns = visibleEvents.map((event) => [
-      `Turno ${event.turn + 1} - ${event.playerName} - ${event.sceneTitle}`,
-      `Accion: ${event.actionLabel ?? cleanActionText(event.action)}`,
-      `Resultado: ${translateOutcome(event.outcome)} (${event.total})`,
-      event.narration,
-      event.consequenceText ? `Consecuencia: ${event.consequenceText}` : ""
-    ].filter(Boolean).join("\n"));
-    return [...turns, ...(onlyMine ? [] : [intro])].join("\n\n---\n\n") || `Todavía no hay turnos de ${humanPlayer.name}.`;
-  }, [room, humanPlayer.name, onlyMine]);
+  const allEvents = useMemo(() => [...room.sessionLog], [room.sessionLog]);
+  const visibleEvents = useMemo(
+    () => onlyMine ? allEvents.filter((event) => event.playerName === humanPlayer.name) : allEvents,
+    [allEvents, onlyMine, humanPlayer.name]
+  );
 
   useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) textarea.scrollTop = 0;
-  }, [historyText]);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [room.sessionLog.length]);
 
   return (
     <div className="narrativeHistory">
       <div className="historyHeader">
-        <h3>Historia</h3>
+        <h3>Historial narrativo</h3>
         <label><input type="checkbox" checked={onlyMine} onChange={(event) => setOnlyMine(event.target.checked)} /> Solo {humanPlayer.name}</label>
       </div>
-      <textarea ref={textareaRef} value={historyText} readOnly aria-label="Historial narrativo de la partida" />
+      <div className="historyTurnList" ref={scrollRef}>
+        {visibleEvents.length === 0 && <p className="historyEmpty">Todavía no hay turnos{onlyMine ? ` de ${humanPlayer.name}` : ""}.</p>}
+        {visibleEvents.map((event) => {
+          const campaignScene = room.campaign.scenes.find((s) => s.id === event.sceneId);
+          const actionOption = campaignScene?.multipleChoiceOptions.find((o) => o.id === event.actionId);
+          const energyCost = getActionEnergyCost(actionOption);
+          return (
+            <article key={event.id} className={`historyTurnEntry ${event.isBot ? "historyBot" : "historyHuman"}`}>
+              <div className="historyTurnMeta">
+                <span className={`historyBadge ${event.isBot ? "bot" : "human"}`}>{event.isBot ? "BOT" : "VOS"}</span>
+                <span className="historyTurnLabel">T{event.turnNumber ?? event.turn + 1}</span>
+                <span className="historySceneName">{event.sceneTitle}</span>
+                <span className={`historyOutcomePill ${event.outcome}`}>{translateOutcome(event.outcome)}</span>
+              </div>
+              <div className="historyChoiceLine">
+                <span>{event.actionLabel ?? cleanActionText(event.action)}</span>
+                {energyCost > 0 && <span className="historyCost"><Zap size={10} /> {energyCost}</span>}
+              </div>
+              <p className="historyNarration">{event.narration}</p>
+            </article>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1490,54 +1547,55 @@ function DiceResultBar({ dice, activePlayerId }: { dice: DiceSnapshot | null; ac
   if (!dice) {
     return (
       <section className="panel diceBar diceBarEmpty">
-        <PanelTitle title="Resolución actual" icon={<Dices size={17} />} />
-        <div className="emptyResolution">
-          <strong>Elegí una acción y tirá dados.</strong>
-          <span>Después de tirar vas a ver acá el d20, el bonus d4 si aplica, el coste d6 y el total contra dificultad.</span>
-        </div>
+        <PanelTitle title="Resolución" icon={<Dices size={17} />} />
+        <p className="diceBarHint">Elegí una acción y tirá dados.</p>
       </section>
     );
   }
 
   const d20 = dice.check.d20.value;
-  const d4 = dice.check.creativeBonus?.value ?? "-";
-  const d6 = dice.consequenceRoll ?? "-";
+  const d4val = dice.check.creativeBonus?.value ?? null;
+  const d6val = dice.consequenceRoll ?? null;
   const breakdown = dice.check.rollBreakdown;
-  const hasCostRoll = Boolean(dice.consequenceRoll);
   const formula = `${breakdown.d20} d20 +${breakdown.statModifier} ${statLabels[dice.stat]} +${breakdown.d4Bonus} d4 = ${breakdown.total} vs ${dice.check.difficulty}`;
 
   return (
     <section className="panel diceBar">
       <PanelTitle title={isPreviousTurn ? "Última resolución" : "Resolución actual"} icon={<Dices size={17} />} />
-      <div className="resolutionBoard">
-        <div className="resolutionMeta">
-          <strong>{dice.player}{isPreviousTurn ? " · turno anterior" : ""}</strong>
-          <span>{statLabels[dice.stat]}</span>
-          <small>{dice.action}</small>
+      <div className="diceBarInner">
+        <div className="diceBarLeft">
+          <strong>{dice.player}{isPreviousTurn ? " · anterior" : ""}</strong>
+          <span className={`statChip stat-${dice.stat}`}>{statLabels[dice.stat]}</span>
         </div>
-        <DiceTile kind="d20" label="d20" value={d20} reason="Acción" />
-        <DiceTile kind="d4" label="d4" value={d4} muted={!dice.check.creativeBonus} reason={dice.check.creativeBonus ? "Bonus" : "Sin bonus"} />
-        <DiceTile kind="d6" label="d6" value={d6} muted={!hasCostRoll} reason={hasCostRoll ? "Coste" : "Sin coste"} />
-        <div className="resolutionTotal"><span>Total</span><strong>{dice.check.total}</strong><small>vs {dice.check.difficulty}</small></div>
-        <div className={`resolutionOutcome ${dice.check.outcome}`}><span>{translateOutcome(dice.check.outcome)}</span></div>
-        <p className="resolutionNote">
-          {formula} → {translateOutcome(dice.check.outcome)}.
-          {dice.combatNote ? ` ${dice.combatNote}` : dice.consequence ? ` Coste d6: ${dice.consequence}` : ""}
-        </p>
+        <div className="diceBarFaces">
+          <DiceBadge kind="d20" value={d20} />
+          <DiceBadge kind="d4" value={d4val ?? "—"} muted={!d4val} />
+          <DiceBadge kind="d6" value={d6val ?? "—"} muted={!d6val} />
+        </div>
+        <div className="diceBarTotal">
+          <strong>{dice.check.total}</strong>
+          <small>vs {dice.check.difficulty}</small>
+        </div>
+        <div className={`diceBarOutcome ${dice.check.outcome}`}>
+          {translateOutcome(dice.check.outcome)}
+        </div>
+      </div>
+      <div className="diceBarFormula">
+        <small>{dice.action}</small>
+        <code>{formula}{dice.combatNote ? ` · ${dice.combatNote}` : dice.consequence ? ` · coste d6: ${dice.consequence}` : ""}</code>
       </div>
     </section>
   );
 }
 
-
-function DiceTile({ kind, label, value, reason, muted = false }: { kind: "d20" | "d4" | "d6"; label: string; value: number | string; reason: string; muted?: boolean }) {
+function DiceBadge({ kind, value, muted = false }: { kind: "d20" | "d4" | "d6"; value: number | string; muted?: boolean }) {
   return (
-    <span className={`diceTile ${kind} ${muted ? "muted" : ""}`}>
-      <span className="diceImageWrap">
+    <span className={`diceBadge ${kind} ${muted ? "muted" : ""}`}>
+      <span className="diceBadgeWrap">
         <img src={`/assets/dice/${kind}.webp`} alt="" aria-hidden="true" />
         <strong>{value}</strong>
       </span>
-      <span className="diceText"><small>{label}</small><em>{reason}</em></span>
+      <small>{kind}</small>
     </span>
   );
 }

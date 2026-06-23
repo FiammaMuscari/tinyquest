@@ -1,65 +1,11 @@
-@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@500;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Fredoka:wght@600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap");
 @import "tailwindcss";
 
 :root {
   color: #fff8df;
   background: #07111d;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Nunito', system-ui, sans-serif;
 }
-
-/* Readability overrides: keep DM text complete and slightly larger. */
-.appShell { width: min(1680px, calc(100% - 24px)); }
-.gameFrame { grid-template-columns: minmax(260px, .78fr) minmax(580px, 1.55fr) minmax(390px, 1fr); }
-.statusPill strong { font-size: 20px; }
-.statusPill small { font-size: 12px; line-height: 1.35; }
-.panelTitle { font-size: 13px; }
-.dmPanel { max-height: none; }
-.narrativeHistory { padding: 12px; }
-.narrativeHistory h3 { font-size: 14px; }
-.historyHeader label { font-size: 12px; }
-.narrativeHistory textarea {
-  height: 330px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-.plotBeatPanel { padding: 12px; }
-.plotBeatPanel h3 { font-size: 14px; }
-.plotBeatPanel p,
-.plotBeatPanel span,
-.narratorBlock p,
-.currentTurnPanel p,
-.currentTurnPanel span,
-.currentTurnPanel strong,
-.resolutionNote {
-  display: block;
-  -webkit-line-clamp: unset;
-  -webkit-box-orient: initial;
-  overflow: visible;
-}
-.plotBeatPanel p {
-  font-size: 14px;
-  line-height: 1.45;
-}
-.plotBeatPanel span {
-  font-size: 13px;
-  line-height: 1.45;
-}
-.plotBeatPanel strong {
-  margin-right: 6px;
-}
-.currentTurnPanel {
-  padding: 12px;
-  gap: 8px;
-}
-.currentTurnPanel h3 { font-size: 12px; }
-.currentTurnPanel p,
-.currentTurnPanel span,
-.currentTurnPanel strong {
-  font-size: 14px;
-  line-height: 1.45;
-}
-.currentTurnPanel span { color: #d7e6ff; }
-.currentTurnPanel strong { color: #ffd1ca; }
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 20% 10%, rgba(255, 184, 62, .22), transparent 28%), linear-gradient(145deg, #06101c, #1f1228 48%, #06262a); }
@@ -672,6 +618,80 @@ h1 {
   color: #eadfc6;
   font-size: 12px;
   line-height: 1.42;
+}
+.historyTurnList {
+  display: grid;
+  gap: 6px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.historyTurnEntry {
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.04);
+  border-left: 3px solid rgba(255,255,255,.1);
+  display: grid;
+  gap: 5px;
+}
+.historyTurnEntry.historyHuman { border-left-color: rgba(117, 234, 219, .5); }
+.historyTurnMeta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.historyBadge {
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.historyBadge.human { background: rgba(117,234,219,.18); color: #75eadb; }
+.historyBadge.bot { background: rgba(148,122,232,.18); color: #b49fd4; }
+.historyTurnLabel { font-size: 10px; color: #c7b894; font-weight: 800; }
+.historySceneName { font-size: 10px; color: #6d7e96; margin-left: auto; }
+.historyOutcomePill {
+  font-size: 9px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.historyOutcomePill.success { background: rgba(90,200,130,.16); color: #7ae6a8; }
+.historyOutcomePill.partial_success { background: rgba(255,180,60,.16); color: #ffda8a; }
+.historyOutcomePill.failure { background: rgba(220,80,80,.16); color: #ff8a8a; }
+.historyChoiceLine {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #fff4d4;
+  font-weight: 700;
+}
+.historyCost {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #ffda8a;
+  font-weight: 700;
+  margin-left: auto;
+}
+.historyNarration {
+  font-size: 12px;
+  color: #c0b8d0;
+  line-height: 1.4;
+  margin: 0;
+}
+.historyEmpty {
+  font-size: 12px;
+  color: #6d7e96;
+  text-align: center;
+  padding: 18px 0;
+  margin: 0;
 }
 .currentTurnPanel {
   display: grid;
@@ -1318,19 +1338,6 @@ h1 {
   opacity: .48;
   filter: grayscale(.35);
 }
-.choiceCard .choiceStats,
-.choiceCard .choiceCost {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 7px;
-  line-height: 1.25;
-}
-.choiceCard .choiceCost {
-  color: #ffe4a5;
-  font-size: 11px;
-  font-weight: 900;
-}
 .compactRules {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
 }
@@ -1430,21 +1437,6 @@ h1 {
 .choiceGrid button {
   min-height: 92px !important;
   padding: 10px !important;
-}
-.choiceGrid strong {
-  display: -webkit-box !important;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.15;
-}
-.choiceCard .choiceStats,
-.choiceCard .choiceCost {
-  width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .actionCompactGrid {
@@ -1594,8 +1586,6 @@ h1 {
 .scenePanel p,
 .sceneBriefGrid p,
 .choiceGrid strong,
-.choiceCard .choiceStats,
-.choiceCard .choiceCost,
 .actionCompactText strong,
 .actionCompactText span,
 .resolutionMeta small,
@@ -1830,6 +1820,10 @@ h1 {
 }
 .diceBar .resolutionMeta small {
   display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: initial !important;
+  overflow: visible !important;
+  white-space: normal !important;
   font-size: 12px !important;
   line-height: 1.3 !important;
 }
@@ -1946,51 +1940,130 @@ h1 {
   }
 }
 
-/* Cinematic turn UI: structuredNarration first, legacy-safe fallback. */
+/* Cinematic turn UI: narration-first, no redundant cards. */
 .turnStoryCard {
   display: grid;
-  gap: 12px;
-  margin-bottom: 12px;
-  padding: 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 215, 123, .34);
-  background: radial-gradient(circle at 14% 0%, rgba(255, 191, 53, .14), transparent 34%), linear-gradient(145deg, rgba(10, 18, 34, .94), rgba(38, 24, 56, .9));
-  box-shadow: inset 0 1px rgba(255,255,255,.08), 0 16px 34px rgba(0,0,0,.28);
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 12px 12px 12px 14px;
+  border-radius: 9px;
+  border-left: 3px solid #d9a84d;
+  border-top: 1px solid rgba(217,168,77,.2);
+  border-right: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(10, 12, 16, .88);
 }
-.turnStoryHeader { display: flex; justify-content: space-between; gap: 10px; align-items: start; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 9px; }
-.turnStoryHeader span,
-.turnActionLine small,
-.dialogueStrip small,
-.companionMomentCard small,
-.consequenceCard small,
-.dangerChangeCard small,
-.clueRevealCard small {
-  display: block;
-  color: #75eadb;
-  text-transform: uppercase;
-  font-size: 11px;
+
+/* Action chip: qué eligió el jugador, encima del resultado */
+.turnActionChip {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+}
+.turnActionChip small {
+  flex-shrink: 0;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: .04em;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #d9b66a;
 }
-.turnStoryHeader strong { color: #ffda8a; text-align: right; }
-.cinematicNarration p { margin: 0 0 8px; font-size: 15px; line-height: 1.58; color: #fff8df; }
-.diceOutcomeCard { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 9px; background: rgba(4, 12, 25, .72); border: 1px solid rgba(255,255,255,.1); }
-.diceOutcomeCard strong { color: #ffda8a; }
-.diceOutcomeCard.success { border-color: rgba(112, 231, 216, .36); }
-.diceOutcomeCard.partial { border-color: rgba(255, 218, 138, .4); }
-.diceOutcomeCard.failure { border-color: rgba(255, 120, 120, .42); }
-.turnActionLine, .dialogueStrip, .companionMomentCard, .consequenceCard, .dangerChangeCard, .clueRevealCard { padding: 11px; border-radius: 9px; background: rgba(4, 12, 25, .58); border: 1px solid rgba(255,255,255,.08); }
-.turnActionLine p, .consequenceCard p, .dangerChangeCard p, .companionMomentCard p { margin: 6px 0 0; line-height: 1.45; color: #efe4ff; }
-.dialogueStrip blockquote { margin: 8px 0 0; padding-left: 10px; border-left: 3px solid #75eadb; color: #d7e6ff; line-height: 1.45; }
-.dialogueStrip blockquote strong { color: #ffda8a; }
-.companionMomentCard p strong { color: #ffda8a; }
-.consequenceCard { border-color: rgba(255, 191, 53, .24); }
-.consequenceDetails { display: grid; gap: 6px; margin-top: 9px; }
-.consequenceDetails span { display: block; padding: 7px 8px; border-radius: 7px; background: rgba(255,255,255,.06); color: #cabbe6; font-size: 12px; line-height: 1.35; }
-.dangerChangeCard { border-color: rgba(255, 120, 120, .24); }
-.dangerChangeCard strong { display: block; margin-top: 6px; color: #ffb23d; font-size: 18px; }
-.clueRevealCard div { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
-.clueRevealCard span { border-radius: 999px; padding: 6px 9px; background: rgba(69, 234, 211, .13); border: 1px solid rgba(69, 234, 211, .26); color: #9ff7ec; font-size: 12px; font-weight: 800; }
+.turnActionChip span {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f3e9d0;
+  line-height: 1.3;
+}
+
+/* Dice result row */
+.diceOutcomeCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: rgba(4, 8, 14, .82);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.diceOutcomeCard.success { border-color: rgba(90, 220, 190, .36); }
+.diceOutcomeCard.partial { border-color: rgba(255, 210, 100, .4); }
+.diceOutcomeCard.failure { border-color: rgba(220, 90, 90, .42); }
+.diceOutcomeMain span { display: block; color: #d9b66a; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+.diceOutcomeMain strong { display: block; font-size: 14px; font-weight: 800; color: #ffda8a; line-height: 1.15; }
+
+/* Narration paragraphs */
+.cinematicNarration p {
+  margin: 0 0 7px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #f3e7cd;
+}
+.cinematicNarration p:last-child { margin-bottom: 0; }
+
+/* Dialogue: inline, no box */
+.inlineDialogue {
+  padding: 8px 10px;
+  border-left: 2px solid rgba(117, 234, 219, .45);
+  background: rgba(69, 234, 211, .04);
+  border-radius: 0 6px 6px 0;
+}
+.inlineDialogue p {
+  margin: 0 0 5px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #d7e6ff;
+  font-style: italic;
+}
+.inlineDialogue p:last-child { margin-bottom: 0; }
+.inlineDialogue p strong { font-style: normal; color: #ffda8a; }
+
+/* Bottom chips: clues, danger change, companion actions */
+.turnChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.chipDanger, .chipClue, .chipCompanion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.chipDanger {
+  background: rgba(220, 80, 80, .12);
+  border: 1px solid rgba(220, 80, 80, .32);
+  color: #ffb3a8;
+}
+.chipClue {
+  background: rgba(69, 234, 211, .1);
+  border: 1px solid rgba(69, 234, 211, .28);
+  color: #9ff7ec;
+}
+.chipCompanion {
+  background: rgba(148, 122, 232, .1);
+  border: 1px solid rgba(148, 122, 232, .26);
+  color: #d8c9f5;
+  border-radius: 7px;
+  padding: 4px 8px;
+  font-size: 11px;
+  width: 100%;
+}
+.chipCompanion strong {
+  color: #ffda8a;
+  font-weight: 800;
+  margin-right: 4px;
+}
+
+/* History collapsed */
 .turnHistoryCollapsed { margin: 0 0 10px; border-radius: 9px; border: 1px solid rgba(255,255,255,.1); background: rgba(4, 12, 25, .46); }
 .turnHistoryCollapsed summary { padding: 11px; color: #ffda8a; font-weight: 900; cursor: pointer; text-transform: uppercase; font-size: 12px; }
 .collapsedTurnList { display: grid; gap: 8px; padding: 0 11px 11px; max-height: 360px; overflow: auto; }
@@ -2001,25 +2074,6 @@ h1 {
 .collapsedTurnList p { margin: 5px 0 0; color: #e8d9ff; line-height: 1.35; font-size: 12px; }
 
 /* Phase 3 QA pass: small hierarchy/mobile fixes. */
-.turnStoryCard {
-  position: relative;
-  border-color: rgba(255, 215, 123, .5);
-  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 18px 42px rgba(0,0,0,.34), 0 0 0 1px rgba(255,191,53,.08);
-}
-.turnStoryCard::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  border-radius: 10px 0 0 10px;
-  background: linear-gradient(180deg, #ffda8a, #75eadb, #d86e5f);
-}
-.turnStoryHeader span { color: #ffda8a; }
-.cinematicNarration p:first-child { font-size: 16px; color: #fff4d4; }
-.diceOutcomeCard { border-width: 1px; background: rgba(8, 11, 16, .86); }
-.turnActionLine { border-color: rgba(130,168,232,.24); }
-.consequenceCard { background: linear-gradient(180deg, rgba(40, 27, 20, .72), rgba(4, 12, 25, .58)); }
-.dangerChangeCard { background: linear-gradient(180deg, rgba(56, 21, 22, .55), rgba(4, 12, 25, .58)); }
 .dmPanel .plotBeatPanel:first-of-type { border-color: rgba(117, 234, 219, .38); }
 .turnHistoryCollapsed { opacity: .9; }
 .turnHistoryCollapsed[open] { opacity: 1; }
@@ -2044,4 +2098,969 @@ h1 {
   .turnActionLine, .dialogueStrip, .companionMomentCard, .consequenceCard, .dangerChangeCard, .clueRevealCard { padding: 10px; }
   .dialogueStrip blockquote { font-size: 13px; }
   .consequenceDetails span, .collapsedTurnList p { font-size: 11px; }
+}
+
+/* Less-is-more Dungeon Master pass: compact, readable, dice beside outcome. */
+.appShell {
+  width: min(1360px, calc(100% - 20px)) !important;
+  padding: 10px 0 18px !important;
+}
+.cleanStatus.topStatus {
+  grid-template-columns: 120px repeat(5, minmax(86px, 1fr)) !important;
+  gap: 6px !important;
+  margin-bottom: 8px !important;
+}
+.brandBlock { padding: 6px 8px !important; }
+.brandLogoSmall { width: 108px !important; margin: 0 !important; }
+.cleanStatus .statusPill {
+  min-height: 42px !important;
+  padding: 6px 8px !important;
+}
+.cleanStatus .statusPill span { font-size: 9px !important; letter-spacing: .04em; }
+.cleanStatus .statusPill strong { font-size: 13px !important; line-height: 1.12 !important; }
+
+.gameFrame {
+  grid-template-columns: minmax(190px, .55fr) minmax(460px, 1.35fr) minmax(360px, .95fr) !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  min-height: 0 !important;
+}
+.panel { padding: 0 10px 10px !important; border-radius: 7px !important; }
+.panelTitle {
+  margin: -1px 0 8px -11px !important;
+  padding: 6px 9px !important;
+  font-size: 10px !important;
+  letter-spacing: .04em;
+}
+.sceneImage { min-height: 190px !important; padding: 12px !important; }
+.scenePanel h2 { font-size: clamp(22px, 2.6vw, 30px) !important; margin-bottom: 5px !important; }
+.scenePanel p { font-size: 13px !important; line-height: 1.34 !important; margin-bottom: 8px !important; }
+.sceneBriefGrid { grid-template-columns: 1fr !important; gap: 6px !important; margin: 8px 0 !important; }
+.sceneBriefGrid div { padding: 7px 8px !important; }
+.sceneBriefGrid div:nth-child(n+2),
+.scenePanel .tagRow { display: none !important; }
+.clueRow { gap: 5px !important; margin: 7px 0 !important; }
+.clueRow span { padding: 5px 7px !important; font-size: 11px !important; }
+.choiceGrid { grid-template-columns: 1fr !important; gap: 6px !important; margin-top: 10px !important; }
+.choiceGrid button {
+  min-height: 54px !important;
+  padding: 8px 10px !important;
+  border-radius: 7px !important;
+}
+.choiceGrid span { margin-top: 3px !important; font-size: 11px !important; line-height: 1.25 !important; }
+.actionComposer textarea { min-height: 54px !important; }
+.actionGuide, .chosenAction { font-size: 11px !important; line-height: 1.3 !important; margin-bottom: 6px !important; }
+.diceRuleHint { display: none !important; }
+.controlRow { margin: 6px 0 !important; gap: 6px !important; }
+.primaryButton, .soloButton { min-height: 38px !important; padding: 8px 11px !important; }
+
+.dmPanel { padding-bottom: 8px !important; }
+.diceOutcomeCard {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 10px !important;
+  border-radius: 7px !important;
+  background: rgba(10, 12, 16, .92) !important;
+}
+.diceOutcomeMain span { display: block; color: #d9b66a; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+.diceOutcomeMain strong { display: block; font-size: 14px; font-weight: 800; color: #ffda8a; line-height: 1.15; }
+.dmMiniDice { display: flex; gap: 4px; align-items: center; }
+.dmMiniDice b {
+  min-width: 38px;
+  padding: 4px 5px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.055);
+  color: #bfc7d8;
+  font-size: 9px;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+.dmMiniDice em { display: block; margin-top: 3px; color: #fff1c2; font-size: 14px; font-style: normal; font-weight: 900; }
+.turnHistoryCollapsed,
+.dmMinorDetails {
+  margin: 0 0 6px !important;
+  border-radius: 7px !important;
+  border: 1px solid rgba(217,168,77,.12) !important;
+  background: rgba(255,255,255,.025) !important;
+}
+.turnHistoryCollapsed summary,
+.dmMinorDetails summary {
+  padding: 8px !important;
+  color: #d9b66a !important;
+  font-size: 10px !important;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.dmMinorDetails .plotBeatPanel { margin: 0 !important; border: 0 !important; background: transparent !important; }
+.memoryPanel, .ambiencePanel { opacity: .82; }
+
+@media (max-width: 1160px) {
+  .gameFrame { display: flex !important; flex-direction: column !important; }
+  .centerColumn { order: 0 !important; }
+  .dmPanel { order: 1 !important; }
+  .turnQueue { order: 2 !important; }
+  .sceneImage { min-height: 160px !important; }
+}
+@media (max-width: 680px) {
+  .appShell { width: calc(100% - 12px) !important; padding-top: 6px !important; }
+  .cleanStatus.topStatus { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .brandBlock { display: none !important; }
+  .sceneImage { min-height: 130px !important; }
+  .scenePanel h2 { font-size: 22px !important; }
+  .turnSecondaryGrid { grid-template-columns: 1fr; }
+  .diceOutcomeCard { grid-template-columns: 1fr !important; }
+  .dmMiniDice { justify-content: space-between; }
+  .dmMiniDice b { flex: 1; }
+}
+
+/* Restore compact dice images with visible number overlay. */
+.dmMiniDice {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  align-items: start !important;
+}
+.miniDiceFace {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.miniDiceImageWrap {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.miniDiceImageWrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(255,191,53,.25));
+}
+.miniDiceImageWrap strong {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  color: #fff6d2;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 900;
+  text-shadow: 0 1px 0 rgba(40, 12, 66, .95), 0 0 6px rgba(255, 224, 165, .8);
+  pointer-events: none;
+}
+.miniDiceFace small {
+  color: #d9b66a;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.diceOutcomeCard .dmMiniDice b,
+.diceOutcomeCard .dmMiniDice em {
+  display: revert !important;
+}
+@media (max-width: 680px) {
+  .dmMiniDice {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .miniDiceImageWrap {
+    width: 30px;
+    height: 30px;
+  }
+  .miniDiceImageWrap strong {
+    font-size: 12px;
+  }
+}
+
+/* Narrative history: scroll propio en todas las resoluciones. */
+.historyTurnList {
+  max-height: 340px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-color: rgba(217,168,77,.45) rgba(8,11,16,.4) !important;
+  scrollbar-width: thin !important;
+}
+@media (max-width: 1160px) {
+  .historyTurnList {
+    max-height: 280px !important;
+  }
+}
+
+/* Cinematic narration: first paragraph slightly bigger, rest normal. */
+.cinematicNarration p:first-child {
+  font-size: 14px !important;
+  line-height: 1.52 !important;
+  color: #fff4d4 !important;
+}
+.cinematicNarration p {
+  font-size: 13px !important;
+  line-height: 1.44 !important;
+  color: #f3e7cd !important;
+}
+
+/* DM panel section priority: make dice outcome very visible, secondary sections quieter. */
+.diceOutcomeCard {
+  border-width: 1px !important;
+  background: rgba(12, 14, 18, .94) !important;
+}
+.diceOutcomeCard.success { border-color: rgba(90, 220, 190, .46) !important; }
+.diceOutcomeCard.partial { border-color: rgba(255, 200, 80, .46) !important; }
+.diceOutcomeCard.failure { border-color: rgba(220, 90, 90, .5) !important; }
+
+/* Historial narration entries: make them denser and easier to scan. */
+.historyTurnEntry {
+  padding: 8px 9px !important;
+  border-left-width: 2px !important;
+}
+.historyNarration {
+  font-size: 11px !important;
+  line-height: 1.38 !important;
+  color: #c8bfd4 !important;
+  display: block !important;
+  overflow: visible !important;
+  -webkit-line-clamp: unset !important;
+}
+.historyChoiceLine {
+  font-size: 11px !important;
+}
+.narrativeHistory {
+  padding: 9px 10px !important;
+}
+.narrativeHistory h3 {
+  margin-bottom: 6px !important;
+  font-size: 11px !important;
+}
+
+/* ── Choice grid redesign: compact horizontal rows, no wasted vertical space ── */
+.choiceGrid {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 4px !important;
+  margin-top: 8px !important;
+}
+
+.choiceCard {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding: 8px 10px !important;
+  border-radius: 7px !important;
+  text-align: left !important;
+  border: 1px solid rgba(130,168,232,.18) !important;
+  background: rgba(8, 10, 14, .82) !important;
+  color: #f3e9d0 !important;
+  transition: border-color .12s ease, background .12s ease !important;
+}
+.choiceCard:hover:not(:disabled) {
+  border-color: rgba(217,168,77,.52) !important;
+  background: rgba(36, 25, 16, .82) !important;
+}
+.choiceCard.selected {
+  border-color: #d9a84d !important;
+  background: linear-gradient(90deg, rgba(52, 32, 12, .94), rgba(18, 14, 20, .9)) !important;
+  box-shadow: inset 3px 0 0 #d9a84d !important;
+}
+.choiceCard:disabled,
+.choiceCard.unavailable {
+  opacity: .42 !important;
+  cursor: not-allowed !important;
+}
+/* Label: takes all remaining space, wraps up to 2 lines, never truncates with ellipsis */
+.choiceCard strong {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  line-height: 1.25 !important;
+  color: #f3e9d0 !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+}
+.choiceCard.selected strong { color: #ffda8a !important; }
+
+/* Right-side meta: fixed width, never wraps */
+.choiceMeta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+/* Stat chips: one per stat, each with its own color */
+.choiceStats {
+  display: flex !important;
+  gap: 3px !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+.statChip {
+  display: inline-block !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .03em !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  line-height: 1.3 !important;
+}
+.stat-body        { background: rgba(232, 100, 80, .15) !important; color: #e8856a !important; border: 1px solid rgba(232,100,80,.3) !important; }
+.stat-mind        { background: rgba(100, 160, 232, .15) !important; color: #82a8e8 !important; border: 1px solid rgba(100,160,232,.3) !important; }
+.stat-charm       { background: rgba(232, 120, 190, .15) !important; color: #e890c8 !important; border: 1px solid rgba(232,120,190,.3) !important; }
+.stat-creativity  { background: rgba(185, 110, 232, .15) !important; color: #c088e8 !important; border: 1px solid rgba(185,110,232,.3) !important; }
+.stat-courage     { background: rgba(232, 165, 60, .15) !important; color: #e8a850 !important; border: 1px solid rgba(232,165,60,.3) !important; }
+.stat-focus       { background: rgba(100, 232, 160, .15) !important; color: #72e8a8 !important; border: 1px solid rgba(100,232,160,.3) !important; }
+.stat-luck        { background: rgba(232, 218, 80, .15) !important; color: #e8d870 !important; border: 1px solid rgba(232,218,80,.3) !important; }
+/* Energy cost pill */
+.choiceCost {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  padding: 3px 7px !important;
+  border-radius: 999px !important;
+  background: rgba(255,228,165,.1) !important;
+  border: 1px solid rgba(255,228,165,.22) !important;
+  color: #ffe4a5 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  margin-top: 0 !important;
+  min-width: 32px !important;
+  justify-content: center !important;
+}
+.choiceCost em {
+  color: #ff8a8a;
+  font-style: normal;
+  font-size: 10px;
+  margin-left: 1px;
+}
+
+/* Category accent: left border tint per action type */
+.choiceCard.fight   { border-left: 2px solid rgba(216,110,95,.55) !important; }
+.choiceCard.talk    { border-left: 2px solid rgba(255,210,100,.5) !important; }
+.choiceCard.defend  { border-left: 2px solid rgba(111,208,163,.5) !important; }
+.choiceCard.pet,
+.choiceCard.magic   { border-left: 2px solid rgba(185,135,232,.5) !important; }
+.choiceCard.selected.fight  { border-left-color: rgba(216,110,95,.9) !important; }
+.choiceCard.selected.talk   { border-left-color: rgba(255,210,100,.9) !important; }
+.choiceCard.selected.defend { border-left-color: rgba(111,208,163,.9) !important; }
+.choiceCard.selected.pet,
+.choiceCard.selected.magic  { border-left-color: rgba(185,135,232,.9) !important; }
+
+/* ── Final override: choice card stats/cost MUST NOT WRAP ── */
+.choiceCard .choiceMeta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+.choiceCard .choiceStats {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 3px !important;
+  align-items: center !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+.choiceCard .choiceStats .statChip {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}
+.choiceCard .choiceCost {
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* ── CurrentTurnPanel (DM inicial): mejor jerarquía ── */
+.currentTurnPanel {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  gap: 10px !important;
+}
+.currentTurnPanel h3 {
+  display: none !important;
+}
+.currentTurnPanel .turnNarrationText p {
+  font-size: 14px !important;
+  line-height: 1.56 !important;
+  color: #f3e7cd !important;
+  margin: 0 0 8px !important;
+}
+.currentTurnPanel span {
+  display: block !important;
+  padding: 8px 10px !important;
+  border-left: 2px solid rgba(117,234,219,.45) !important;
+  background: rgba(69,234,211,.04) !important;
+  border-radius: 0 6px 6px 0 !important;
+  font-size: 13px !important;
+  line-height: 1.42 !important;
+  color: #d7e6ff !important;
+  font-style: italic !important;
+  font-weight: normal !important;
+}
+.currentTurnPanel strong {
+  display: block !important;
+  padding: 7px 10px !important;
+  border-radius: 6px !important;
+  background: rgba(255,150,60,.06) !important;
+  border-left: 2px solid rgba(255,180,60,.38) !important;
+  font-size: 12px !important;
+  line-height: 1.38 !important;
+  color: #ffd48a !important;
+  font-weight: 700 !important;
+}
+
+/* ── Queue cards: miniMeters más compactos ── */
+.queueCard .miniMeters {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 3px !important;
+}
+.queueCard .miniMeters span {
+  font-size: 10px !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+  justify-content: center !important;
+}
+
+/* ── Scene image: un poco más de altura para más atmósfera ── */
+.sceneImage {
+  min-height: 200px !important;
+}
+
+/* ── historyTurnEntry narration: expandible al hover ── */
+.historyTurnEntry:focus-within .historyNarration,
+.historyTurnEntry:hover .historyNarration {
+  -webkit-line-clamp: unset !important;
+  overflow: visible !important;
+}
+
+/* ════════════════════════════════════════════════
+   QUEUE AUDIO — música en la barra izquierda
+   ════════════════════════════════════════════════ */
+.queueAudio {
+  display: grid !important;
+  grid-template-columns: 28px 1fr 90px !important;
+  grid-template-rows: auto auto !important;
+  gap: 4px 8px !important;
+  align-items: center !important;
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-radius: 7px !important;
+  background: rgba(8, 10, 14, .7) !important;
+  border: 1px solid rgba(217,168,77,.14) !important;
+}
+.queueAudioBtn {
+  grid-row: 1 / 3 !important;
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 50% !important;
+  background: rgba(217,168,77,.18) !important;
+  border: 1px solid rgba(217,168,77,.32) !important;
+  color: #f0c76a !important;
+  flex-shrink: 0 !important;
+}
+.queueAudioBtn:hover { background: rgba(217,168,77,.28) !important; }
+.queueAudioInfo {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+}
+.queueAudioInfo strong {
+  font-size: 11px !important;
+  color: #f1c970 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: block !important;
+  font-weight: 700 !important;
+}
+.queueAudioInfo span {
+  font-size: 9px !important;
+  color: var(--muted) !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  display: block !important;
+}
+.queueAudioVol {
+  grid-column: 3 !important;
+  grid-row: 1 / 3 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  accent-color: #d9a84d !important;
+}
+
+/* ════════════════════════════════════════════════
+   CHOICE CARDS — más compactas
+   ════════════════════════════════════════════════ */
+.choiceCard {
+  padding: 6px 10px !important;
+}
+.choiceCard strong {
+  font-size: 12px !important;
+  -webkit-line-clamp: 1 !important;
+  line-height: 1.3 !important;
+}
+.choiceGrid {
+  grid-template-columns: 1fr !important;
+  gap: 5px !important;
+}
+
+/* ════════════════════════════════════════════════
+   CENTER COLUMN — flex, sin scroll
+   ════════════════════════════════════════════════ */
+.centerColumn {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  overflow: hidden !important;
+  max-height: 100% !important;
+}
+
+/* ── ScenePanel compacto ── */
+.scenePanel .panelTitle { display: none !important; }
+.scenePanel { padding-bottom: 10px !important; }
+.sceneImage {
+  min-height: 110px !important;
+  padding: 10px 14px !important;
+  display: flex !important;
+  align-items: flex-end !important;
+}
+.sceneImage h2 { font-size: clamp(18px, 2vw, 28px) !important; margin-bottom: 2px !important; }
+.sceneImage p { font-size: 11px !important; margin-bottom: 3px !important; line-height: 1.3 !important; }
+.sceneClueInline {
+  display: inline-block;
+  font-size: 10px;
+  color: rgba(111, 208, 163, .9);
+  background: rgba(8, 30, 20, .6);
+  border: 1px solid rgba(111, 208, 163, .25);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-top: 3px;
+}
+.choiceGrid { margin-top: 6px !important; }
+
+/* ── ActionComposer compacto ── */
+.compactAction { padding-bottom: 8px !important; }
+.compactAction .panelTitle { margin-bottom: 6px !important; }
+.actionCompactGrid { gap: 8px !important; }
+.actionCompactText small { font-size: 9px !important; }
+.actionCompactText strong { font-size: 13px !important; }
+.actionCompactText span { font-size: 11px !important; }
+
+/* ════════════════════════════════════════════════
+   COMPACT DICE BAR — reemplaza el grid de 6 columnas
+   ════════════════════════════════════════════════ */
+.diceBarInner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  margin-bottom: 8px !important;
+}
+.diceBarLeft {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  min-width: 90px !important;
+  flex: 0 0 auto !important;
+}
+.diceBarLeft > strong {
+  color: #f1c970 !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+  font-weight: 700 !important;
+}
+.diceBarFaces {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: flex-end !important;
+  flex: 1 1 auto !important;
+}
+.diceBadge {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 2px !important;
+}
+.diceBadgeWrap {
+  position: relative !important;
+  width: 46px !important;
+  height: 46px !important;
+}
+.diceBadgeWrap img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 0 8px rgba(255,191,53,.25)) !important;
+}
+.diceBadgeWrap strong {
+  position: absolute !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #fff8df !important;
+  font-size: 17px !important;
+  font-weight: 900 !important;
+  text-shadow: 0 1px 4px rgba(0,0,0,.9) !important;
+  pointer-events: none !important;
+}
+.diceBadge.d20 .diceBadgeWrap strong { font-size: 19px !important; }
+.diceBadge.d4 .diceBadgeWrap strong { margin-top: 3px !important; font-size: 15px !important; }
+.diceBadge.d6 .diceBadgeWrap strong { margin-top: 1px !important; }
+.diceBadge > small {
+  font-size: 9px !important;
+  color: var(--muted) !important;
+  text-transform: uppercase !important;
+  font-weight: 900 !important;
+  letter-spacing: .04em !important;
+}
+.diceBadge.muted { opacity: 0.42 !important; }
+.diceBarTotal {
+  text-align: center !important;
+  min-width: 52px !important;
+  flex: 0 0 auto !important;
+}
+.diceBarTotal > strong {
+  display: block !important;
+  font-size: 30px !important;
+  color: #f4cb6d !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+}
+.diceBarTotal > small {
+  font-size: 11px !important;
+  color: var(--muted) !important;
+  font-weight: 800 !important;
+}
+.diceBarOutcome {
+  padding: 6px 12px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .05em !important;
+  background: rgba(32,61,43,.76) !important;
+  border: 1px solid rgba(111,208,163,.34) !important;
+  color: #d8ffe6 !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+}
+.diceBarOutcome.failure {
+  background: rgba(72,28,25,.78) !important;
+  border-color: rgba(216,110,95,.42) !important;
+  color: #ffd1ca !important;
+}
+.diceBarOutcome.partial_success {
+  background: rgba(72,51,23,.78) !important;
+  border-color: rgba(217,168,77,.42) !important;
+  color: #ffe0a2 !important;
+}
+.diceBarFormula {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  padding-top: 7px !important;
+  border-top: 1px solid rgba(255,255,255,.06) !important;
+}
+.diceBarFormula > small {
+  font-size: 12px !important;
+  color: #d8c9f5 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+}
+.diceBarFormula > code {
+  font-size: 10px !important;
+  color: var(--muted) !important;
+  font-family: inherit !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block !important;
+}
+.diceBarHint {
+  color: var(--muted) !important;
+  font-size: 13px !important;
+  margin: 0 !important;
+}
+
+/* ── UI cleanup requested 2026-06-23: remove stray option accents and align roll controls ── */
+.choiceCard,
+.choiceCard.fight,
+.choiceCard.talk,
+.choiceCard.defend,
+.choiceCard.pet,
+.choiceCard.magic,
+.choiceCard.selected.fight,
+.choiceCard.selected.talk,
+.choiceCard.selected.defend,
+.choiceCard.selected.pet,
+.choiceCard.selected.magic {
+  border-left: 1px solid rgba(130,168,232,.18) !important;
+}
+.choiceCard.selected {
+  border-left-color: #d9a84d !important;
+  box-shadow: inset 0 0 0 1px rgba(255,225,154,.16), 0 0 14px rgba(217,168,77,.12) !important;
+}
+
+.compactAction .empty {
+  margin: 0 0 8px !important;
+  color: #d8c9f5 !important;
+  line-height: 1.25 !important;
+}
+.actionCompactGrid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 128px 102px 118px !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+}
+.actionCompactText,
+.statSelectCompact,
+.compactPet,
+.compactAction .primaryButton {
+  box-sizing: border-box !important;
+  min-height: 56px !important;
+  height: 56px !important;
+  margin: 0 !important;
+}
+.actionCompactText {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  padding: 7px 10px !important;
+}
+.actionCompactText small,
+.statSelectCompact {
+  letter-spacing: .03em !important;
+}
+.actionCompactText strong {
+  line-height: 1.15 !important;
+}
+.actionCompactText span {
+  display: block !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+.statSelectCompact {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+  background: rgba(8, 11, 16, .72) !important;
+  border: 1px solid rgba(217,168,77,.16) !important;
+  line-height: 1 !important;
+}
+.statSelectCompact select {
+  width: 100% !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 3px 8px !important;
+  font-size: 12px !important;
+}
+.compactPet {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 8px !important;
+  line-height: 1.1 !important;
+}
+.compactAction .primaryButton {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 0 10px !important;
+  line-height: 1.05 !important;
+}
+@media (max-width: 980px) {
+  .actionCompactGrid { grid-template-columns: 1fr 1fr !important; }
+  .compactAction .primaryButton { width: 100% !important; }
+}
+
+/* ─── Fix: scenePanel scrolls dentro del centerColumn para que
+   ActionComposer (TIRADA) y DiceBar (RESOLUCIÓN) siempre sean visibles ─── */
+@media (min-width: 1161px) {
+  .centerColumn {
+    max-height: 100% !important;
+  }
+  .scenePanel {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    scrollbar-color: rgba(217,168,77,.45) rgba(8,11,16,.4);
+    scrollbar-width: thin;
+  }
+  .actionComposer {
+    flex: 0 0 auto !important;
+  }
+  .diceBar {
+    flex: 0 0 auto !important;
+  }
+}
+
+/* ════════════════════════════════════════════════
+   FONT & VISUAL POLISH — Cinzel + Nunito upgrade
+   ════════════════════════════════════════════════ */
+
+/* Panel titles: Cinzel for medieval elegance */
+.panelTitle,
+.panelTitle span {
+  font-family: 'Cinzel', serif !important;
+  letter-spacing: .07em !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+}
+
+/* Top status labels */
+.statusPill span {
+  font-family: 'Cinzel', serif !important;
+  font-size: 8.5px !important;
+  letter-spacing: .08em !important;
+  font-weight: 600 !important;
+  color: #c0954a !important;
+  text-transform: uppercase !important;
+}
+
+/* Stat chips: Cinzel for fantasy feel */
+.statChip {
+  font-family: 'Cinzel', serif !important;
+  letter-spacing: .04em !important;
+}
+
+/* Dice outcome label */
+.diceOutcomeMain span,
+.turnActionChip small,
+.miniDiceFace small,
+.diceBarOutcome {
+  font-family: 'Cinzel', serif !important;
+  letter-spacing: .06em !important;
+}
+
+/* History badges */
+.historyBadge,
+.historyOutcomePill {
+  font-family: 'Cinzel', serif !important;
+  letter-spacing: .05em !important;
+}
+
+/* Summary/collapse labels */
+.turnHistoryCollapsed summary,
+.dmMinorDetails summary {
+  font-family: 'Cinzel', serif !important;
+  letter-spacing: .06em !important;
+}
+
+/* Scene title: elegant serif for h2 inside scene image */
+.sceneImage h2 {
+  font-family: 'Cinzel', serif !important;
+  font-weight: 700 !important;
+  letter-spacing: .02em !important;
+  color: #f5d078 !important;
+  text-shadow: 0 2px 12px rgba(0,0,0,.85), 0 0 28px rgba(0,0,0,.6) !important;
+}
+
+/* Remove duplicate "ACTUAL" badge — card already shows "Turno actual" */
+.queueCard.current::after {
+  content: none !important;
+}
+
+/* Fix bot turn description text: never truncate with ellipsis, allow wrapping */
+.actionCompactText {
+  height: auto !important;
+  min-height: 56px !important;
+}
+.actionCompactText span {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  line-height: 1.3 !important;
+}
+
+/* Cleaner body background — remove the heavy golden radial */
+body {
+  background: linear-gradient(135deg, #08090e, #170c14 52%, #0b1718) !important;
+}
+
+/* gameFrame: remove background image noise, cleaner dark surface */
+.gameFrame {
+  background:
+    linear-gradient(90deg, rgba(6,8,12,.97), rgba(18,12,24,.9)) !important;
+}
+
+/* Simplify panel backgrounds — single flat dark, no multi-gradient */
+.panel,
+.brandBlock,
+.statusPill {
+  background: rgba(10, 12, 16, .92) !important;
+  border-color: rgba(185, 145, 60, .2) !important;
+  box-shadow: none !important;
+}
+
+/* Panel title: warmer brown tab */
+.panelTitle {
+  background: rgba(82, 50, 28, .95) !important;
+  border-right: 1px solid rgba(185,145,60,.22) !important;
+  border-bottom: 1px solid rgba(185,145,60,.16) !important;
+  box-shadow: none !important;
+}
+
+/* Primary buttons: slightly less glowing */
+.primaryButton,
+.soloButton {
+  background: linear-gradient(180deg, #d4943f, #9e5e22) !important;
+  box-shadow: none !important;
+}
+
+/* h1 Fredoka logo title: keep but tighten */
+h1 {
+  color: #f0c050 !important;
+  text-shadow: 0 3px 0 #4a2010, 0 0 16px rgba(200,140,30,.35) !important;
 }
