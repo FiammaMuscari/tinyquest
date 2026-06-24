@@ -3064,3 +3064,32 @@ h1 {
   color: #f0c050 !important;
   text-shadow: 0 3px 0 #4a2010, 0 0 16px rgba(200,140,30,.35) !important;
 }
+
+/* ── Stat bonus display en diceBar (entre dados y total) ── */
+.diceBarStatBonus {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 2px !important;
+  flex: 0 0 auto !important;
+  min-width: 44px !important;
+  padding: 4px 6px !important;
+  border-radius: 6px !important;
+  background: rgba(217,168,77,.08) !important;
+  border: 1px solid rgba(217,168,77,.2) !important;
+}
+.diceBarStatBonus > small {
+  font-size: 8px !important;
+  color: var(--muted) !important;
+  text-transform: uppercase !important;
+  font-weight: 900 !important;
+  letter-spacing: .04em !important;
+  line-height: 1 !important;
+}
+.diceBarStatBonus > strong {
+  font-size: 20px !important;
+  color: #f1c970 !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}

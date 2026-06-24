@@ -1480,16 +1480,16 @@ function HelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boolean)
           <section className="helpPanel">
             <button className="helpClose" type="button" onClick={() => setOpen(false)} aria-label="Cerrar ayuda"><X size={16} /></button>
             <h2>Cómo jugar</h2>
-            <p>En Tiny Quest cada campaña dura hasta 15 minutos y tiene 3 escenas. En tu turno elegís una acción, un stat y opcionalmente una mascota o habilidad.</p>
+            <p>En Tiny Quest cada campaña dura hasta 15 minutos y tiene 3 escenas. En tu turno elegís una acción, un stat y opcionalmente tu mascota.</p>
             <ul>
-              <li><strong>d20</strong>: resuelve la acción principal.</li>
-              <li><strong>d4</strong>: bonus por mascota, habilidad, vínculo, item o ventaja.</li>
-              <li><strong>d6</strong>: complicación, daño o consecuencia de parcial/fallo.</li>
-              <li><strong>Peligro</strong>: si sube demasiado, la escena se complica o se cierra.</li>
-              <li><strong>Progreso</strong>: acerca al grupo al objetivo de la escena.</li>
-              <li><strong>Pistas</strong>: vienen de la data del motor y desbloquean caminos.</li>
+              <li><strong>d20</strong>: dado principal. Se suma al modificador del stat elegido para obtener el total. Si el total supera la dificultad (DC) es éxito; si queda 1-2 puntos abajo es éxito parcial; más abajo es fallo.</li>
+              <li><strong>d4 — cómo usarlo</strong>: tildá "Mascota d4" antes de tirar para sumar un d4 al resultado. También se activa automáticamente si el stat elegido es Creatividad. Úsalo cuando la acción está en el límite entre éxito y fallo.</li>
+              <li><strong>d6 — coste de complicación</strong>: se tira automáticamente en fallos y éxitos parciales. No lo controlás vos — el motor lo lanza para determinar qué tan grave es la consecuencia: daño, pista perdida, subida de peligro o deuda narrativa. Un d6 alto significa que la complicación es seria.</li>
+              <li><strong>Fórmula</strong>: d20 + stat + d4 (opcional) = total vs DC.</li>
+              <li><strong>Peligro</strong>: sube con fallos y acciones arriesgadas. Si llega a 10 la escena se cierra o se complica gravemente.</li>
+              <li><strong>Pistas</strong>: desbloquean rutas y opciones nuevas. Investigan antes de confrontar.</li>
             </ul>
-            <p>El Dungeon Master narra lo ocurrido, pero no decide los hechos: pistas, daños, finales, peligro y avances salen del motor.</p>
+            <p>El Dungeon Master narra lo que ocurre pero no cambia el resultado del dado — pistas, daños, finales y peligro los decide el motor.</p>
           </section>
         </div>
       )}
@@ -1571,6 +1571,10 @@ function DiceResultBar({ dice, activePlayerId }: { dice: DiceSnapshot | null; ac
           <DiceBadge kind="d20" value={d20} />
           <DiceBadge kind="d4" value={d4val ?? "—"} muted={!d4val} />
           <DiceBadge kind="d6" value={d6val ?? "—"} muted={!d6val} />
+        </div>
+        <div className="diceBarStatBonus">
+          <small>{statLabels[dice.stat]}</small>
+          <strong>+{breakdown.statModifier}</strong>
         </div>
         <div className="diceBarTotal">
           <strong>{dice.check.total}</strong>
