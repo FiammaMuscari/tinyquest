@@ -123,9 +123,13 @@ tinyquest/
 
 ## Core rule
 
+```
+ENGINE DECIDES FACT → LLM NARRATES FACT → RAG RETRIEVES CONTINUITY
+```
+
 The engine is the source of truth. It owns campaigns, scenes, turns, rounds, players, dice rolls, danger, progress, clues, flags, memory, and endings.
 
-The AI narrator only narrates facts the engine already resolved. It cannot invent clues, damage, HP changes, scene changes, dice results, or endings.
+The AI narrator only narrates facts the engine already resolved. It cannot invent clues, damage, HP changes, scene changes, dice results, or endings. Embeddings do not authorize new facts — they only retrieve what the engine already confirmed.
 
 ---
 
@@ -160,10 +164,42 @@ Total = d20 + stat modifier + d4 bonus. Compared against a difficulty set by the
 
 ## Memory system
 
-- `memorySummary` — compact current truth: clues, suspects, betrayals, bonds, stakes, current twist.
-- `sessionLog` — turn-by-turn record with action, stat, dice total, consequence, flags, and narration.
+TinyQuest has four memory layers:
 
-The AI receives both every turn. The UI shows accumulated story first, then current turn summary, then available options.
+| Layer | What it stores | Used by |
+|-------|---------------|---------|
+| `memorySummary` | Compact current truth: clues, suspects, betrayals, bonds, stakes, twist | DM prompt every turn |
+| `sessionLog` | Turn-by-turn record: action, stat, dice, consequence, flags, narration | DM prompt, UI history |
+| `narrativeMemory` | Deep structured facts, characters, causal links, story graph | Retrieval at each turn |
+| **RAG vector store** | Embedded narrative memories with hybrid scoring | Retrieved before DM call |
+
+### Narrative RAG (new)
+
+Each turn produces up to 8 `EmbeddedMemory` records (fact, clue, npc\_memory, moral\_choice, failed\_action, causal\_link, dialogue, scene\_transition). Before generating narration, the engine retrieves the most relevant past memories using hybrid scoring:
+
+- **40%** cosine similarity (text embedding)
+- **25%** entity overlap (NPC/object/clue IDs)
+- **10%** importance weight
+- **8%** scene proximity
+- **7%** unresolved bonus
+- **5%** recency + type boost
+- Penalties for resolved/forbidden memories
+
+The `MockEmbeddingProvider` is deterministic (hash-based, no network) so the full pipeline runs offline.
+
+### Narrative memory primitives
+
+- **StoryThreads** — open narrative threads with unresolved questions per NPC/object/scene. Auto-updated each turn; escalated if the same conflict recurs.
+- **PendingConsequences** — delayed state effects (danger boost, NPC hostility) triggered when a `Condition` is met (flag, clue revealed, danger threshold).
+- **MoralProfile** — per-player moral dimension tracking (mercy, truth, deception, violence, sacrifice, loyalty, corruption, pragmatism). Remembered by NPCs.
+
+### Core invariant
+
+```
+ENGINE DECIDES FACT → LLM NARRATES FACT → RAG RETRIEVES CONTINUITY
+```
+
+The LLM cannot invent clues, NPCs, damage, scene changes, dice results, or endings. `stateSuggestions` from the LLM are advisory only — real state is mutated exclusively by `applyStatePatch`.
 
 ---
 
@@ -175,7 +211,7 @@ The AI receives both every turn. The UI shows accumulated story first, then curr
 | Styling | CSS custom properties + CSS Grid (no Tailwind components) |
 | Fonts | Cinzel (panel titles), Nunito (body), Fredoka (logo) |
 | Game logic | Pure TypeScript, zero React deps |
-| AI narrator | Groq API — `qwen/qwen3-32b` |
+| AI narrator | Groq API — `llama-3.3-70b-versatile` (default, overridable) |
 | Icons | Lucide React |
 | Monorepo | npm workspaces |
 
@@ -196,8 +232,14 @@ The AI receives both every turn. The UI shows accumulated story first, then curr
 
 ## Roadmap
 
-- [ ] Expand clue metadata into typed first-class data
+- [x] Narrative RAG with semantic embeddings (`MockEmbeddingProvider` + hybrid scoring)
+- [x] StoryThreads — open narrative threads with unresolved questions
+- [x] PendingConsequences — delayed state effects triggered by conditions
+- [x] MoralProfile — per-player moral dimension tracking remembered by NPCs
+- [x] NarratorVoice — per-campaign literary style with few-shot examples
+- [x] Bot personality and loyalty rules
+- [x] Deterministic ending selection
+- [ ] Wire NarrativeMemoryIndex into turn flow (App.tsx integration)
+- [ ] LocalEmbeddingProvider (transformers.js, runs fully offline)
 - [ ] Per-class special actions
-- [ ] Deterministic ending selection
-- [ ] Bot personality and loyalty rules
 - [ ] Multiplayer room persistence

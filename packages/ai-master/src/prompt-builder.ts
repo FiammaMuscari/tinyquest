@@ -1,4 +1,18 @@
-import { getDangerBand, getDangerLabel, inferActionDomain, isFinalScene, shouldResolveEnding, type NarrationRequest } from "@tiny-quest/game-engine";
+import {
+  getDangerBand, getDangerLabel, inferActionDomain, isFinalScene, shouldResolveEnding,
+  type NarrationRequest, type RetrievedMemory, type NarratorVoice
+} from "@tiny-quest/game-engine";
+import type { ActiveNarrativeTension } from "@tiny-quest/game-engine";
+import type { StoryThread } from "@tiny-quest/game-engine";
+import type { PendingConsequence } from "@tiny-quest/game-engine";
+
+type NarrativeContext = {
+  retrievedMemories?: RetrievedMemory[];
+  activeTensions?: ActiveNarrativeTension[];
+  storyThreads?: StoryThread[];
+  pendingConsequences?: PendingConsequence[];
+  moralProfileSummary?: string;
+};
 
 const MAX_PAYLOAD_CHARS = 8_000;
 
@@ -57,7 +71,17 @@ function compactPayload<T extends Record<string, unknown>>(payload: T): T {
   } as unknown as T;
 }
 
-export function buildDungeonMasterSystemPrompt() {
+export function buildNarratorVoiceSection(voice: NarratorVoice | undefined): string {
+  if (!voice) return "";
+  return [
+    `NARRATOR VOICE: genre=${voice.genre} | tone=${voice.tone} | rhythm=${voice.rhythm} | diction=${voice.diction}.`,
+    voice.forbiddenStyle.length ? `Forbidden style: ${voice.forbiddenStyle.join("; ")}.` : "",
+    `Examples — success: "${voice.examples.success}" | partial: "${voice.examples.partial}" | failure: "${voice.examples.failure}" | npc: "${voice.examples.npcDialogue}".`
+  ].filter(Boolean).join(" ");
+}
+
+export function buildDungeonMasterSystemPrompt(narratorVoice?: NarratorVoice) {
+  const voiceSection = buildNarratorVoiceSection(narratorVoice);
   return [
     "Sos el narrador de Tiny Quest, un libro interactivo con dados. No sos el motor de reglas.",
     "El motor ya resolvió la acción y te entrega un ResolutionPlan. Ese plan es la única fuente de verdad.",
@@ -77,12 +101,49 @@ export function buildDungeonMasterSystemPrompt() {
     "Si storyContext.pendingTwists tiene entradas, creá en la narración una señal ambigua que apunte a ese giro sin nombrarlo.",
     "immediateAction debe explicar qué hizo el actor. companionMoments debe mostrar bots como personajes, no como sistema. uiFocus debe decir qué destaca la UI.",
     "Respetá botIntent/botEmotion/personality/fear/desire/speechStyle. Belo protege o confronta; no hace análisis fino si Miri puede hacerlo. Miri investiga, observa o duda; no tanquea la turba si Belo puede cubrir. companionMoments deben tener acción física concreta y diálogo corto coherente con speechStyle.",
+    "RETRIEVED MEMORY RULES: retrievedMemories son referencias de continuidad. No son permiso para revelar pistas nuevas, cambiar estado, introducir NPCs, matar/mover/transformar/acusar/absolver personajes. Solo ResolutionPlan, mustHappen, allowedClueIds y el estado del motor pueden autorizar hechos nuevos. Si un retrieved memory contradice mustHappen o mustNotHappen, obedecé mustHappen/mustNotHappen.",
+    "ACTIVE NARRATIVE TENSIONS: úsalas para colorear la narración. No resolverlas salvo que el motor lo autorice. No mencionarlas como datos técnicos — incorporalas como señales narrativas.",
+    voiceSection,
     "Formato obligatorio: {\"narration\":\"1 a 3 párrafos concretos\",\"immediateAction\":{\"actorId\":\"...\",\"actorName\":\"...\",\"text\":\"...\"},\"rollPresentation\":{\"total\":0,\"dc\":0,\"result\":\"success|partial|failure\",\"label\":\"...\"},\"dialogue\":[{\"speakerId\":\"...\",\"speakerName\":\"...\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"...\",\"intention\":\"...\"}],\"companionMoments\":[{\"characterId\":\"...\",\"characterName\":\"...\",\"action\":\"...\",\"emotion\":\"...\",\"relevance\":\"minor|major\",\"botIntent\":\"protect|doubt|confront|investigate|distract|retreat|accuse|comfort|guard|observe\",\"botEmotion\":\"afraid|angry|guilty|loyal|suspicious|desperate|calm|focused\",\"dialogue\":\"frase breve opcional\"}],\"consequence\":{\"summary\":\"...\",\"physicalChange\":\"...\",\"socialChange\":\"...\",\"emotionalChange\":\"...\"},\"worldStateChange\":{\"text\":\"...\",\"changedNpcIds\":[],\"changedObjectIds\":[],\"changedClueIds\":[]},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"...\"},\"clueReveals\":[{\"clueId\":\"...\",\"title\":\"...\",\"mode\":\"hint|partial|full\",\"text\":\"...\"}],\"uiFocus\":{\"mainText\":\"...\",\"highlight\":\"roll|clue|danger|dialogue|consequence|combat\",\"cardType\":\"discovery|danger|failure|partial|success|combat|social\",\"priority\":\"low|medium|high\"},\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[]}"
-  ].join(" ");
+  ].filter(Boolean).join(" ");
 }
 
 
-export function buildDungeonMasterPayload(input: NarrationRequest) {
+function buildRetrievedMemoriesSection(memories: RetrievedMemory[]): unknown[] {
+  return memories.slice(0, 6).map((r, i) => ({
+    index: i + 1,
+    type: r.memory.type,
+    memory: r.memory.text.slice(0, 200),
+    whyRelevant: r.reasons.slice(0, 3).join("; ") || "general continuity",
+    entities: [...r.memory.npcIds, ...r.memory.objectIds, ...r.memory.clueIds].slice(0, 4),
+    truthStatus: r.memory.truthStatus,
+    rule: "Use only as continuity reference. Do not reveal as new fact. Do not change state. Do not introduce absent entities. Only ResolutionPlan can authorize new facts."
+  }));
+}
+
+function buildActiveTensionsSection(tensions: ActiveNarrativeTension[]): unknown[] {
+  return tensions.slice(0, 3).map((t, i) => ({
+    index: i + 1,
+    title: t.title,
+    cause: t.source,
+    unresolvedQuestion: t.unresolvedQuestion,
+    involvedEntities: t.involvedEntityIds.slice(0, 4),
+    useNowIfRelevant: t.likelyPayoff,
+    doNotResolveUnlessAuthorized: "Only the engine (mustHappen / StatePatch) can resolve this tension."
+  }));
+}
+
+function buildStoryThreadsSection(threads: StoryThread[]): unknown[] {
+  return threads.slice(0, 3).map((t) => ({
+    title: t.title,
+    status: t.status,
+    unresolvedQuestion: t.unresolvedQuestion,
+    nextPressureBeat: t.nextPressureBeat,
+    involvedNpcs: t.involvedNpcIds.slice(0, 3)
+  }));
+}
+
+export function buildDungeonMasterPayload(input: NarrationRequest, narrative: NarrativeContext = {}) {
   const sceneIndex = input.selectedCampaign?.scenes.findIndex((scene) => scene.id === input.currentScene.id) ?? 0;
   const campaignScene = input.selectedCampaign?.scenes.find((scene) => scene.id === input.currentScene.id);
   const context = input.retrievedContext;
@@ -360,6 +421,22 @@ export function buildDungeonMasterPayload(input: NarrationRequest) {
       category: option.category,
       risk: option.riskLevel
     })),
+    relevantRetrievedMemory: narrative.retrievedMemories && narrative.retrievedMemories.length > 0
+      ? buildRetrievedMemoriesSection(narrative.retrievedMemories)
+      : undefined,
+    activeNarrativeTensions: narrative.activeTensions && narrative.activeTensions.length > 0
+      ? buildActiveTensionsSection(narrative.activeTensions)
+      : undefined,
+    relevantStoryThreads: narrative.storyThreads && narrative.storyThreads.length > 0
+      ? buildStoryThreadsSection(narrative.storyThreads)
+      : undefined,
+    triggeredPendingConsequences: narrative.pendingConsequences
+      ? narrative.pendingConsequences.filter((pc) => pc.status === "triggered").slice(0, 3).map((pc) => pc.narrativeHint)
+      : undefined,
+    moralProfileSummary: narrative.moralProfileSummary || undefined,
+    narratorVoice: input.selectedCampaign?.narratorVoice
+      ? buildNarratorVoiceSection(input.selectedCampaign.narratorVoice)
+      : undefined,
     responseContract: {
       narration: "2 a 3 párrafos de prosa narrativa adulta: 1) acción física concreta con un objeto o detalle sensorial de la escena, 2) tensión emocional real entre personajes (puede incluir deseo, lealtad rota, miedo o vínculo que cambia), 3) señal oblicua de giro o misterio si storyContext lo permite. Evitar informe seco y frases genéricas.",
       npcDialogue: ["PNJ: una frase breve con deseo, amenaza o mentira."],
@@ -393,6 +470,6 @@ export function buildDungeonMasterPayload(input: NarrationRequest) {
   return compactPayload(payload);
 }
 
-export function buildDungeonMasterPrompt(input: NarrationRequest): string {
-  return JSON.stringify(buildDungeonMasterPayload(input), null, 2);
+export function buildDungeonMasterPrompt(input: NarrationRequest, narrative: NarrativeContext = {}): string {
+  return JSON.stringify(buildDungeonMasterPayload(input, narrative), null, 2);
 }

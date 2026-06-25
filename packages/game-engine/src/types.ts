@@ -448,6 +448,20 @@ export type CampaignReward = {
   description: string;
 };
 
+export type NarratorVoice = {
+  genre: string;
+  tone: string;
+  rhythm: string;
+  diction: string;
+  forbiddenStyle: string[];
+  examples: {
+    success: string;
+    partial: string;
+    failure: string;
+    npcDialogue: string;
+  };
+};
+
 export type Campaign = {
   id: string;
   title: string;
@@ -492,6 +506,7 @@ export type Campaign = {
   endingConditions?: Record<string, string>;
   storyObjects?: StoryObject[];
   causalLinks?: CampaignCausalLink[];
+  narratorVoice?: NarratorVoice;
 };
 
 export type GameEvent = {
@@ -710,6 +725,9 @@ export type NarrativeMemory = {
   conclusions: StoryConclusions;
   recentMotifs: string[];
   cachedKeys: string[];
+  storyThreads?: import("./game/memory/story-threads").StoryThread[];
+  pendingConsequences?: import("./game/memory/pending-consequences").PendingConsequence[];
+  moralProfile?: import("./game/memory/moral-profile").MoralProfile;
 };
 
 export type DmRetrievedContext = {

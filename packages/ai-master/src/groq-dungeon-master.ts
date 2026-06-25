@@ -215,7 +215,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
 
   private async generateNarrationUncached(input: NarrationRequest, cacheKey: string): Promise<NarrationResponse> {
     const messages: GroqMessage[] = [
-      { role: "system", content: buildDungeonMasterSystemPrompt() },
+      { role: "system", content: buildDungeonMasterSystemPrompt(input.selectedCampaign?.narratorVoice) },
       { role: "user", content: input.resolutionPlan ? buildCompactGroqPrompt(input.resolutionPlan, this.policy.maxPromptChars, input) : "{}" }
     ];
     const json = await this.callGroq(messages, {}, "groq-chat");

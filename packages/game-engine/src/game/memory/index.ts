@@ -5,3 +5,7 @@ export * from "./causalGraph";
 export * from "./storyConclusions";
 export * from "./dmContextBuilder";
 export * from "./validators";
+export * from "./story-threads";
+export * from "./pending-consequences";
+export * from "./moral-profile";
+export * from "./active-narrative-tension";
