@@ -18,7 +18,11 @@ import { createSessionForCampaign } from "./scenes";
 import { campaignToWorldTheme, defaultCampaign } from "./campaigns";
 import { getActivePlayer, getCurrentScene, getVisibleActionChoices } from "./room-state";
 import { resolveAttack, resolveDefense } from "./combat";
-import { buildDmContext, buildVisibleOptionsForDm, createInitialNarrativeMemory, indexTurnResult } from "./game/memory";
+import {
+  buildDmContext, buildVisibleOptionsForDm, createInitialNarrativeMemory, indexTurnResult,
+  updateStoryThreadsAfterResolution, addPendingConsequenceFromResolution, evaluatePendingConsequences, applyTriggeredPendingConsequences,
+  updateMoralProfileFromResolution, initialMoralProfile
+} from "./game/memory";
 import { buildResolutionPlan } from "./resolution-plan";
 import type { ActionResolution, Campaign, CampaignMemoryUpdate, CheckOutcome, GameEvent, GameRoom, MemorySummary, NarrationResponse, Player, Scene, ScenePhase, StatKey, StructuredNextOption, WorldConfig, WorldTheme } from "./types";
 
@@ -637,7 +641,20 @@ export function applyNarration(room: GameRoom, resolution: ActionResolution, nar
     memorySummary: tragicCompanionDeath
       ? { ...stableMemory, stakes: Array.from(new Set([...stableMemory.stakes, deathCause!])).slice(-6), currentTwist: deathCause! }
       : stableMemory,
-    narrativeMemory: indexTurnResult({ ...nextRoom, players, memorySummary: stableMemory, mysteryClues: [...clues] }, event)
+    narrativeMemory: (() => {
+      const base = indexTurnResult({ ...nextRoom, players, memorySummary: stableMemory, mysteryClues: [...clues] }, event);
+      const threads = updateStoryThreadsAfterResolution(room.narrativeMemory.storyThreads ?? [], { ...nextRoom, dangerClock }, resolution);
+      const withNewCons = addPendingConsequenceFromResolution(room.narrativeMemory.pendingConsequences?.filter((pc) => pc.status === "pending") ?? [], { ...nextRoom, dangerClock }, resolution);
+      const { triggered, remaining } = evaluatePendingConsequences(withNewCons, { ...nextRoom, dangerClock });
+      const { dangerDelta } = applyTriggeredPendingConsequences(nextRoom, triggered);
+      if (dangerDelta) dangerClock = Math.max(0, Math.min(10, dangerClock + dangerDelta));
+      return {
+        ...base,
+        storyThreads: threads,
+        pendingConsequences: [...triggered, ...remaining].slice(-12),
+        moralProfile: updateMoralProfileFromResolution(room.narrativeMemory.moralProfile ?? initialMoralProfile(), resolution)
+      };
+    })()
   };
 
   nextRoom.sessionLog = [event, ...nextRoom.sessionLog].slice(0, 24);

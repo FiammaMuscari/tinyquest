@@ -25,6 +25,12 @@ import {
   shouldGrantCreativeBonus,
   species,
   totalExtraPoints,
+  MockEmbeddingProvider,
+  InMemoryVectorStore,
+  NarrativeMemoryIndex,
+  buildEmbeddedMemoriesFromTurn,
+  retrieveNarrativeMemories,
+  summarizeMoralProfileForPrompt,
   type Campaign,
   type BotPlayer,
   type Character,
@@ -553,6 +559,7 @@ export function App() {
   const [now, setNow] = useState(() => Date.now());
   const turnInFlightRef = useRef(false);
   const previousActivePlayerIdRef = useRef<string | null>(null);
+  const narrativeIndexRef = useRef<NarrativeMemoryIndex | null>(null);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -698,6 +705,10 @@ export function App() {
   }, [isAudioPlaying, sceneAudioUrl, volume]);
 
   function startSolo() {
+    narrativeIndexRef.current = new NarrativeMemoryIndex({
+      embeddingProvider: new MockEmbeddingProvider(),
+      store: new InMemoryVectorStore()
+    });
     const nextRoom = createSoloRoom(draft, selectedCampaign);
     setRoom(nextRoom);
     const firstScene = getRoomScenes(nextRoom).find((candidate) => candidate.id === nextRoom.initialSceneId) ?? getRoomScenes(nextRoom)[0];
@@ -761,6 +772,18 @@ export function App() {
         combatNote: resolution.combatNote
       });
       await wait(DICE_REVEAL_MS);
+
+      // RAG: retrieve past memories and attach to narration request before calling LLM
+      if (narrativeIndexRef.current) {
+        const retrieved = await retrieveNarrativeMemories({ room, resolution, memoryIndex: narrativeIndexRef.current, limit: 5 });
+        const moralProfile = room.narrativeMemory.moralProfile;
+        const moralProfileSummary = moralProfile ? summarizeMoralProfileForPrompt(moralProfile, active.name) : undefined;
+        resolution.narrationRequest.narrativeContext = {
+          retrievedMemories: retrieved,
+          moralProfileSummary: moralProfileSummary || undefined
+        };
+      }
+
       let narration: NarrationResponse;
       const importantTurn = active.type === "human" || resolution.check.outcome !== "success" || Boolean(resolution.consequence) || nextOptions.length === 0;
       if (!importantTurn) {
@@ -773,6 +796,12 @@ export function App() {
         }
       }
       let nextRoom = applyNarration(room, resolution, narration);
+
+      // RAG: index memories from this turn (async, fire-and-forget)
+      if (narrativeIndexRef.current) {
+        const memories = buildEmbeddedMemoriesFromTurn({ roomBefore: room, roomAfter: nextRoom, resolution, narration: narration.structuredNarration });
+        narrativeIndexRef.current.addMemories(memories).catch(() => {/* silent */});
+      }
       if (nextRoom.sessionComplete) {
         let finalRecap = buildFinalRecap(nextRoom);
         try {

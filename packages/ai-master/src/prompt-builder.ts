@@ -6,7 +6,7 @@ import type { ActiveNarrativeTension } from "@tiny-quest/game-engine";
 import type { StoryThread } from "@tiny-quest/game-engine";
 import type { PendingConsequence } from "@tiny-quest/game-engine";
 
-type NarrativeContext = {
+export type NarrativeContext = {
   retrievedMemories?: RetrievedMemory[];
   activeTensions?: ActiveNarrativeTension[];
   storyThreads?: StoryThread[];

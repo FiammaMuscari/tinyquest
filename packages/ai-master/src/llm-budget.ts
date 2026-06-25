@@ -113,6 +113,10 @@ function buildNarrativeStoryContext(input: NarrationRequest) {
 
 export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input?: NarrationRequest) {
   const storyContext = input ? buildNarrativeStoryContext(input) : undefined;
+  const retrievedMemories = input?.narrativeContext?.retrievedMemories
+    ?.slice(0, 5)
+    .map((r) => ({ type: r.memory.type, summary: r.memory.summaryLine, turn: r.memory.createdAtTurn, resolved: r.memory.resolved, score: Math.round(r.score * 100) / 100 }));
+  const moralProfileSummary = input?.narrativeContext?.moralProfileSummary;
   const payload = {
     contract: "DungeonNarrationOutput JSON only",
     actor: { id: plan.actorId, name: plan.actorName, kind: plan.actorKind },
@@ -128,11 +132,13 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     npcDirectives: plan.npcDirectives.slice(0, 3).map((npc) => ({ npcId: npc.npcId, name: npc.name, canSpeak: npc.canSpeak, allowedIntentions: npc.allowedIntentions.slice(0, 3) })),
     uiFocus: plan.uiFocus,
     storyContext,
-    rules: ["Obedecer consequence.summary exacto.", "No inventar NPCs, objetos, pistas ni ubicaciones.", "No cambiar dado ni resultado.", "No revelar mustNotHappen.", "No usar clueReveals si cluePolicy.canRevealNewClue=false.", "Usar storyContext para enriquecer narración: objetos físicos, giros oblicuos, tensión emocional entre personajes."]
+    retrievedMemories: retrievedMemories?.length ? retrievedMemories : undefined,
+    moralProfileSummary: moralProfileSummary || undefined,
+    rules: ["Obedecer consequence.summary exacto.", "No inventar NPCs, objetos, pistas ni ubicaciones.", "No cambiar dado ni resultado.", "No revelar mustNotHappen.", "No usar clueReveals si cluePolicy.canRevealNewClue=false.", "Usar storyContext para enriquecer narración: objetos físicos, giros oblicuos, tensión emocional entre personajes.", "retrievedMemories son hechos confirmados del pasado — úsalos para continuidad narrativa, no los contradigas."]
   };
   const text = JSON.stringify(payload);
   if (text.length <= maxChars) return text;
-  const slim = { ...payload, storyContext: storyContext ? { narrativeDirective: storyContext.narrativeDirective, activeTwist: storyContext.activeTwist } : undefined, mustHappen: payload.mustHappen.slice(0, 2), mustNotHappen: payload.mustNotHappen.slice(0, 2), botDirectives: [], npcDirectives: payload.npcDirectives.slice(0, 2) };
+  const slim = { ...payload, storyContext: storyContext ? { narrativeDirective: storyContext.narrativeDirective, activeTwist: storyContext.activeTwist } : undefined, retrievedMemories: retrievedMemories?.slice(0, 2), mustHappen: payload.mustHappen.slice(0, 2), mustNotHappen: payload.mustNotHappen.slice(0, 2), botDirectives: [], npcDirectives: payload.npcDirectives.slice(0, 2) };
   return JSON.stringify(slim).slice(0, maxChars);
 }
 

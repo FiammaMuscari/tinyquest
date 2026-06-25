@@ -849,6 +849,10 @@ export type NarrationRequest = {
   visibleOptions?: SceneActionChoice[];
   structuredOptions?: StructuredNextOption[];
   resolutionPlan?: import("./resolution-plan").ResolutionPlan;
+  narrativeContext?: {
+    retrievedMemories?: import("./game/rag/embedded-memory.types").RetrievedMemory[];
+    moralProfileSummary?: string;
+  };
   narrativeContract?: {
     actionType: import("./narrative-contract").NarrativeActionType;
     campaignActionType?: CampaignActionType;
