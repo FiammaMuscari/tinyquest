@@ -1,9 +1,9 @@
-import { createBoardgameServer } from "./boardgame-server";
-import { readEnv } from "./env";
+import { readEnv } from "./env.js";
+import { createWsServer } from "./ws-server.js";
 
 const env = readEnv();
-const server = createBoardgameServer();
 
-server.run(env.port, () => {
-  console.log(`Tiny Quest boardgame.io server listening on ${env.port}`);
+createWsServer(env.port, () => {
+  const mode = env.groqApiKey ? "Groq AI" : "mock (sin GROQ_API_KEY)";
+  console.log(`Tiny Quest WebSocket server en ws://localhost:${env.port} — narración: ${mode}`);
 });

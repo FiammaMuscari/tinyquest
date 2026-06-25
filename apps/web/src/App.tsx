@@ -1,5 +1,6 @@
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Brain, Cat, Dices, Heart, HelpCircle, Pause, Play, Sparkles, Wand2, X, Zap } from "lucide-react";
+import { Bot, Brain, Cat, Dices, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
+import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
@@ -561,6 +562,22 @@ export function App() {
   const previousActivePlayerIdRef = useRef<string | null>(null);
   const narrativeIndexRef = useRef<NarrativeMemoryIndex | null>(null);
 
+  const [mpState, setMpState] = useState<MultiplayerState>(() => multiplayerClient.state);
+  const [mpLobbyMode, setMpLobbyMode] = useState<"host" | "guest" | null>(null);
+  const [joinCodeInput, setJoinCodeInput] = useState("");
+
+  useEffect(() => {
+    const handler = (s: MultiplayerState) => {
+      setMpState({ ...s });
+      if (s.gameRoom && ["active", "watching", "narrating", "opponent_gone", "ended"].includes(s.phase)) {
+        setRoom(s.gameRoom);
+      }
+      if (s.lastEventSummary) setCurrentNarration(s.lastEventSummary);
+    };
+    multiplayerClient.on("state_change", handler);
+    return () => multiplayerClient.off("state_change", handler);
+  }, []);
+
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
@@ -727,6 +744,34 @@ export function App() {
     setPlotBeat(opening.plotBeat);
   }
 
+  function startMultiplayerHost() {
+    setMpLobbyMode("host");
+    multiplayerClient.createRoom(draft.name, draft, selectedCampaignId);
+  }
+
+  function openMultiplayerJoin() {
+    multiplayerClient.connect();
+    setMpLobbyMode("guest");
+  }
+
+  function confirmJoinRoom() {
+    const code = joinCodeInput.trim().toUpperCase();
+    if (code.length < 4) return;
+    multiplayerClient.joinRoom(code, draft.name, draft);
+  }
+
+  function cancelMultiplayer() {
+    multiplayerClient.disconnect();
+    setMpLobbyMode(null);
+    setJoinCodeInput("");
+    setRoom(null);
+  }
+
+  function runMultiplayerTurn() {
+    if (!selectedActionDraft || !mpState.yourTurn || mpState.phase !== "active") return;
+    multiplayerClient.submitAction(selectedActionDraft.action, selectedStat, usePet);
+  }
+
   async function runTurn(botAction?: string, botStat?: StatKey) {
     if (!room || room.sessionComplete || busy || turnInFlightRef.current) return;
     turnInFlightRef.current = true;
@@ -877,6 +922,20 @@ export function App() {
   }
 
 
+  const mpPreGamePhases: MultiplayerState["phase"][] = ["idle", "connecting", "lobby_host", "lobby_guest", "waiting_guest"];
+  if (mpLobbyMode !== null && mpPreGamePhases.includes(mpState.phase)) {
+    return (
+      <MultiplayerLobbyScreen
+        mode={mpLobbyMode}
+        mpState={mpState}
+        joinCodeInput={joinCodeInput}
+        setJoinCodeInput={setJoinCodeInput}
+        onConfirmJoin={confirmJoinRoom}
+        onCancel={cancelMultiplayer}
+      />
+    );
+  }
+
   if (!room) {
     return (
       <LobbyScreen
@@ -887,29 +946,42 @@ export function App() {
         scene={scene}
         sceneImageUrl={sceneImageUrl}
         startSolo={startSolo}
+        onMultiplayerHost={startMultiplayerHost}
+        onMultiplayerJoin={openMultiplayerJoin}
       />
     );
   }
+
+  const isMultiplayer = mpLobbyMode !== null;
+  const mpBlockActions = isMultiplayer && (mpState.phase !== "active" || !mpState.yourTurn);
+  const handleHumanTurn = isMultiplayer ? runMultiplayerTurn : () => runTurn();
 
   return (
     <main className="appShell">
       <TopStatus room={room} sceneTitle={scene.title} danger={room?.dangerClock ?? 0} remainingSeconds={remainingSeconds} activePlayer={activePlayer} />
       <HelpButton open={showHelp} setOpen={setShowHelp} />
-      {room.sessionComplete && <FinalBanner room={room} onBackToCampaigns={() => setRoom(null)} onReplayRoute={startSolo} />}
+      {isMultiplayer && <MultiplayerStatusBar mpState={mpState} onLeave={cancelMultiplayer} />}
+      {room.sessionComplete && <FinalBanner room={room} onBackToCampaigns={() => { cancelMultiplayer(); setRoom(null); }} onReplayRoute={startSolo} />}
+      {isMultiplayer && mpState.phase === "opponent_gone" && (
+        <div className="mpDisconnectOverlay">
+          <p>Tu oponente se desconectó. La partida continúa si regresa en 5 minutos.</p>
+          <button className="ghostButton" onClick={cancelMultiplayer}>Volver al menú</button>
+        </div>
+      )}
       <section className="gameFrame">
         <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         <section className="centerColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={isBotTurn(room) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} />}
-          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy} botTurnPaused={botTurnPaused} turnError={turnError} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={() => runTurn()} runBot={runBotTurn} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} />}
+          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
         </section>
-        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
+        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
       </section>
     </main>
   );
 }
 
-function LobbyScreen({ selectedCampaign, setSelectedCampaignId, draft, setDraft, scene, sceneImageUrl, startSolo }: { selectedCampaign: Campaign; setSelectedCampaignId: (id: string) => void; draft: Character; setDraft: (character: Character) => void; scene: ReturnType<typeof createScenesForCampaign>[number]; sceneImageUrl: string; startSolo: () => void }) {
+function LobbyScreen({ selectedCampaign, setSelectedCampaignId, draft, setDraft, scene, sceneImageUrl, startSolo, onMultiplayerHost, onMultiplayerJoin }: { selectedCampaign: Campaign; setSelectedCampaignId: (id: string) => void; draft: Character; setDraft: (character: Character) => void; scene: ReturnType<typeof createScenesForCampaign>[number]; sceneImageUrl: string; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void }) {
   const [showHelp, setShowHelp] = useState(false);
   return (
     <main className="appShell lobbyShell">
@@ -920,7 +992,8 @@ function LobbyScreen({ selectedCampaign, setSelectedCampaignId, draft, setDraft,
         </div>
         <div className="lobbyHeaderActions">
           <button className="soloButton lobbyStart" onClick={startSolo}><Play size={18} /> Iniciar solo con bots</button>
-          <button className="ghostButton" type="button" disabled>Crear sala multiplayer</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerHost}><Users size={16} /> Crear sala 2 jugadores</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerJoin}><Users size={16} /> Unirse con código</button>
         </div>
       </header>
 
@@ -1089,27 +1162,29 @@ function AmbienceControl({ audioRef, audioUrl, ambienceName, mood, isPlaying, se
   );
 }
 
-function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void }) {
+function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void; multiplayerBlock?: boolean }) {
   const allowedStats = Array.from(new Set(props.sceneChoices.flatMap((choice) => choice.recommendedStats)));
   const isBot = props.activeType === "bot";
   const willRollD4 = !isBot && props.selectedChoice ? shouldGrantCreativeBonus(props.selectedChoice.action, props.selectedStat, props.usePet) : false;
   const selectedEnergyCost = getActionEnergyCost(props.selectedChoice);
   const canPaySelectedAction = isBot || canPayActionEnergy(props.character.energy, props.selectedChoice);
+  const blocked = props.multiplayerBlock && !isBot;
   return (
     <section className="panel actionComposer compactAction">
       <PanelTitle title="Tirada" icon={<Dices size={17} />} />
       {!props.room ? <p className="empty">Crea tu personaje e inicia solo para probar una sesión completa con bots.</p> : (
         <>
-          {isBot && <p className="empty">Turno bot: leé la escena y hacé clic para continuar.</p>}
+          {isBot && !blocked && <p className="empty">Turno bot: leé la escena y hacé clic para continuar.</p>}
+          {blocked && <p className="empty">Turno de tu oponente — esperando su acción…</p>}
           <div className="actionCompactGrid">
             <div className="actionCompactText">
               <small>{isBot ? "Agente automático" : "Acción elegida"}</small>
               <strong>{isBot ? props.character.name : props.selectedChoice?.label ?? "Elegí una acción"}</strong>
               <span>{isBot ? "El motor elegirá acción, stat y bonus sin input humano." : props.selectedChoice?.action ?? "Seleccioná una opción de escena."}</span>
             </div>
-            <label className="statSelectCompact">Stat<select value={props.selectedStat} onChange={(event) => props.setSelectedStat(event.target.value as StatKey)} disabled={isBot || props.busy}>{allowedStats.map((stat) => <option key={stat} value={stat}>{statLabels[stat]} +{props.character.stats[stat]}</option>)}</select></label>
-            <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy} /> Mascota d4</label>
-            <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={!isBot && (props.busy || !canPaySelectedAction)}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Resolviendo..." : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : "Tirar dados"}</button>
+            <label className="statSelectCompact">Stat<select value={props.selectedStat} onChange={(event) => props.setSelectedStat(event.target.value as StatKey)} disabled={isBot || props.busy || blocked}>{allowedStats.map((stat) => <option key={stat} value={stat}>{statLabels[stat]} +{props.character.stats[stat]}</option>)}</select></label>
+            <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy || blocked} /> Mascota d4</label>
+            <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={blocked || (!isBot && (props.busy || !canPaySelectedAction))}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Narrando..." : blocked ? "Esperar turno" : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : "Tirar dados"}</button>
           </div>
           {props.turnError && <p className="turnError">{props.turnError}</p>}
         </>
@@ -1708,4 +1783,90 @@ function translateOutcome(outcome: string) {
   if (outcome === "success") return "éxito";
   if (outcome === "partial_success") return "éxito parcial";
   return "fallo";
+}
+
+// ─── Multiplayer components ───────────────────────────────────────────────────
+
+function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput, onConfirmJoin, onCancel }: {
+  mode: "host" | "guest";
+  mpState: MultiplayerState;
+  joinCodeInput: string;
+  setJoinCodeInput: (v: string) => void;
+  onConfirmJoin: () => void;
+  onCancel: () => void;
+}) {
+  const isConnecting = mpState.phase === "connecting";
+  const roomCode = mpState.roomCode;
+  const error = mpState.errorMessage;
+
+  return (
+    <main className="appShell lobbyShell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh" }}>
+      <section className="panel" style={{ maxWidth: 480, width: "100%", textAlign: "center", padding: "36px 32px" }}>
+        <div style={{ marginBottom: 24 }}>
+          <Users size={40} style={{ color: "#ffd77b", marginBottom: 12 }} />
+          {mode === "host" ? (
+            <>
+              <h2 style={{ fontSize: 22, marginBottom: 8 }}>Sala creada</h2>
+              {isConnecting || !roomCode ? (
+                <p style={{ color: "#aaa" }}>Conectando al servidor…</p>
+              ) : (
+                <>
+                  <p style={{ color: "#ccc", marginBottom: 16 }}>Compartí este código con tu oponente:</p>
+                  <div style={{ fontSize: 48, fontWeight: 900, letterSpacing: "0.15em", color: "#ffd77b", background: "rgba(255,215,123,0.08)", borderRadius: 12, padding: "16px 24px", marginBottom: 20 }}>
+                    {roomCode}
+                  </div>
+                  <p style={{ color: "#888", fontSize: 13 }}>Esperando que se una tu oponente…</p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 style={{ fontSize: 22, marginBottom: 8 }}>Unirse a sala</h2>
+              <p style={{ color: "#ccc", marginBottom: 20 }}>Ingresá el código de 6 caracteres que te compartió el anfitrión:</p>
+              <input
+                type="text"
+                value={joinCodeInput}
+                onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => { if (e.key === "Enter") onConfirmJoin(); }}
+                maxLength={8}
+                placeholder="XXXXXX"
+                disabled={isConnecting}
+                style={{ fontSize: 32, fontWeight: 900, letterSpacing: "0.2em", textAlign: "center", width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,215,123,0.35)", borderRadius: 10, padding: "14px 16px", color: "#ffd77b", marginBottom: 16, outline: "none" }}
+              />
+              <button
+                className="soloButton"
+                style={{ width: "100%", marginBottom: 10 }}
+                onClick={onConfirmJoin}
+                disabled={isConnecting || joinCodeInput.trim().length < 4}
+              >
+                {isConnecting ? "Conectando…" : "Unirse"}
+              </button>
+            </>
+          )}
+          {error && <p style={{ color: "#ff6b6b", marginTop: 12, fontSize: 13 }}>{error}</p>}
+        </div>
+        <button className="ghostButton" style={{ width: "100%" }} onClick={onCancel}>
+          <X size={14} style={{ marginRight: 6 }} />Cancelar
+        </button>
+      </section>
+    </main>
+  );
+}
+
+function MultiplayerStatusBar({ mpState, onLeave }: { mpState: MultiplayerState; onLeave: () => void }) {
+  const phaseLabel: Record<MultiplayerState["phase"], string> = {
+    idle: "", connecting: "Conectando…", lobby_host: "Lobby", lobby_guest: "Lobby",
+    waiting_guest: "Esperando oponente…", active: "Tu turno",
+    watching: `Turno de ${mpState.opponentName ?? "oponente"}…`,
+    narrating: "Narrando…", opponent_gone: "Oponente desconectado", ended: "Partida terminada"
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 16px", background: "rgba(255,215,123,0.08)", borderBottom: "1px solid rgba(255,215,123,0.2)", fontSize: 13 }}>
+      <Users size={14} style={{ color: "#ffd77b", flexShrink: 0 }} />
+      <span style={{ color: "#ffd77b", fontWeight: 700 }}>Multijugador</span>
+      {mpState.roomCode && <span style={{ color: "#aaa" }}>Sala: <strong style={{ color: "#fff" }}>{mpState.roomCode}</strong></span>}
+      <span style={{ color: mpState.yourTurn ? "#7fff90" : "#aaa", flexGrow: 1 }}>{phaseLabel[mpState.phase]}</span>
+      <button onClick={onLeave} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 12, padding: "2px 6px" }}>Salir</button>
+    </div>
+  );
 }

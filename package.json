@@ -9,11 +9,14 @@
     "preview": "npm --workspace apps/web run preview",
     "typecheck": "npm --workspace apps/web run typecheck",
     "test": "node --test tests/*.test.mjs",
-    "groq:smoke": "node scripts/run-groq-narration-smoke.mjs"
+    "groq:smoke": "node scripts/run-groq-narration-smoke.mjs",
+    "server:dev": "tsx --tsconfig tsconfig.server.json server/src/index.ts",
+    "server:install": "npm install --workspace @tiny-quest/server"
   },
   "workspaces": [
     "apps/web",
-    "packages/*"
+    "packages/*",
+    "server"
   ],
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.1",

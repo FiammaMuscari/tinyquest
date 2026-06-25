@@ -1268,6 +1268,20 @@ h1 {
   }
 }
 
+.mpDisconnectOverlay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(255, 107, 107, .45);
+  border-radius: 8px;
+  background: rgba(80, 20, 20, .75);
+  color: #ffaaaa;
+  font-size: 14px;
+}
+
 .finalBanner {
   margin-bottom: 12px;
   border-color: rgba(255, 191, 53, .62);

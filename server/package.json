@@ -1,0 +1,17 @@
+{
+  "name": "@tiny-quest/server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --tsconfig ../tsconfig.server.json src/index.ts",
+    "start": "node --tsconfig ../tsconfig.server.json dist/index.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.14",
+    "tsx": "^4.19.4"
+  }
+}

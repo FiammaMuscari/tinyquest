@@ -24,7 +24,7 @@ import {
   updateMoralProfileFromResolution, initialMoralProfile
 } from "./game/memory";
 import { buildResolutionPlan } from "./resolution-plan";
-import type { ActionResolution, Campaign, CampaignMemoryUpdate, CheckOutcome, GameEvent, GameRoom, MemorySummary, NarrationResponse, Player, Scene, ScenePhase, StatKey, StructuredNextOption, WorldConfig, WorldTheme } from "./types";
+import type { ActionResolution, Campaign, CampaignMemoryUpdate, Character, CheckOutcome, GameEvent, GameRoom, MemorySummary, NarrationResponse, Player, Scene, ScenePhase, StatKey, StructuredNextOption, WorldConfig, WorldTheme } from "./types";
 
 export const dungeonWorld: WorldConfig = {
   id: "dungeon-realms",
@@ -124,6 +124,18 @@ export function applyMemoryUpdate<T extends { memorySummary: MemorySummary }>(ga
 
 export function createSoloRoom(humanCharacter = createCharacter(), selectedCampaign: Campaign = defaultCampaign): GameRoom {
   return createGameRoom({ mode: "solo_test", humanCharacter, selectedCampaign, botCount: 2 });
+}
+
+export function createMultiplayerRoom(hostCharacter: Character, guestCharacter: Character, selectedCampaign: Campaign): GameRoom {
+  const guest: import("./types").Player = {
+    id: "player-2",
+    name: guestCharacter.name,
+    type: "human",
+    status: "active",
+    character: guestCharacter,
+    temporaryItems: []
+  };
+  return createGameRoom({ mode: "multiplayer", humanCharacter: hostCharacter, extraPlayers: [guest], botCount: 0, selectedCampaign });
 }
 
 function normalizeActionText(value: string): string {
