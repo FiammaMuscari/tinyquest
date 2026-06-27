@@ -1,4 +1,5 @@
 import type { DungeonMasterProvider, FinalRecapRequest, FinalRecapResponse, NarrationRequest, NarrationResponse } from "@tiny-quest/game-engine";
+import { buildNarrativeIngredientBundle } from "@tiny-quest/game-engine";
 import { narrationResponseSchema } from "./schemas";
 import { buildDungeonMasterSystemPrompt } from "./prompt-builder";
 import { buildFallbackNarrationOutput, parseDungeonNarrationOutput, toLegacyNarrationFields } from "./narration-contract";
@@ -9,6 +10,11 @@ type GroqEnv = {
   VITE_GROQ_API_KEY?: string;
   GROQ_MODEL?: string;
   VITE_GROQ_MODEL?: string;
+  GEMINI_API_KEY?: string;
+  VITE_GEMINI_API_KEY?: string;
+  GEMINI_MODEL?: string;
+  VITE_GEMINI_MODEL?: string;
+  provider?: string;
   policy?: Partial<LlmBudgetPolicy>;
 };
 
@@ -154,6 +160,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   private readonly apiKey?: string;
   private readonly model: string;
   private readonly useLocalProxy: boolean;
+  private readonly isGemini: boolean;
   private readonly policy: LlmBudgetPolicy;
   private readonly budgetState: LlmBudgetState;
   private cacheHits = 0;
@@ -162,8 +169,15 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   private readonly pendingNarrationRequests = new Map<string, Promise<NarrationResponse>>();
 
   constructor(env: GroqEnv = {}) {
-    this.apiKey = env.GROQ_API_KEY || env.VITE_GROQ_API_KEY;
-    this.model = env.GROQ_MODEL || env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
+    // Gemini is selected explicitly (provider=gemini) or implicitly when a Gemini key is present.
+    this.isGemini = env.provider === "gemini" || Boolean(env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY);
+    if (this.isGemini) {
+      this.apiKey = env.GEMINI_API_KEY || env.VITE_GEMINI_API_KEY;
+      this.model = env.GEMINI_MODEL || env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
+    } else {
+      this.apiKey = env.GROQ_API_KEY || env.VITE_GROQ_API_KEY;
+      this.model = env.GROQ_MODEL || env.VITE_GROQ_MODEL || "openai/gpt-oss-120b";
+    }
     this.useLocalProxy = !this.apiKey && typeof window !== "undefined";
     this.policy = { ...DEFAULT_CHEAP_LLM_POLICY, ...(env.policy ?? {}) };
     this.budgetState = createLlmBudgetState();
@@ -182,7 +196,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     if (!input.resolutionPlan) {
       if (!this.apiKey && !this.useLocalProxy) throw new Error("Groq no esta configurado. Falta GROQ_API_KEY o el proxy local.");
     } else {
-      const decision = shouldCallGroq(input.resolutionPlan, this.policy, this.budgetState, Boolean(this.apiKey));
+      const decision = shouldCallGroq(input.resolutionPlan, this.policy, this.budgetState, Boolean(this.apiKey) || this.useLocalProxy);
       if (!decision.allowed) {
         recordSkippedCall(this.budgetState, input.resolutionPlan, decision.reason);
         this.fallbackUses += 1;
@@ -214,9 +228,10 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   }
 
   private async generateNarrationUncached(input: NarrationRequest, cacheKey: string): Promise<NarrationResponse> {
+    const bundle = input.resolutionPlan ? buildNarrativeIngredientBundle(input, input.resolutionPlan) : undefined;
     const messages: GroqMessage[] = [
       { role: "system", content: buildDungeonMasterSystemPrompt(input.selectedCampaign?.narratorVoice) },
-      { role: "user", content: input.resolutionPlan ? buildCompactGroqPrompt(input.resolutionPlan, this.policy.maxPromptChars, input) : "{}" }
+      { role: "user", content: input.resolutionPlan ? buildCompactGroqPrompt(input.resolutionPlan, this.policy.maxPromptChars, input, bundle) : "{}" }
     ];
     const json = await this.callGroq(messages, {}, "groq-chat");
     if (input.resolutionPlan) recordGroqCall(this.budgetState, input.resolutionPlan);
@@ -328,22 +343,27 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
           forbiddenContradictions: input.memorySummary.forbiddenContradictions
         })
       }
-    ], { model: "llama-3.3-70b-versatile", forceJson: true }, "repair-json");
+    ], { model: this.isGemini ? "gemini-2.5-flash" : "llama-3.3-70b-versatile", forceJson: true }, "repair-json");
   }
 
   private async callGroq(messages: GroqMessage[], options: { model?: string; forceJson?: boolean } = {}, debugLabel = "chat") {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
     const model = options.model ?? this.model;
-    const isQwen = model === "qwen/qwen3-32b";
-    const endpoint = this.useLocalProxy ? "/api/groq/chat" : "https://api.groq.com/openai/v1/chat/completions";
+    const isQwen = model.startsWith("qwen/");
+    const isGptOss = model.startsWith("openai/gpt-oss");
+    const directUrl = this.isGemini
+      ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+      : "https://api.groq.com/openai/v1/chat/completions";
+    const endpoint = this.useLocalProxy ? (this.isGemini ? "/api/gemini/chat" : "/api/groq/chat") : directUrl;
     let body = {
       model,
       messages,
-      temperature: isQwen ? 0.62 : 0.68,
+      temperature: isQwen ? 0.72 : 0.80,
       max_tokens: Math.max(220, Math.min(560, Math.ceil(this.policy.maxOutputChars / 4))),
       ...(isQwen ? { reasoning_effort: "none", include_reasoning: false } : {}),
-      ...(options.forceJson || !model.startsWith("qwen/") ? { response_format: { type: "json_object" } } : {})
+      ...(isGptOss ? { reasoning_effort: "low" } : {}),
+      ...(options.forceJson || !isQwen ? { response_format: { type: "json_object" } } : {})
     };
     if (JSON.stringify(body).length > MAX_GROQ_BODY_CHARS) {
       body = { ...body, messages: compactGroqMessages(messages) };
@@ -366,14 +386,15 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       });
     }
     if (!response.ok) {
-      const error = response.status === 429 ? "Groq rate limit: espera unos segundos antes del siguiente turno." : `Groq request failed: ${response.status}`;
+      const provider = this.isGemini ? "Gemini" : "Groq";
+      const error = response.status === 429 ? `${provider} rate limit: espera unos segundos antes del siguiente turno.` : `${provider} request failed: ${response.status}`;
       writeLlmDebug({ ...debugBase, error });
       throw new Error(error);
     }
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
-      const error = "Groq response did not include content.";
+      const error = `${this.isGemini ? "Gemini" : "Groq"} response did not include content.`;
       writeLlmDebug({ ...debugBase, error });
       throw new Error(error);
     }
@@ -424,6 +445,10 @@ function normalizeGroqNarration(value: unknown, input: NarrationRequest) {
     data.narration = legacy.narration;
     data.npcDialogue = legacy.npcDialogue;
     data.consequence = legacy.consequence;
+    // Surface enrichedOptions for App.tsx to use as choice labels
+    if (structured.enrichedOptions?.length) {
+      data.enrichedOptions = structured.enrichedOptions;
+    }
   }
   const sections = typeof data.sections === "object" && data.sections !== null ? data.sections as Record<string, unknown> : undefined;
   const target = input.narrativeContract?.target ?? input.currentScene.title;

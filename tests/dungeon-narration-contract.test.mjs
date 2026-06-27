@@ -64,12 +64,12 @@ function validOutput(overrides = {}) {
   };
 }
 
-test("1-2) prompt pide DungeonNarrationOutput e incluye ResolutionPlan", async () => {
+test("1-2) prompt expresa el contrato de narración e incluye el ResolutionPlan", async () => {
   const source = await readFile(new URL("../packages/ai-master/src/prompt-builder.ts", import.meta.url), "utf8");
-  assert.match(source, /DungeonNarrationOutput/);
   assert.match(source, /ResolutionPlan/);
-  assert.match(source, /immediateAction/);
+  assert.match(source, /enrichedOptions/);
   assert.match(source, /clueReveals/);
+  assert.match(source, /memoryPatch/);
 });
 
 test("3) parser acepta JSON válido", () => {

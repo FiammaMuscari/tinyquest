@@ -34,7 +34,7 @@ const { createScenesForCampaign } = await import(`file://${join(dir, "scenes.mjs
 const { getVisibleActionChoices } = await import(`file://${join(dir, "room-state.mjs")}`);
 
 const campaign = campaigns.find((item) => item.id === "luna-roja");
-const scene = createScenesForCampaign(campaign).find((item) => item.id === "body-by-mill");
+const scene = createScenesForCampaign(campaign).find((item) => item.id === "cuartel-umbral");
 const roomBase = {
   id: "room",
   campaign,
@@ -57,10 +57,10 @@ test("cada turno no final devuelve al menos 3 opciones", () => {
 });
 
 test("acciones agotadas mutan y no reaparecen igual", () => {
-  const room = { ...roomBase, livingState: { ...roomBase.livingState, actionMemory: { "compare-bite-wound": { actionId: "compare-bite-wound", sceneId: scene.id, uses: 1, exhausted: true } } } };
+  const room = { ...roomBase, livingState: { ...roomBase.livingState, actionMemory: { "examinar-marca-nicolas": { actionId: "examinar-marca-nicolas", sceneId: scene.id, uses: 1, exhausted: true } } } };
   const choices = getVisibleActionChoices(scene, room);
-  assert.equal(choices.some((choice) => choice.id === "compare-bite-wound"), false);
-  assert.ok(choices.some((choice) => choice.id.startsWith("compare-bite-wound-")));
+  assert.equal(choices.some((choice) => choice.id === "examinar-marca-nicolas"), false);
+  assert.ok(choices.some((choice) => choice.id.startsWith("examinar-marca-nicolas-")));
   assert.ok(choices.length >= 3);
 });
 

@@ -18,6 +18,8 @@ export interface ResolutionPlan {
     total: number;
     dc: number;
     result: ResolutionResult;
+    critical?: boolean;
+    fumble?: boolean;
   };
   scene: {
     id: string;
@@ -338,7 +340,9 @@ export function buildResolutionPlan(input: BuildResolutionPlanInput): Resolution
       bonus: input.check.rollBreakdown.statModifier + input.check.rollBreakdown.d4Bonus + input.check.rollBreakdown.flatBonus - input.check.rollBreakdown.penalties,
       total: input.check.total,
       dc: input.check.difficulty,
-      result
+      result,
+      critical: input.check.critical,
+      fumble: input.check.fumble
     },
     scene: {
       id: input.scene.id,

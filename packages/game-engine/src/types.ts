@@ -548,6 +548,12 @@ export type CheckResult = {
   difficulty: number;
   d20: RollResult;
   creativeBonus?: RollResult;
+  /** Natural high roll (widened by luck): spectacular success regardless of difficulty. */
+  critical?: boolean;
+  /** Natural 1: disaster regardless of total. */
+  fumble?: boolean;
+  /** How many pips luck widened the crit range (0-3). For UI/narration. */
+  luckBonus?: number;
   rollBreakdown: {
     d20: number;
     statModifier: number;
@@ -870,17 +876,19 @@ export type NarrationRequest = {
 
 export interface DungeonNarrationOutput {
   narration: string;
-  immediateAction: { actorId: string; actorName: string; text: string };
-  rollPresentation: { total: number; dc: number; result: "success" | "partial" | "failure"; label: string };
   dialogue: Array<{ speakerId: string; speakerName: string; speakerKind: "player" | "bot" | "npc" | "narrator"; line: string; intention: string }>;
-  companionMoments: Array<{ characterId: string; characterName: string; action: string; emotion: string; relevance: "minor" | "major"; botIntent?: import("./bot-personality").BotIntent; botEmotion?: import("./bot-personality").BotEmotion; dialogue?: string }>;
   consequence: { summary: string; physicalChange?: string; socialChange?: string; emotionalChange?: string };
-  worldStateChange: { text: string; changedNpcIds: string[]; changedObjectIds: string[]; changedClueIds: string[] };
   dangerChange: { before: number; after: number; manifestation: string };
   clueReveals: Array<{ clueId: string; title: string; mode: "hint" | "partial" | "full"; text: string }>;
-  uiFocus: { mainText: string; highlight: "roll" | "clue" | "danger" | "dialogue" | "consequence" | "combat"; cardType: "discovery" | "danger" | "failure" | "partial" | "success" | "combat" | "social"; priority: "low" | "medium" | "high" };
   memoryPatch: { factsToRemember: string[]; factsToUpdate: string[]; factsToForget?: string[] };
   continuityWarnings: string[];
+  enrichedOptions?: Array<{ id: string; label: string }>;
+  // Legacy optional fields kept for backwards compat
+  immediateAction?: { actorId: string; actorName: string; text: string };
+  rollPresentation?: { total: number; dc: number; result: "success" | "partial" | "failure"; label: string };
+  companionMoments?: Array<{ characterId: string; characterName: string; action: string; emotion: string; relevance: "minor" | "major"; botIntent?: import("./bot-personality").BotIntent; botEmotion?: import("./bot-personality").BotEmotion; dialogue?: string }>;
+  worldStateChange?: { text: string; changedNpcIds: string[]; changedObjectIds: string[]; changedClueIds: string[] };
+  uiFocus?: { mainText: string; highlight: "roll" | "clue" | "danger" | "dialogue" | "consequence" | "combat"; cardType: "discovery" | "danger" | "failure" | "partial" | "success" | "combat" | "social"; priority: "low" | "medium" | "high" };
 }
 
 export type NarrationResponse = {
@@ -920,6 +928,7 @@ export type NarrationResponse = {
   stateSuggestions: StateSuggestion[];
   pacingHint: "continue" | "next_scene" | "finale";
   structuredNarration?: DungeonNarrationOutput;
+  enrichedOptions?: Array<{ id: string; label: string }>;
 };
 
 export type FinalRecapRequest = {

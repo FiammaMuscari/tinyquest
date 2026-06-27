@@ -23,6 +23,7 @@ export * from "./energy";
 export * from "./living-state-adapter";
 export * from "./narrative-contract";
 export * from "./player-narration";
+export * from "./narrative-ingredient-bundle";
 export * from "./resolution-plan";
 export * from "./story-graph.compiler";
 export * from "./story-graph.runtime";

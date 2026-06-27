@@ -47,23 +47,23 @@ function roomLike() {
   };
 }
 
-test("Luna Roja tiene vertical slice concreto de 6 escenas y acciones no genéricas", () => {
-  assert.equal(redMoon.scenes.length, 6);
+test("Luna Roja tiene vertical slice concreto de 4 escenas y acciones no genéricas", () => {
+  assert.equal(redMoon.scenes.length, 4);
   assert.equal(redMoon.durationMinutes, 25);
-  assert.ok(redMoon.npcs.some((npc) => npc.name === "Tomás, aprendiz del molino"));
+  assert.ok(redMoon.npcs.some((npc) => npc.name === "Inspector Bran"));
   const labels = redMoon.scenes.flatMap((scene) => scene.multipleChoiceOptions.map((option) => option.label));
-  assert.ok(labels.includes("Comparar la mordida con la herida del cadáver"));
-  assert.ok(labels.includes("Interrogar a Tomás sobre la campana"));
-  assert.ok(labels.includes("Seguir el rastro de barro hasta la casa del alcalde"));
+  assert.ok(labels.includes("Examinar la marca de plata rota de Nicolás"));
+  assert.ok(labels.includes("Escuchar a Nicolás antes de que lo aíslen"));
+  assert.ok(labels.includes("Presentar la orden falsificada ante el tribunal"));
   assert.equal(labels.some((label) => label.includes("Examinar el objeto clave")), false);
 });
 
 test("no se repite clueId ya descubierto", () => {
   const state = adapter.createLivingStateForRoom(roomLike());
-  const discovered = reducer.applyStatePatch(state, { ...adapter.emptyStatePatch(), clueUpdates: [{ id: "fake-claws", discovered: true, confirmed: true }] });
-  const choice = redMoon.scenes[0].multipleChoiceOptions.find((option) => option.id === "compare-bite-wound");
-  const candidateIds = adapter.clueIdsForChoice(redMoon, "body-by-mill", choice, "success");
-  assert.deepEqual(candidateIds, ["fake-claws"]);
+  const discovered = reducer.applyStatePatch(state, { ...adapter.emptyStatePatch(), clueUpdates: [{ id: "marca-rota", discovered: true, confirmed: true }] });
+  const choice = redMoon.scenes[0].multipleChoiceOptions.find((option) => option.id === "examinar-marca-nicolas");
+  const candidateIds = adapter.clueIdsForChoice(redMoon, "cuartel-umbral", choice, "success");
+  assert.deepEqual(candidateIds, ["marca-rota"]);
   assert.deepEqual(adapter.filterUndiscoveredClueIds(discovered, candidateIds), []);
 });
 
@@ -89,34 +89,34 @@ test("recupera +1 energía por ronda hasta máximo configurable", () => {
 
 test("NPC conserva nombre/presencia y objeto cambia estado después de usarse", () => {
   const state = adapter.createLivingStateForRoom(roomLike());
-  assert.equal(redMoon.npcs.find((npc) => npc.id === "tomas-apprentice").name, "Tomás, aprendiz del molino");
-  assert.equal(state.npcStates["tomas-apprentice"].present, true);
+  assert.equal(redMoon.npcs.find((npc) => npc.id === "nicolas-fierro").name, "Nicolás Fierro");
+  assert.equal(state.npcStates["nicolas-fierro"].present, true);
   const patch = adapter.emptyStatePatch();
-  patch.itemUpdates = [{ id: "moon-bell-seal", state: "danado", notes: ["sello roto"], storyMarks: ["sacrificio"] }];
+  patch.itemUpdates = [{ id: "cuaderno-carvell-object", state: "danado", notes: ["cuaderno dañado"], storyMarks: ["sacrificio"] }];
   const next = reducer.applyStatePatch(state, patch);
-  assert.equal(next.inventory["moon-bell-seal"].state, "danado");
+  assert.equal(next.inventory["cuaderno-carvell-object"].state, "danado");
 });
 
 test("finales de Luna Roja se deciden por estado del motor y permiten al menos 3 rutas", () => {
   const base = {
-    currentSceneId: "rain-trial",
+    currentSceneId: "tribunal-sello",
     round: 2,
     availableEndings: redMoon.possibleEndings.map((ending) => ending.id),
-    sceneClocks: { "rain-trial": { currentTicks: 0, maxTicks: 4 } },
-    inventory: { "moon-bell-seal": { state: "intacto" }, "ritual-tool-object": { state: "intacto" } }
+    sceneClocks: { "tribunal-sello": { currentTicks: 0, maxTicks: 4 } },
+    inventory: {}
   };
   const confirmed = (ids) => Object.fromEntries(ids.map((id) => [id, { id, status: "confirmed" }]));
-  const secret = endings.selectEnding(redMoon, {
+  const truthful = endings.selectEnding(redMoon, {
     ...base,
     danger: 8,
-    discoveredClues: confirmed(["fake-claws", "ritual-tool", "moon-seal"]),
-    routeStates: { "secret-route": { id: "secret-route", status: "open" } },
-    endingScore: { truth: 3 }
+    discoveredClues: confirmed(["marca-rota", "sello-falsificado", "cuaderno-carvell"]),
+    routeStates: {},
+    endingScore: { truth: 3, mercy: 2 }
   });
   const tragic = endings.selectEnding(redMoon, { ...base, danger: 9, discoveredClues: {}, routeStates: {}, endingScore: { chaos: 4 } });
   const falseWin = endings.selectEnding(redMoon, { ...base, danger: 5, discoveredClues: {}, routeStates: {}, endingScore: { violence: 2, truth: 0 } });
-  assert.equal(secret.id, "secret-deep-truth");
-  assert.equal(tragic.id, "tragic-execution");
-  assert.equal(falseWin.id, "false-victory");
-  assert.equal(new Set([secret.id, tragic.id, falseWin.id]).size, 3);
+  assert.equal(truthful.id, "verdad-completa");
+  assert.equal(tragic.id, "ejecucion-tragica");
+  assert.equal(falseWin.id, "verano-gana");
+  assert.equal(new Set([truthful.id, tragic.id, falseWin.id]).size, 3);
 });

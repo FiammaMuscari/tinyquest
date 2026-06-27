@@ -89,5 +89,6 @@ export const narrationResponseSchema = z.object({
   memoryUpdate: dmMemoryUpdateSchema,
   stateSuggestions: z.array(stateSuggestionSchema).default([]),
   pacingHint: z.enum(["continue", "next_scene", "finale"]).default("continue"),
-  structuredNarration: dungeonNarrationOutputSchema.optional()
+  structuredNarration: dungeonNarrationOutputSchema.optional(),
+  enrichedOptions: z.array(z.object({ id: z.string(), label: z.string() })).optional()
 });

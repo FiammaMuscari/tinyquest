@@ -164,12 +164,12 @@ test("I) crisis/action targetKind inválido se detecta", () => {
   assert.ok(issues.some((issue) => issue.code === "invalid-target-kind"));
 });
 
-test("J) prompt de Groq incluye ResolutionPlan y mustNotHappen", async () => {
+test("J) prompt de Groq incluye ResolutionPlan y restricciones forbidden", async () => {
   const source = await readFile(new URL("../packages/ai-master/src/prompt-builder.ts", import.meta.url), "utf8");
   assert.match(source, /ResolutionPlan/);
-  assert.match(source, /mustNotHappen/);
-  assert.match(source, /consequence\.summary/);
-  assert.match(source, /roll\.result/);
+  assert.match(source, /forbidden/);
+  assert.match(source, /consequence/);
+  assert.match(source, /roll/);
 });
 
 
@@ -206,7 +206,7 @@ test("N) peligro alto genera dangerManifestation física", () => {
     contextLabels: { npcs: { roldan: "Alcalde Roldán" }, objects: { "moon-seal": "Sello lunar" }, clues: { "seal-flour": "Harina vieja" } },
     target: { id: "moon-seal", kind: "object" }
   });
-  assert.match(consequence.dangerManifestation ?? "", /turba|campana|piedra|testigos|salida/i);
+  assert.match(consequence.dangerManifestation ?? "", /amenaza|golpe|arma|grito|salida|acorrala/i);
 });
 
 test("O) consecuencia usa contexto presente y no inventa NPCs u objetos", () => {

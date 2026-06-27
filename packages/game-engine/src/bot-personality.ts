@@ -105,29 +105,27 @@ export function updateBotMemoryAfterTurn(memory: Record<string, BotMemoryState>,
   const next = { ...memory };
   for (const profile of BOT_PERSONALITY_PROFILES) {
     const current = getBotMemory(next, profile.botId);
-    const text = `${turn.action ?? ""} ${turn.consequenceText ?? ""}`.toLowerCase();
     const seen = [...(turn.unlockedClues ?? []), ...(turn.structuredNarration?.clueReveals?.map((clue) => clue.clueId) ?? [])];
     const suspected = (turn.structuredNarration?.dialogue ?? []).filter((line) => /mentir|dudar|acusar|contradic/i.test(line.intention ?? "")).map((line) => line.speakerId);
-    const protectedIds = /nicolás|nicolas|accused-wolf/.test(text) && /protege|proteger|pedrada|turba|piedra/.test(text) ? ["accused-wolf"] : [];
-    next[profile.botId] = { ...current, seenClueIds: unique([...current.seenClueIds, ...seen]), suspectedNpcIds: unique([...current.suspectedNpcIds, ...suspected]), protectedNpcIds: unique([...current.protectedNpcIds, ...protectedIds]), lastImportantMoment: turn.consequenceText ?? current.lastImportantMoment };
+    next[profile.botId] = { ...current, seenClueIds: unique([...current.seenClueIds, ...seen]), suspectedNpcIds: unique([...current.suspectedNpcIds, ...suspected]), protectedNpcIds: current.protectedNpcIds, lastImportantMoment: turn.consequenceText ?? current.lastImportantMoment };
   }
   return next;
 }
 
-function sceneHasNicolasRisk(state: Pick<GameRoom, "dangerClock" | "phase">, scene?: Scene, plan?: ResolutionPlan) {
+function sceneHasAllyAtRisk(state: Pick<GameRoom, "dangerClock" | "phase">, scene?: Scene, plan?: ResolutionPlan) {
   const text = `${scene?.title ?? ""} ${scene?.objective ?? ""} ${scene?.danger ?? ""} ${plan?.actionText ?? ""} ${plan?.consequence.summary ?? ""}`.toLowerCase();
-  return /nicolás|nicolas|acusado|pedrada|turba|ejecución|ejecucion/.test(text) || (state.dangerClock ?? 0) >= 6;
+  return /acusad|ejecuci|arresto|amenaza|herid|captura|peligro|condena|atacar|golpe/.test(text) || (state.dangerClock ?? 0) >= 6;
 }
 
 function evidenceAtRisk(scene?: Scene, plan?: ResolutionPlan) {
   const text = `${scene?.title ?? ""} ${scene?.objective ?? ""} ${plan?.actionText ?? ""} ${plan?.consequence.summary ?? ""}`.toLowerCase();
-  return /prueba|carta|grillete|campana|sello|mordida|herida|cuerda|contamina|toca|alterar|desaparece/.test(text) || Boolean(plan?.validContext.availableClueIds.length);
+  return /prueba|evidencia|documento|sello|objeto|registro|contamina|toca|alterar|desaparece|destruir/.test(text) || Boolean(plan?.validContext.availableClueIds.length);
 }
 
 export function chooseBotIntent(bot: BotPlayer | { id: string; name: string }, state: GameRoom, scene: Scene, plan?: ResolutionPlan): BotIntent {
   const profile = getBotPersonalityProfile(bot.id || bot.name);
   if (profile.name === "Belo") {
-    if (sceneHasNicolasRisk(state, scene, plan)) return "protect";
+    if (sceneHasAllyAtRisk(state, scene, plan)) return "protect";
     if ((state.dangerClock ?? 0) >= 4) return "guard";
     return "confront";
   }
@@ -142,7 +140,7 @@ export function chooseBotIntent(bot: BotPlayer | { id: string; name: string }, s
 export function chooseBotEmotion(bot: BotPlayer | { id: string; name: string }, state: GameRoom, scene: Scene, plan?: ResolutionPlan): BotEmotion {
   const profile = getBotPersonalityProfile(bot.id || bot.name);
   if ((state.dangerClock ?? 0) >= 8 || plan?.roll.result === "failure") return profile.name === "Belo" ? "desperate" : "afraid";
-  if (profile.name === "Belo") return sceneHasNicolasRisk(state, scene, plan) ? "loyal" : "angry";
+  if (profile.name === "Belo") return sceneHasAllyAtRisk(state, scene, plan) ? "loyal" : "angry";
   if (profile.name === "Miri") return evidenceAtRisk(scene, plan) ? "focused" : "suspicious";
   return profile.defaultEmotion;
 }
@@ -157,8 +155,8 @@ export function buildBotActionFromIntent(bot: BotPlayer | { id: string; name: st
     return false;
   });
   if (option) return option.action;
-  if (name === "Belo" && (intent === "protect" || intent === "guard")) return `${name} se planta delante de Nicolás y mira las manos de la turba, no la prueba.`;
-  if (name === "Belo" && intent === "confront") return `${name} enfrenta a Roldán con voz baja y cuerpo firme para que nadie toque a Nicolás.`;
+  if (name === "Belo" && (intent === "protect" || intent === "guard")) return `${name} se planta entre la amenaza y el grupo, listo para recibir el primer golpe.`;
+  if (name === "Belo" && intent === "confront") return `${name} encara con voz baja y cuerpo firme a quien presiona al grupo.`;
   if (name === "Miri" && intent === "investigate") return `${name} revisa la prueba sin moverla y busca la contradicción material.`;
   if (name === "Miri" && intent === "doubt") return `${name} clava la mirada en el testigo y marca la frase que no encaja.`;
   if (name === "Miri" && (intent === "guard" || intent === "observe")) return `${name} protege la evidencia con el cuerpo ladeado y observa quién intenta acercarse.`;
@@ -177,7 +175,7 @@ export function validateBotPersonalityConsistency(botMoment: CompanionMomentLike
   const text = `${botMoment.action} ${botMoment.dialogue ?? ""}`.toLowerCase();
   if (/ayuda al grupo|hace algo|se mantiene cerca/.test(text)) issues.push("BOT_GENERIC_MOMENT");
   if (profile.name === "Belo" && /analiza|deduce|calcula|compara la mordida|lee la tinta|examina fino/.test(text)) issues.push("BOT_ROLE_DRIFT");
-  if (profile.name === "Miri" && /se planta delante de nicolás|recibe la pedrada|empuja a la turba|tanquea|carga contra/.test(text)) issues.push("BOT_ROLE_DRIFT");
+  if (profile.name === "Miri" && /se planta (delante|entre|frente)|recibe (el|la) (primer\s+)?(golpe|pedrada|impacto)|empuja a|tanquea|carga contra|se interpone/.test(text)) issues.push("BOT_ROLE_DRIFT");
   if (botMoment.botIntent && !profile.actionBiases.includes(botMoment.botIntent) && !(profile.name === "Belo" && botMoment.botIntent === "confront") && !(profile.name === "Miri" && botMoment.botIntent === "doubt")) issues.push("BOT_PERSONALITY_MISMATCH");
   return issues;
 }

@@ -1,59 +1,73 @@
 ---
 campaignId: luna-roja
 kind: overview
-tags: [hombre_lobo, aldea, juicio, falsificacion, magia_lunar]
+tags: [licantropo, ciudad, juicio, corrupcion, pacto_de_plata, magia_policial]
 ---
 # El Asesino de la Luna Roja
 
 ## Theme
-Hombre lobo, aldea cerrada, juicio social, magia lunar falsificada.
+Intriga urbana licántropa. Corrupción institucional. Justicia contra ley en una ciudad que criminaliza la naturaleza.
+
+## Mundo
+Veldaran, ciudad amurallada con el Pacto de Plata: los licántropos son ciudadanos registrados, no monstruos. La Guardia del Umbral tiene el monopolio de la magia y el poder de arresto. La Mano de Bronce es una red clandestina que protege a los no registrados.
 
 ## Premisa
-Un molinero aparece muerto bajo el molino. La aldea quiere ejecutar a un licantropo joven antes de que exista juicio, pero las pruebas fueron fabricadas con magia lunar y mano humana.
+El Inspector Bran va a ejecutar a Nicolás Fierro, licántropo registrado, antes del amanecer con una orden de emergencia falsificada. El crimen real lo cometió su agente Cora por orden de Bran, que estaba siendo chantajeado por Carvell. El grupo tiene horas para probarlo.
 
 ## Conflicto central
-Verdad contra miedo colectivo. Cada escena debe preguntar si el grupo protege pruebas, calma a la turba o expone a quien usa el horror como coartada.
+Tiempo real contra sistema corrupto. Cada ronda Bran avanza en el proceso de ejecución. El grupo necesita evidencia antes de que el tribunal abra y la orden se vuelva irrevocable.
 
 ## Explicacion falsa
-El Lobo Acusado mato al molinero durante un ataque de furia.
+Nicolás Fierro, licántropo con permiso de guardia, mató a Carvell durante la noche y huyó.
 
 ## Secreto real
-La herramienta ritual del archivo del alcalde fue usada para copiar marcas de garra. El crimen protege una deuda familiar.
+Carvell chantajeaba a Bran con tres años de desfalco. Bran mandó a su agente Cora a matarlo con un cuchillo y usó la presencia accidental de Nicolás como coartada. Nicolás estaba ayudando ilegalmente a Issa, una licántropa sin registro, a cruzar el sector sellado de la muralla.
 
 ## Amenaza visible
-La Bestia Maldita del Bosque Rojo.
+La orden de ejecución de emergencia con sello senatorial.
 
 ## Amenaza oculta
-Una casa local compra silencio y manipula a la turba para romper la proteccion del linaje licantropo.
+El cuaderno de Carvell: si Bran lo destruye antes de que el grupo lo encuentre, el motivo desaparece.
 
 ## Peligro inicial
-2/10. La aldea esta armada pero aun escucha.
+2/10. El cuartel está controlado pero el mandato de arresto ya existe.
 
 ## Duracion estimada
-15 minutos, 4 escenas maximo.
+25 minutos, 4 escenas.
 
 ## Tono
-Fantasia oscura de aldea, lluvia, madera vieja, sellos rotos, campanas, culpa heredada, romance peligroso y justicia imperfecta.
+Tenso, político y moral. Ciudad nocturna con lluvia, patrullas selladas, archivos cerrados y personas que saben más de lo que pueden decir.
 
 ## Escenas
-1. El Cadaver Bajo el Molino: asegurar una prueba fisica antes de que la turba la contamine.
-2. El Bosque Rojo: seguir la magia lunar hasta su ejecutor.
-3. El Lobo Acusado: decidir si proteger, presionar o usar al acusado como cebo.
-4. El Juicio Bajo la Luna: cerrar verdad, sacrificio, condena o pacto.
+1. El Cuartel del Umbral: encontrar la primera contradicción antes de que Bran selle la orden.
+2. Los Muros Bajos: encontrar a Issa y al cuaderno de Carvell antes de que los agentes lleguen.
+3. El Archivo de Veldaran: conseguir el registro de acceso nocturno antes de que Bran destruya la evidencia.
+4. El Tribunal del Gran Sello: presentar las pruebas y proteger a los testigos antes del veredicto.
+
+## Facciones
+- Guardia del Umbral: autoridad corrupta con monopolio mágico.
+- La Mano de Bronce: red clandestina de protección de licántropos sin registro.
+- Casa Verano: poder político que quiere usar el caso para ganar control de la Guardia.
+- Senado de Sellos: quiere un culpable presentable antes del amanecer.
+
+## Personajes clave
+- Nicolás Fierro: acusado inocente. Registrado bajo el Pacto de Plata. Marca de plata rota.
+- Issa: 16 años, sin registro, testigo presencial del crimen real.
+- Inspector Bran: el culpable real. Usa la ley para matar antes de que la verdad lo destruya.
+- Cora la Sombra: agente de Bran, la asesina real. Aparece en el tribunal.
 
 ## Decisiones disponibles
-Investigar pruebas, contener facciones, proteger al acusado, rastrear magia, combatir criatura, negociar testimonio, consagrar o romper reliquias.
+Examinar evidencia forense, interrogar aliados bajo presión, negociar con facciones, combatir agentes de Bran, proteger testigos vulnerables, presentar pruebas al tribunal.
 
 ## Escalada de peligro
-Peligro 4: la turba ocupa rutas. Peligro 7: un NPC huye o miente por miedo. Peligro 9: se fuerza juicio. Peligro 10: ejecucion o combate final.
+Peligro 4: agentes de Bran rastrean al grupo. Peligro 7: una ruta de evidencia se cierra. Peligro 9: Bran llega primero al archivo. Peligro 10: orden de ejecución ejecutada.
 
-## Unicidad
-La criatura no es solo enemigo: es herramienta, testigo y victima parcial de una manipulacion humana.
-
-## No revelar temprano
-No revelar que el archivo del alcalde esta implicado hasta que exista fake_claws + ritual_tool o una accion social fuerte.
+## Dilemas morales
+- Usar a Issa como testigo la protege a ella pero puede destruir la Mano de Bronce.
+- Aceptar el trato de Casa Verano salva a Nicolás pero entrega control de la Guardia.
+- Exponer el desfalco de Bran destruye su carrera pero revela irregularidades antiguas.
 
 ## Rutas
-Ruta principal: pruebas falsas -> herramienta ritual -> carta de deuda -> juicio.
-Ruta secundaria: calmar turba -> testimonio de sacristana -> final de misericordia.
-Ruta de fallo: acusacion apresurada -> NPC ausente -> juicio corrupto.
+Ruta principal: marca rota → sello falsificado → cuaderno de Carvell → tribunal.
+Ruta de testigo: ganar confianza de la Mano → testimonio de Issa → protección en tribunal.
+Ruta de fallo: Bran destruye evidencia → orden ejecutada antes del amanecer.

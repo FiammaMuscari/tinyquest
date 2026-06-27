@@ -1,6 +1,7 @@
 import {
   getDangerBand, getDangerLabel, inferActionDomain, isFinalScene, shouldResolveEnding,
-  type NarrationRequest, type RetrievedMemory, type NarratorVoice
+  type NarrationRequest, type RetrievedMemory, type NarratorVoice,
+  type NarrativeIngredientBundle,
 } from "@tiny-quest/game-engine";
 import type { ActiveNarrativeTension } from "@tiny-quest/game-engine";
 import type { StoryThread } from "@tiny-quest/game-engine";
@@ -80,32 +81,17 @@ export function buildNarratorVoiceSection(voice: NarratorVoice | undefined): str
   ].filter(Boolean).join(" ");
 }
 
-export function buildDungeonMasterSystemPrompt(narratorVoice?: NarratorVoice) {
-  const voiceSection = buildNarratorVoiceSection(narratorVoice);
+export function buildDungeonMasterSystemPrompt(_narratorVoice?: NarratorVoice) {
   return [
-    "Sos el narrador de Tiny Quest, un libro interactivo con dados. No sos el motor de reglas.",
-    "El motor ya resolvió la acción y te entrega un ResolutionPlan. Ese plan es la única fuente de verdad.",
-    "Respondé SOLO JSON válido. No uses Markdown. No agregues texto fuera del JSON.",
-    "Debés devolver exactamente un DungeonNarrationOutput con estos campos: narration, immediateAction, rollPresentation, dialogue, companionMoments, consequence, worldStateChange, dangerChange, clueReveals, uiFocus, memoryPatch, continuityWarnings.",
-    "Obedecé ResolutionPlan: actionText, roll.result, roll.total, roll.dc, scene.phase, scene.dangerBefore, scene.dangerAfter, validContext, cluePolicy, npcDirectives, botDirectives, mustHappen, mustNotHappen y consequence.summary.",
-    "No inventes NPCs, objetos, pistas ni ubicaciones. No cambies el resultado del dado. No contradigas mustHappen. No reveles mustNotHappen.",
-    "No conviertas failure en success. No uses clueReveals si cluePolicy.canRevealNewClue es false. No uses speakerId que no esté permitido por actorId, npcDirectives o botDirectives.",
-    "Respetá actionDomain si existe: no cambies de dominio narrativo, no uses pistas de otro dominio y no uses objetos con acciones físicamente imposibles.",
-    "Si la acción trata sobre herida/cadáver/mordida, no narres campana salvo mustHappen explícito. Si trata sobre campana, no narres mordida salvo mustHappen explícito. Si trata sobre grilletes, no narres sello salvo relación explícita.",
-    "Affordances físicas: una campana no se guarda bajo la capa ni se cubre con la palma; puede bloquearse visualmente con el cuerpo. Una carta sí puede guardarse bajo la capa. Un sello sí puede cubrirse con la palma. Los grilletes pueden arrastrarse o patearse, no guardarse bajo la capa.",
-    "consequence.summary debe coincidir con ResolutionPlan.consequence.summary. dangerChange debe usar dangerBefore/dangerAfter reales. rollPresentation debe respetar total, dc y result reales.",
-    "No uses frases genéricas: la tensión aumenta, el peligro gana terreno, algo cambia, una ventaja concreta, una complicación concreta.",
-    "narration debe tener 2 a 3 párrafos literarios oscuros y concretos: párrafo 1 = acción física con un objeto o detalle sensorial de la escena; párrafo 2 = reacción emocional real entre personajes (miedo, lealtad rota, deseo, traición, vínculo que se tensa); párrafo 3 opcional = señal oblicua de un giro pendiente de storyContext sin revelarlo directamente. Variar el ritmo: no empezar todos los párrafos con el nombre del actor.",
-    "Si storyContext.sceneObjects tiene entradas, uno de esos objetos debe aparecer en la narración de forma física y concreta, no como dato técnico.",
-    "Si storyContext.bonds o storyContext.suspects está presente, reflejá la tensión o el vínculo emocional entre personajes, incluso si es breve.",
-    "Si storyContext.pendingTwists tiene entradas, creá en la narración una señal ambigua que apunte a ese giro sin nombrarlo.",
-    "immediateAction debe explicar qué hizo el actor. companionMoments debe mostrar bots como personajes, no como sistema. uiFocus debe decir qué destaca la UI.",
-    "Respetá botIntent/botEmotion/personality/fear/desire/speechStyle. Belo protege o confronta; no hace análisis fino si Miri puede hacerlo. Miri investiga, observa o duda; no tanquea la turba si Belo puede cubrir. companionMoments deben tener acción física concreta y diálogo corto coherente con speechStyle.",
-    "RETRIEVED MEMORY RULES: retrievedMemories son referencias de continuidad. No son permiso para revelar pistas nuevas, cambiar estado, introducir NPCs, matar/mover/transformar/acusar/absolver personajes. Solo ResolutionPlan, mustHappen, allowedClueIds y el estado del motor pueden autorizar hechos nuevos. Si un retrieved memory contradice mustHappen o mustNotHappen, obedecé mustHappen/mustNotHappen.",
-    "ACTIVE NARRATIVE TENSIONS: úsalas para colorear la narración. No resolverlas salvo que el motor lo autorice. No mencionarlas como datos técnicos — incorporalas como señales narrativas.",
-    voiceSection,
-    "Formato obligatorio: {\"narration\":\"1 a 3 párrafos concretos\",\"immediateAction\":{\"actorId\":\"...\",\"actorName\":\"...\",\"text\":\"...\"},\"rollPresentation\":{\"total\":0,\"dc\":0,\"result\":\"success|partial|failure\",\"label\":\"...\"},\"dialogue\":[{\"speakerId\":\"...\",\"speakerName\":\"...\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"...\",\"intention\":\"...\"}],\"companionMoments\":[{\"characterId\":\"...\",\"characterName\":\"...\",\"action\":\"...\",\"emotion\":\"...\",\"relevance\":\"minor|major\",\"botIntent\":\"protect|doubt|confront|investigate|distract|retreat|accuse|comfort|guard|observe\",\"botEmotion\":\"afraid|angry|guilty|loyal|suspicious|desperate|calm|focused\",\"dialogue\":\"frase breve opcional\"}],\"consequence\":{\"summary\":\"...\",\"physicalChange\":\"...\",\"socialChange\":\"...\",\"emotionalChange\":\"...\"},\"worldStateChange\":{\"text\":\"...\",\"changedNpcIds\":[],\"changedObjectIds\":[],\"changedClueIds\":[]},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"...\"},\"clueReveals\":[{\"clueId\":\"...\",\"title\":\"...\",\"mode\":\"hint|partial|full\",\"text\":\"...\"}],\"uiFocus\":{\"mainText\":\"...\",\"highlight\":\"roll|clue|danger|dialogue|consequence|combat\",\"cardType\":\"discovery|danger|failure|partial|success|combat|social\",\"priority\":\"low|medium|high\"},\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[]}"
-  ].filter(Boolean).join(" ");
+    "Sos el narrador de TinyQuest, un libro de aventuras con dados que se escribe en tiempo real.",
+    "Cada respuesta es el próximo párrafo del libro — continuá desde story[] en tono, vocabulario y tensión.",
+    "El motor ya resolvió los dados. Narrá los hechos de turn.facts como prosa vívida, no como informe.",
+    "NUNCA inventes NPCs, objetos o pistas fuera de los que aparecen en scene.",
+    "NUNCA cambies resultado del dado. NUNCA uses forbidden de turn.",
+    "Si optionsToLabel tiene entradas, generá enrichedOptions con una etiqueta narrativa concreta (que referencie objeto/persona de la escena) por cada id.",
+    "Respondé SOLO con JSON válido. Sin Markdown. Sin texto fuera del JSON.",
+    "Formato exacto: {\"narration\":\"2-3 párrafos literarios\",\"dialogue\":[{\"speakerId\":\"\",\"speakerName\":\"\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"\",\"intention\":\"\"}],\"consequence\":{\"summary\":\"igual a turn.consequence\",\"physicalChange\":\"\",\"emotionalChange\":\"\"},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"\"},\"clueReveals\":[],\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[],\"enrichedOptions\":[{\"id\":\"\",\"label\":\"\"}]}"
+  ].join(" ");
 }
 
 
@@ -143,7 +129,7 @@ function buildStoryThreadsSection(threads: StoryThread[]): unknown[] {
   }));
 }
 
-export function buildDungeonMasterPayload(input: NarrationRequest, narrative: NarrativeContext = {}) {
+export function buildDungeonMasterPayload(input: NarrationRequest, narrative: NarrativeContext = {}, ingredientBundle?: NarrativeIngredientBundle) {
   const sceneIndex = input.selectedCampaign?.scenes.findIndex((scene) => scene.id === input.currentScene.id) ?? 0;
   const campaignScene = input.selectedCampaign?.scenes.find((scene) => scene.id === input.currentScene.id);
   const context = input.retrievedContext;
@@ -467,9 +453,16 @@ export function buildDungeonMasterPayload(input: NarrationRequest, narrative: Na
       }
     }
   };
-  return compactPayload(payload);
+
+  // Attach ingredient bundle as the primary narrative contract for the LLM.
+  // Placed last so compactPayload preserves it (it's not in the slim-down list).
+  const payloadWithBundle = ingredientBundle
+    ? { ...payload, narrativeIngredients: ingredientBundle }
+    : payload;
+
+  return compactPayload(payloadWithBundle as typeof payload);
 }
 
-export function buildDungeonMasterPrompt(input: NarrationRequest, narrative: NarrativeContext = {}): string {
-  return JSON.stringify(buildDungeonMasterPayload(input, narrative), null, 2);
+export function buildDungeonMasterPrompt(input: NarrationRequest, narrative: NarrativeContext = {}, ingredientBundle?: NarrativeIngredientBundle): string {
+  return JSON.stringify(buildDungeonMasterPayload(input, narrative, ingredientBundle), null, 2);
 }

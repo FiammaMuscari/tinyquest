@@ -166,7 +166,7 @@ function detectTurnIssues(turn: NarrativePlaytestTurn, previousTurns: NarrativeP
     for (const line of turn.structuredNarration.dialogue) if (line.speakerKind !== "narrator" && !allowedSpeakers.has(line.speakerId)) issues.push({ type: "INVALID_NPC", severity: "high", message: `speakerId inválido en diálogo: ${line.speakerId}` });
     const allowedClues = new Set(turn.resolutionPlan?.cluePolicy.allowedClueIds ?? []);
     for (const clue of turn.structuredNarration.clueReveals) if (!turn.resolutionPlan?.cluePolicy.canRevealNewClue || !allowedClues.has(clue.clueId)) issues.push({ type: "INVALID_CLUE", severity: "high", message: `clueReveal inválido: ${clue.clueId}` });
-    for (const moment of turn.structuredNarration.companionMoments) {
+    for (const moment of (turn.structuredNarration.companionMoments ?? [])) {
       if (/ayuda|apoya|hace algo|se mantiene/i.test(moment.action) && moment.action.length < 40) issues.push({ type: "BOT_GENERIC_MOMENT", severity: "medium", message: "companionMoment demasiado genérico." });
       const profile = getBotPersonalityProfile(moment.characterId);
       for (const code of validateBotPersonalityConsistency(moment, profile)) {
@@ -174,7 +174,9 @@ function detectTurnIssues(turn: NarrativePlaytestTurn, previousTurns: NarrativeP
       }
     }
     if (turn.resolutionPlan) {
-      for (const item of validateTurnContextCoherence(turn.resolutionPlan, turn.structuredNarration)) {
+      // The authored cast for this turn counts as "known" NPCs (not invented by the narrator).
+      const castMemory = { npcs: turn.resolutionPlan.npcDirectives.map((npc) => npc.name).filter(Boolean) };
+      for (const item of validateTurnContextCoherence(turn.resolutionPlan, turn.structuredNarration, { memory: castMemory })) {
         issues.push({ type: item.code === "DOMAIN_MISMATCH" ? "DOMAIN_MISMATCH" : item.code === "IMPOSSIBLE_OBJECT_ACTION" ? "IMPOSSIBLE_OBJECT_ACTION" : item.code === "INCOMPATIBLE_CLUE" ? "INCOMPATIBLE_CLUE" : item.code.includes("clue") ? "INVALID_CLUE" : item.code.includes("target") || item.code.includes("object") ? "WRONG_TARGET_CONSEQUENCE" : item.code.includes("npc") ? "INVALID_NPC" : item.code.includes("danger") ? "DANGER_NOT_MANIFESTED" : item.code.includes("failure") ? "FAILURE_LOOKS_LIKE_SUCCESS" : item.code.includes("partial") || item.code.includes("success") ? "NO_WORLD_CHANGE" : "GENERIC_CONSEQUENCE", severity: item.level === "error" ? "high" : "medium", message: item.message, evidence: item.evidence });
       }
     }

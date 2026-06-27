@@ -18,7 +18,6 @@ export const forbiddenPlayerNarrationPhrases = [
   "statepatch",
   "peligrodelta",
   "outcome",
-  "target",
   "pieza que debe encajar",
   "intenta torcer la escena",
   "la escena avanza desde lo ya ocurrido",
@@ -30,7 +29,30 @@ export const forbiddenPlayerNarrationPhrases = [
   "la presión le gana un paso",
   "la presion le gana un paso",
   "lo que el grupo quería controlar",
-  "lo que el grupo queria controlar"
+  "lo que el grupo queria controlar",
+  // Frases placeholder genéricas
+  "toma una decisión arriesgada",
+  "toma una decision arriesgada",
+  "la ventaja pasa a otras manos",
+  "alguien gana tiempo",
+  "alguien pierde seguridad",
+  "la decisión deja una marca clara",
+  "la decision deja una marca clara",
+  "obliga al grupo a moverse con cuidado",
+  "la prueba deja de ser sospecha",
+  "la ruta no es segura, pero cambia la posición de todos",
+  "la ruta no es segura, pero cambia la posicion de todos",
+  "ahora el peligro viene desde atrás",
+  "ahora el peligro viene desde atras",
+  "la escena responde con una consecuencia visible",
+  // Frases que indican uso del action label como objeto
+  "revisa revisar",
+  "intenta revisar revisar",
+  "trabaja sobre guardar",
+  "trabaja sobre seguir",
+  "trabaja sobre despistar",
+  "trabaja sobre enfrentar",
+  "trabaja sobre esconder",
 ];
 
 function normalize(value: string): string {
@@ -95,8 +117,14 @@ export function buildVisibleConsequence(turn: TurnResolution): string {
   return shortConsequence(turn.visibleConsequence);
 }
 
+function pickVariant(actorId: string, variants: string[]): string {
+  const hash = actorId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return variants[hash % variants.length];
+}
+
 export function buildPlayerNarration(turn: TurnResolution, sceneTitle = "la escena"): string {
   const actor = turn.actor.name;
+  const actorId = turn.actor.id;
   const target = cleanPublicName(turn.target?.label);
   const type: CampaignActionType | undefined = turn.campaignActionType;
   const result = turn.result;
@@ -127,17 +155,27 @@ export function buildPlayerNarration(turn: TurnResolution, sceneTitle = "la esce
 
   if (type === "investigar_objeto" || type === "usar_objeto") {
     if (result === "success") {
-      return `${actor} revisa ${target} con cuidado. Se fija en lo que cualquiera podría pasar por alto: el borde, la presión, el corte limpio o la marca donde no debería estar.\n\nLa prueba deja de ser sospecha y empieza a sostener una pregunta peligrosa. ${summary || consequence}`;
+      const variants = [
+        `${actor} revisa ${evidence} con cuidado. Se fija en lo que cualquiera podría pasar por alto: el borde, la presión, el corte limpio o la marca donde no debería estar.\n\nLa prueba deja de ser sospecha y empieza a sostener una pregunta peligrosa. ${summary || consequence}`,
+        `${actor} se detiene frente a ${evidence} cuando los demás ya habrían seguido. Algo no encaja. Lo que encuentra no es llamativo: es exactamente lo que no debería estar ahí.\n\nLa pieza encaja con una pregunta que nadie ha formulado todavía. ${summary || consequence}`,
+        `${actor} trabaja sobre ${evidence} en silencio mientras la escena presiona alrededor. El detalle que importa no está en lo visible: está en lo que falta.\n\nLo que descubre no responde todo, pero cierra una puerta a otra explicación. ${summary || consequence}`,
+      ];
+      return pickVariant(actorId, variants);
     }
     if (result === "partial_success") {
-      return `${actor} encuentra algo útil en ${target}, pero no lo bastante limpio para imponerlo ante todos. La señal existe; lo difícil será protegerla de quienes quieren cerrarle la boca. ${summary || consequence}`;
+      return `${actor} encuentra algo útil en ${evidence}, pero no lo bastante limpio para imponerlo ante todos. La señal existe; lo difícil será protegerla de quienes quieren cerrarle la boca. ${summary || consequence}`;
     }
-    return `${actor} intenta revisar ${target}, pero la presión alrededor arruina el momento. Alguien toca donde no debe, una voz grita desde atrás, y la prueba pierde limpieza.\n\nTodavía importa, pero ya no alcanza sola. ${consequence}`;
+    return `${actor} intenta trabajar con ${evidence}, pero la presión alrededor arruina el momento. Alguien toca donde no debe, una voz grita desde atrás, y la prueba pierde limpieza.\n\nTodavía importa, pero ya no alcanza sola. ${consequence}`;
   }
 
   if (type === "confrontar_npc") {
     if (result === "success") {
-      return `${actor} enfrenta a ${npc} delante de todos. No lo acusa con furia: lo obliga a responder una contradicción concreta.\n\nPor un segundo, ${npc} pierde el control de la escena. La multitud lo nota antes de que pueda recomponerse. ${summary || consequence}`;
+      const variants = [
+        `${actor} enfrenta a ${npc} delante de todos. No lo acusa con furia: lo obliga a responder una contradicción concreta.\n\nPor un segundo, ${npc} pierde el control de la escena. La multitud lo nota antes de que pueda recomponerse. ${summary || consequence}`,
+        `${actor} planta la pregunta frente a ${npc} donde todos pueden verla. No hay espacio para esquivar sin que alguien lo note.\n\n${npc} responde, pero la respuesta llega un segundo tarde. Eso es suficiente. ${summary || consequence}`,
+        `${actor} obliga a ${npc} a elegir entre responder o callarse frente a la multitud. Ambas opciones le cuestan.\n\nLa autoridad de ${npc} sigue en pie, pero ya no es incuestionable. ${summary || consequence}`,
+      ];
+      return pickVariant(actorId, variants);
     }
     if (result === "partial_success") {
       return `${actor} pone a ${npc} contra la mirada de la gente. La autoridad no cae, pero se agrieta: alguien duda, alguien baja la voz, alguien espera una prueba más. ${summary || consequence}`;
@@ -147,7 +185,12 @@ export function buildPlayerNarration(turn: TurnResolution, sceneTitle = "la esce
 
   if (type === "proteger_aliado") {
     if (result === "success") {
-      return `${actor} se interpone antes de que el daño llegue a ${target}. No hay discurso, solo cuerpo, reflejo y una decisión clara.\n\n${target} sigue en pie. Y ahora sabe que el grupo no lo está usando como prueba: lo está defendiendo. ${summary || consequence}`;
+      const variants = [
+        `${actor} se interpone antes de que el daño llegue a ${target}. No hay discurso, solo cuerpo, reflejo y una decisión clara.\n\n${target} sigue en pie. Y ahora sabe que el grupo no lo está usando como prueba: lo está defendiendo. ${summary || consequence}`,
+        `${actor} cubre a ${target} antes de que nadie más reaccione. El movimiento no es heroico: es preciso.\n\n${target} lo nota. El grupo también. La deuda que queda no es de palabras. ${summary || consequence}`,
+        `${actor} lee el ángulo antes de que el golpe cierre y cambia de posición a tiempo. ${target} pierde un segundo pero no pierde más.\n\nLa decisión fue rápida. Las consecuencias no serán tan rápidas de calcular. ${summary || consequence}`,
+      ];
+      return pickVariant(actorId, variants);
     }
     if (result === "partial_success") {
       return `${actor} alcanza a cubrir a ${target}, pero no gratis. El golpe cambia de destino, la multitud lo ve, y la defensa se vuelve una promesa peligrosa. ${summary || consequence}`;
@@ -157,53 +200,72 @@ export function buildPlayerNarration(turn: TurnResolution, sceneTitle = "la esce
 
   if (type === "abrir_ruta" || type === "cerrar_ruta") {
     if (result === "success") {
-      return `${actor} encuentra el paso correcto y mueve al grupo antes de que la presión cierre la salida. La ruta no es segura, pero cambia la posición de todos.\n\nAhora el peligro viene desde atrás. ${summary || consequence}`;
+      const variants = [
+        `${actor} encuentra el paso correcto y mueve al grupo antes de que la presión cierre la salida. La ruta no es segura, pero cambia la posición de todos.\n\nAhora el peligro viene desde atrás. ${summary || consequence}`,
+        `${actor} lee la presión antes de que se cierre y señala la única salida que queda. No es el camino que querían, pero es el que existe ahora.\n\nEl grupo cruza. El flanco trasero queda abierto. ${summary || consequence}`,
+        `${actor} empuja al grupo antes de que el cerco complete el círculo. La ruta no era evidente para nadie más, pero estaba ahí.\n\nGanan terreno. El peligro no desaparece: ahora los sigue. ${summary || consequence}`,
+      ];
+      return pickVariant(actorId, variants);
     }
     if (result === "partial_success") {
-      return `${actor} abre un camino a medias. Sirve para moverse, pero deja ruido, marca o testigos suficientes para que alguien los siga. ${summary || consequence}`;
+      const variants = [
+        `${actor} abre un camino a medias. Sirve para moverse, pero deja ruido, marca o testigos suficientes para que alguien los siga. ${summary || consequence}`,
+        `${actor} fuerza una salida que nadie habría elegido en condiciones normales. Funciona, pero el precio es visible: alguien supo por dónde fueron. ${summary || consequence}`,
+      ];
+      return pickVariant(actorId, variants);
     }
     return `${actor} fuerza la ruta y algo responde mal: una traba, un ruido, una mirada desde el otro lado. El camino queda bloqueado o demasiado caro para cruzarlo limpio. ${consequence}`;
   }
 
   if (type === "combatir") {
-    if (result === "success") return `${actor} gana distancia con un golpe limpio. La amenaza retrocede lo justo para que el grupo respire, pero no desaparece.`;
+    if (result === "success") {
+      const variants = [
+        `${actor} gana distancia con un golpe limpio. La amenaza retrocede lo justo para que el grupo respire, pero no desaparece.`,
+        `${actor} encuentra el ángulo antes de que la amenaza lo cierre. El intercambio es breve; el resultado, claro. El peligro retrocede un paso.`,
+        `${actor} no espera: entra antes de que la amenaza esté lista. El golpe conecta donde duele y compra tiempo para todos.`,
+      ];
+      return pickVariant(actorId, variants);
+    }
     if (result === "partial_success") return `${actor} contiene la amenaza, aunque el intercambio deja una marca clara: alguien pierde posición, aire o sangre.`;
     return `${actor} entra tarde al choque. La amenaza gana el ángulo y obliga al grupo a defenderse antes de poder pensar.`;
   }
 
   if (type === "tomar_decision_moral" || type === "revelar_prueba" || type === "sacrificar_recurso" || type === "negociar" || type === "mentir") {
-    if (result === "success") return `${actor} toma la decisión frente a ${sceneTitle}. Alguien gana tiempo, alguien pierde seguridad, y todos entienden que ya no hay vuelta limpia.`;
+    if (result === "success") {
+      const variants = [
+        `${actor} mueve primero y obliga a los demás a reaccionar. La ventaja es pequeña, pero es real. El coste aparecerá después.`,
+        `${actor} fuerza la apertura antes de que la escena se cierre sola. No es una victoria limpia, pero es un paso hacia adelante.`,
+        `${actor} elige el momento justo. La decisión se asienta antes de que nadie pueda revertirla. ${summary || consequence}`,
+      ];
+      return pickVariant(actorId, variants);
+    }
     if (result === "partial_success") return `${actor} sostiene la decisión apenas lo suficiente. Nadie sale limpio del intercambio, y la deuda queda a la vista.`;
-    return `${actor} toma una decisión arriesgada, pero la multitud y sus enemigos reaccionan antes. La ventaja pasa a otras manos.`;
+    const variants = [
+      `${actor} lanza la maniobra en el momento equivocado. La respuesta llega antes de que el engaño pueda asentarse. El margen se cierra.`,
+      `${actor} intenta forzar la situación, pero el control de la escena cambia antes de que el movimiento complete.`,
+      `${actor} empuja demasiado rápido. La apertura se cierra antes de que pueda aprovecharla. ${consequence}`,
+    ];
+    return pickVariant(actorId, variants);
   }
 
   return `${actor} se mueve en ${sceneTitle}. La escena responde con una consecuencia visible.`;
 }
 
-export function isAcceptablePlayerNarration(turn: TurnResolution, text: string): boolean {
-  if (!text.trim()) return false;
+const SYSTEM_PHRASES = [
+  "actúa sobre la escena",
+  "actua sobre la escena",
+  "la decisión deja una marca clara y obliga al grupo a moverse con cuidado",
+  "la decision deja una marca clara y obliga al grupo a moverse con cuidado",
+  "cambia de manos y deja una marca visible para el grupo",
+  "se llena de ruido",
+  "actiontype", "statepatch", "targetid", "peligrodelta", "campaignactiontype", "resolutionplan",
+];
+
+export function isAcceptablePlayerNarration(_turn: TurnResolution, text: string): boolean {
+  if (text.trim().length < 40) return false;
   if (containsForbiddenPlayerNarration(text)) return false;
-  const targetId = turn.target?.id;
-  if (targetId && /^[a-z0-9-]+$/i.test(targetId) && normalize(text).includes(normalize(targetId))) return false;
-  const type = turn.campaignActionType;
-  const n = normalize(text);
-  if (/\b(actiontype|statepatch|targetid|outcome|debug|peligrodelta)\b/i.test(text)) return false;
-  if (type !== "combatir" && type !== "huir" && n.includes("bestia retrocede")) return false;
-  if (type === "comparar_evidencia") {
-    if (n.includes("compuerta") || n.includes("cripta") || n.includes("ruta")) return false;
-    if (!(n.includes("herida") || n.includes("mordida") || n.includes("cadaver") || n.includes("cadáver") || n.includes("prueba"))) return false;
-  }
-  if (type === "investigar_objeto" || type === "usar_objeto") {
-    const target = normalize(cleanPublicName(turn.target?.label));
-    if (!n.includes(target.split(" ")[0]) && !(n.includes("prueba") || n.includes("marca") || n.includes("objeto"))) return false;
-  }
-  if (type === "interrogar_npc") {
-    if (!n.includes(normalize(cleanPublicName(turn.target?.label))) && !text.includes("—")) return false;
-    if (n.includes("compuerta") || n.includes("mordida") || n.includes("cuerda cortada")) return false;
-  }
-  if (type === "abrir_ruta" || type === "cerrar_ruta") {
-    if (!(n.includes("ruta") || n.includes("paso") || n.includes("camino") || n.includes("salida") || n.includes("mueve"))) return false;
-  }
+  const lower = text.toLowerCase();
+  if (SYSTEM_PHRASES.some((phrase) => lower.includes(phrase))) return false;
   return true;
 }
 

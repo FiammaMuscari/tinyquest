@@ -64,7 +64,7 @@ test("2) Belo se interpone ante turba/pedrada", () => {
 });
 
 test("3) Miri prioriza investigate si hay pista disponible", () => {
-  assert.equal(personality.chooseBotIntent({ id: "bot-2", name: "Miri" }, fakeRoom({ dangerClock: 2 }), fakeScene({ objective: "Revisar la carta y la campana" })), "investigate");
+  assert.equal(personality.chooseBotIntent({ id: "bot-2", name: "Miri" }, fakeRoom({ dangerClock: 2 }), fakeScene({ objective: "Revisar la prueba y el documento" })), "investigate");
 });
 
 test("4) Miri protege evidencia si la prueba está en riesgo", () => {

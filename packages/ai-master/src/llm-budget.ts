@@ -1,4 +1,4 @@
-import type { NarrationRequest, ResolutionPlan } from "@tiny-quest/game-engine";
+import type { NarrationRequest, NarrativeIngredientBundle, ResolutionPlan } from "@tiny-quest/game-engine";
 
 export interface LlmBudgetPolicy {
   enabled: boolean;
@@ -26,9 +26,9 @@ export interface LlmBudgetState {
 
 export const DEFAULT_CHEAP_LLM_POLICY: LlmBudgetPolicy = {
   enabled: true,
-  maxCallsPerRun: 16,
-  maxCallsPerScene: 6,
-  maxPromptChars: 6500,
+  maxCallsPerRun: 24,
+  maxCallsPerScene: 8,
+  maxPromptChars: 3200,
   maxOutputChars: 3200,
   useGroqForPlayerTurns: true,
   useGroqForBotTurns: false,
@@ -79,66 +79,123 @@ function short(value: string | undefined, max = 220) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-function buildNarrativeStoryContext(input: NarrationRequest) {
-  const campaign = input.selectedCampaign;
-  const memory = input.memorySummary;
-  if (!campaign) return undefined;
-  const sceneClueIds = input.currentScene.clueIds ?? [];
-  const sceneObjects = campaign.storyObjects
-    ?.filter((o) => sceneClueIds.some((c) => o.relatedClues?.includes(c)) || o.location?.toLowerCase().includes(input.currentScene.id))
+export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input?: NarrationRequest, bundle?: NarrativeIngredientBundle) {
+  // Recent LLM narration paragraphs — the story so far, LLM must continue from here
+  const storyLast = (input?.recentSessionLog ?? [])
     .slice(0, 3)
-    .map((o) => ({ name: o.name, desc: short(o.description, 90), status: o.status }));
-  const activeTwist = memory.currentTwist ? short(memory.currentTwist, 140) : undefined;
-  const pendingTwists = campaign.twists
-    ?.filter((t) => !input.storyFlags.includes(`twist:${t.id}:revealed`))
-    .slice(0, 2)
-    .map((t) => ({ trigger: t.trigger, hint: short(t.reveal, 100) }));
-  const narrativeDirective = activeTwist
-    ? "Giro activo: tejelo como señal oblicua en la narración, nunca revelación directa."
-    : pendingTwists?.length
-      ? "Hay giros pendientes: genera tensión que insinúe revelaciones futuras sin revelarlas."
-      : "Narrá con objeto físico de la escena, tensión emocional entre personajes y riesgo concreto.";
-  return {
-    sceneObjects: sceneObjects?.length ? sceneObjects : undefined,
-    activeTwist,
-    pendingTwists: pendingTwists?.length ? pendingTwists : undefined,
-    moralPressure: short(campaign.moralDilemmas?.[0], 140),
-    graveConsequence: short(campaign.graveConsequences?.[0], 110),
-    openThreads: memory.unresolvedThreads?.slice(0, 2),
-    bonds: memory.bonds?.slice(0, 2),
-    suspects: memory.suspects?.slice(0, 2),
-    narrativeDirective
-  };
-}
+    .map((e) => e.narration ?? "")
+    .filter((n) => n.length > 20)
+    .map((n) => short(n, 300) ?? n);
 
-export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input?: NarrationRequest) {
-  const storyContext = input ? buildNarrativeStoryContext(input) : undefined;
-  const retrievedMemories = input?.narrativeContext?.retrievedMemories
-    ?.slice(0, 5)
-    .map((r) => ({ type: r.memory.type, summary: r.memory.summaryLine, turn: r.memory.createdAtTurn, resolved: r.memory.resolved, score: Math.round(r.score * 100) / 100 }));
-  const moralProfileSummary = input?.narrativeContext?.moralProfileSummary;
-  const payload = {
-    contract: "DungeonNarrationOutput JSON only",
-    actor: { id: plan.actorId, name: plan.actorName, kind: plan.actorKind },
-    actionText: plan.actionText,
-    roll: { total: plan.roll.total, dc: plan.roll.dc, result: plan.roll.result },
-    scene: { id: plan.scene.id, title: plan.scene.title, location: plan.scene.location, phase: plan.scene.phase, dangerBefore: plan.scene.dangerBefore, dangerAfter: plan.scene.dangerAfter },
-    consequence: { summary: plan.consequence.summary, physicalChange: short(plan.consequence.physicalChange), socialChange: short(plan.consequence.socialChange), emotionalChange: short(plan.consequence.emotionalChange), dangerManifestation: short(plan.consequence.dangerManifestation) },
-    mustHappen: plan.mustHappen.map((item) => short(item, 180)),
-    mustNotHappen: plan.mustNotHappen.map((item) => short(item, 180)),
-    allowedSpeakers: { actorId: plan.actorId, npcIds: plan.validContext.presentNpcIds, botIds: plan.botDirectives.map((bot) => bot.botId) },
-    cluePolicy: plan.cluePolicy,
-    botDirectives: plan.botDirectives.slice(0, 2).map((bot) => ({ botId: bot.botId, name: bot.name, allowedActions: bot.allowedActions.slice(0, 2), intent: bot.botIntent, emotion: bot.botEmotion })),
-    npcDirectives: plan.npcDirectives.slice(0, 3).map((npc) => ({ npcId: npc.npcId, name: npc.name, canSpeak: npc.canSpeak, allowedIntentions: npc.allowedIntentions.slice(0, 3) })),
-    uiFocus: plan.uiFocus,
-    storyContext,
-    retrievedMemories: retrievedMemories?.length ? retrievedMemories : undefined,
-    moralProfileSummary: moralProfileSummary || undefined,
-    rules: ["Obedecer consequence.summary exacto.", "No inventar NPCs, objetos, pistas ni ubicaciones.", "No cambiar dado ni resultado.", "No revelar mustNotHappen.", "No usar clueReveals si cluePolicy.canRevealNewClue=false.", "Usar storyContext para enriquecer narración: objetos físicos, giros oblicuos, tensión emocional entre personajes.", "retrievedMemories son hechos confirmados del pasado — úsalos para continuidad narrativa, no los contradigas."]
+  // Hard facts for this turn (what happened, must appear in narration)
+  const facts = bundle?.hardFacts.map((f) => short(f, 130) ?? f)
+    ?? plan.mustHappen.slice(0, 5).map((f) => short(f, 130) ?? f);
+
+  // Forbidden facts (must never appear)
+  const forbidden = bundle?.forbiddenFacts.slice(0, 4).map((f) => short(f, 110) ?? f)
+    ?? plan.mustNotHappen.slice(0, 3).map((f) => short(f, 110) ?? f);
+
+  // Scene NPCs from bundle or plan
+  const npcs = bundle
+    ? bundle.presentNpcs.slice(0, 3).map((n) => ({ name: n.name, attitude: n.currentAttitude, gestures: n.plausibleGestures.slice(0, 2) }))
+    : plan.npcDirectives.slice(0, 3).map((n) => ({ name: n.name, attitude: "desconocida", gestures: [] as string[] }));
+
+  // Scene objects and motifs from bundle
+  const objects = bundle
+    ? bundle.loadedObjects.slice(0, 3).map((o) => ({ name: o.name, state: o.knownState }))
+    : [];
+  const motifs = bundle?.sensoryMotifs.slice(0, 3) ?? [];
+
+  // First sentences of recent narrations — do not start the same way
+  const noRepeat = bundle?.recentNarrationOpenings.slice(0, 4)
+    ?? storyLast.map((s) => s.split(/[.!?]/)[0]).filter(Boolean).slice(0, 3);
+
+  // Visible options to enrich with narrative labels — ground each to its real
+  // target entity + current state so the label references the right NPC/object,
+  // not a random one from the scene.
+  const liveNpcById = new Map((bundle?.presentNpcs ?? []).map((n) => [n.id, n] as const));
+  const liveObjById = new Map((bundle?.loadedObjects ?? []).map((o) => [o.id, o] as const));
+  const campaign = input?.selectedCampaign;
+  const resolveOptionTarget = (o: { targetId?: string; npcId?: string; objectId?: string; routeId?: string }): { name: string; state?: string } | undefined => {
+    const id = o.npcId ?? o.objectId ?? o.routeId ?? o.targetId;
+    if (!id) return undefined;
+    const liveNpc = liveNpcById.get(id);
+    if (liveNpc) return { name: liveNpc.name, state: liveNpc.currentAttitude };
+    const liveObj = liveObjById.get(id);
+    if (liveObj) return { name: liveObj.name, state: liveObj.knownState };
+    const npc = campaign?.npcs.find((n) => n.id === id);
+    if (npc) return { name: npc.name };
+    const obj = campaign?.storyObjects?.find((x) => x.id === id);
+    if (obj) return { name: obj.name, state: obj.status };
+    const enemy = campaign?.enemies.find((e) => e.id === id);
+    if (enemy) return { name: enemy.name };
+    return undefined;
   };
+  const optionsToLabel = (input?.visibleOptions ?? []).slice(0, 5).map((o) => {
+    const target = resolveOptionTarget(o);
+    return {
+      id: o.id,
+      mechanic: o.label,
+      ...(target ? { target: target.name } : {}),
+      ...(target?.state ? { targetState: target.state } : {}),
+      ...(o.intent ? { intent: o.intent } : {}),
+      ...(o.riskLevel ? { risk: o.riskLevel } : {})
+    };
+  });
+
+  // Bots
+  const bots = plan.botDirectives.slice(0, 2).map((b) => ({
+    name: b.name, intent: b.botIntent, emotion: b.botEmotion, action: b.allowedActions[0] ?? ""
+  }));
+
+  const payload = {
+    story: storyLast,
+    turn: {
+      actor: plan.actorName,
+      kind: plan.actorKind,
+      action: plan.actionText,
+      roll: { total: plan.roll.total, dc: plan.roll.dc, result: plan.roll.result, ...(plan.roll.critical ? { critical: true } : {}), ...(plan.roll.fumble ? { fumble: true } : {}) },
+      facts,
+      consequence: plan.consequence.summary,
+      forbidden,
+      clue: plan.cluePolicy.canRevealNewClue
+        ? { canReveal: true, ids: plan.cluePolicy.allowedClueIds.slice(0, 3) }
+        : { canReveal: false }
+    },
+    scene: {
+      location: plan.scene.title,
+      dangerBefore: plan.scene.dangerBefore,
+      dangerAfter: plan.scene.dangerAfter,
+      npcs,
+      objects,
+      motifs
+    },
+    bots: bots.length ? bots : undefined,
+    noRepeat: noRepeat.length ? noRepeat : undefined,
+    optionsToLabel: optionsToLabel.length ? optionsToLabel : undefined,
+    rules: [
+      "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
+      "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
+      "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",
+      "Continuá voz y tensión desde story[]. No empezar igual que noRepeat.",
+      ...(plan.roll.critical ? ["turn.roll.critical: fue un golpe de suerte extraordinario (20 natural). Narralo como un momento sobresaliente, casi imposible, sin inventar hechos fuera de facts."] : []),
+      ...(plan.roll.fumble ? ["turn.roll.fumble: fue una pifia (1 natural). Narrala como un pequeño desastre que se vuelve en contra del actor, dentro de lo que dice consequence."] : []),
+      "PROHIBIDO: inventar NPCs/objetos/pistas fuera de scene. No revelar forbidden."
+    ]
+  };
+
   const text = JSON.stringify(payload);
   if (text.length <= maxChars) return text;
-  const slim = { ...payload, storyContext: storyContext ? { narrativeDirective: storyContext.narrativeDirective, activeTwist: storyContext.activeTwist } : undefined, retrievedMemories: retrievedMemories?.slice(0, 2), mustHappen: payload.mustHappen.slice(0, 2), mustNotHappen: payload.mustNotHappen.slice(0, 2), botDirectives: [], npcDirectives: payload.npcDirectives.slice(0, 2) };
+
+  // Slim fallback: drop less critical fields
+  const slim = {
+    story: storyLast.slice(0, 2).map((s) => short(s, 200) ?? s),
+    turn: { ...payload.turn, facts: facts.slice(0, 3), forbidden: forbidden.slice(0, 2) },
+    scene: { ...payload.scene, objects: objects.slice(0, 2), motifs: motifs.slice(0, 2) },
+    noRepeat: noRepeat.slice(0, 2),
+    optionsToLabel: optionsToLabel.slice(0, 3),
+    rules: payload.rules
+  };
   return JSON.stringify(slim).slice(0, maxChars);
 }
 

@@ -17,12 +17,23 @@ export type CombatResult = {
     damageReason: string;
   };
   defenseReduction?: number;
+  critical?: boolean;
+  fumble?: boolean;
   note: string;
 };
 
 export function resolveAttack(stats: Stats, selectedStat: StatKey, enemy: Enemy): CombatResult {
   const d20 = rollDie(20);
   const attackTotal = d20.value + stats[selectedStat];
+  if (d20.value === 1) {
+    return { outcome: "miss", fumble: true, d20, attackTotal, note: `Pifia: el golpe se desvía y ${enemy.name} gana la iniciativa.` };
+  }
+  if (d20.value === 20) {
+    const damageDie = rollDie(8);
+    const extraDie = rollDie(8);
+    const damageTotal = damageDie.value + extraDie.value + stats[selectedStat];
+    return { outcome: "strong_hit", critical: true, d20, damageDie, attackTotal, damage: damageTotal, damageBreakdown: { damageRoll: damageDie.value + extraDie.value, damageBonus: stats[selectedStat], damageTotal, damageReason: `¡Golpe crítico contra ${enemy.name}!` }, note: `¡Golpe crítico contra ${enemy.name}!` };
+  }
   if (attackTotal >= enemy.defense + 5) {
     const damageDie = rollDie(8);
     const damageTotal = damageDie.value + stats[selectedStat];

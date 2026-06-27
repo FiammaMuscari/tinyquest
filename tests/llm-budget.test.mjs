@@ -62,14 +62,14 @@ test("3) shouldCallGroq permite turno player major", () => {
 });
 
 test("4) shouldCallGroq bloquea maxCallsPerRun", () => {
-  const state = budget.createLlmBudgetState({ callsUsed: 3 });
+  const state = budget.createLlmBudgetState({ callsUsed: budget.DEFAULT_CHEAP_LLM_POLICY.maxCallsPerRun });
   const decision = budget.shouldCallGroq(plan(), budget.DEFAULT_CHEAP_LLM_POLICY, state, true);
   assert.equal(decision.allowed, false);
   assert.equal(decision.reason, "max-calls-per-run");
 });
 
 test("5) shouldCallGroq bloquea maxCallsPerScene", () => {
-  const state = budget.createLlmBudgetState({ callsUsed: 1, callsUsedByScene: { chapel: 2 } });
+  const state = budget.createLlmBudgetState({ callsUsed: 1, callsUsedByScene: { chapel: budget.DEFAULT_CHEAP_LLM_POLICY.maxCallsPerScene } });
   const decision = budget.shouldCallGroq(plan(), budget.DEFAULT_CHEAP_LLM_POLICY, state, true);
   assert.equal(decision.allowed, false);
   assert.equal(decision.reason, "max-calls-per-scene");
@@ -82,6 +82,30 @@ test("6-8) prompt compacto contiene contrato y respeta maxPromptChars", () => {
   assert.match(prompt, /Tomás mira la campana/);
   assert.ok(prompt.length <= budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars);
   assert.doesNotMatch(prompt, /recentSessionLog|sessionLog|memorySummary|campaignStory/);
+});
+
+test("8b) optionsToLabel ancla cada opción a su entidad real con estado, intent y risk", () => {
+  const input = {
+    recentSessionLog: [],
+    selectedCampaign: {
+      npcs: [{ id: "lena-subofficer", name: "Lena" }],
+      enemies: [],
+      storyObjects: [{ id: "cuaderno-carvell-object", name: "cuaderno de Carvell", status: "hidden" }]
+    },
+    visibleOptions: [
+      { id: "hablar-lena", label: "Encontrar a Lena antes de que Bran la vea", npcId: "lena-subofficer", targetKind: "npc", intent: "negotiate", riskLevel: "medium" },
+      { id: "buscar-cuaderno", label: "Buscar el cuaderno de Carvell", objectId: "cuaderno-carvell-object", targetKind: "object", intent: "investigate", riskLevel: "high" }
+    ]
+  };
+  const prompt = budget.buildCompactGroqPrompt(plan(), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input);
+  const parsed = JSON.parse(prompt);
+  const lena = parsed.optionsToLabel.find((o) => o.id === "hablar-lena");
+  assert.equal(lena.target, "Lena");
+  assert.equal(lena.intent, "negotiate");
+  assert.equal(lena.risk, "medium");
+  const cuaderno = parsed.optionsToLabel.find((o) => o.id === "buscar-cuaderno");
+  assert.equal(cuaderno.target, "cuaderno de Carvell");
+  assert.equal(cuaderno.targetState, "hidden");
 });
 
 test("9) cacheKey cambia si cambia consequence.summary", () => {

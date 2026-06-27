@@ -25,28 +25,29 @@ async function importModules() {
 
 const { campaigns: campaignModule, outcomes } = await importModules();
 const redMoon = campaignModule.campaigns.find((campaign) => campaign.id === "luna-roja");
-const bodyScene = redMoon.scenes.find((scene) => scene.id === "body-by-mill");
+const bodyScene = redMoon.scenes.find((scene) => scene.id === "cuartel-umbral");
 const actor = { id: "p1", name: "Fiamy" };
 const byId = (id) => bodyScene.multipleChoiceOptions.find((choice) => choice.id === id);
 
 test("interrogar_npc nunca devuelve outcome de ruta", () => {
-  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("question-tomas-bell"), rawAction: "Interrogar a Tomás sobre la campana", result: "success" });
+  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("hablar-nicolas"), rawAction: "Escuchar a Nicolás antes de que lo aíslen", result: "success" });
   assert.equal(facts.actionType, "interrogar_npc");
   assert.notEqual(facts.outcomeKind, "route_opened");
   assert.equal(facts.outcomeKind, "npc_confession");
-  assert.match(facts.factualSummary, /Tomás|campana/);
+  assert.match(facts.factualSummary, /Nicolás|capa verde/);
 });
 
 test("abrir_ruta nunca devuelve confesión de NPC", () => {
-  const routeChoice = redMoon.scenes.find((scene) => scene.id === "red-forest").multipleChoiceOptions.find((choice) => choice.id === "follow-mud-to-mayor");
+  const routeChoice = { id: "forzar-salida", label: "Forzar la salida sellada", action: "Forzar la salida sellada", actionType: "abrir_ruta", targetKind: "route", targetId: "salida-sellada", recommendedStats: ["mind"] };
   const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: routeChoice, rawAction: routeChoice.label, result: "success" });
   assert.equal(facts.actionType, "abrir_ruta");
   assert.equal(facts.outcomeKind, "route_opened");
   assert.notEqual(facts.outcomeKind, "npc_confession");
 });
 
-test("comparar_evidencia nunca deriva a compuerta o movimiento", () => {
-  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("compare-bite-wound"), rawAction: "Comparar la mordida con la herida del cadáver", result: "success" });
+test("comparar_evidencia nunca deriva a confesión o movimiento", () => {
+  const cmpChoice = { id: "comparar-herida", label: "Comparar la herida con un colmillo real", action: "Comparar la herida con un colmillo real", actionType: "comparar_evidencia", targetKind: "object", targetId: "herida-carvell", recommendedStats: ["mind"] };
+  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: cmpChoice, rawAction: cmpChoice.label, result: "success" });
   const text = `${facts.factualSummary} ${facts.visibleConsequence} ${facts.narrationHints.mustMention.join(" ")}`.toLowerCase();
   assert.equal(facts.actionType, "comparar_evidencia");
   assert.equal(facts.outcomeKind, "evidence_confirmed");
@@ -55,10 +56,11 @@ test("comparar_evidencia nunca deriva a compuerta o movimiento", () => {
 });
 
 test("confrontar_npc menciona el NPC objetivo", () => {
-  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("confront-elias-mob"), rawAction: "Enfrentar a Elías frente a la turba", result: "success" });
+  const confChoice = { id: "confrontar-bran", label: "Confrontar al Inspector Bran", action: "Confrontar al Inspector Bran", actionType: "confrontar_npc", targetKind: "npc", targetId: "inspector-bran", recommendedStats: ["charm"] };
+  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: confChoice, rawAction: confChoice.label, result: "success" });
   assert.equal(facts.actionType, "confrontar_npc");
-  assert.equal(facts.target.id, "elias-bailiff");
-  assert.ok(facts.narrationHints.mustMention.some((item) => item.includes("Elías")));
+  assert.equal(facts.target.id, "inspector-bran");
+  assert.ok(facts.narrationHints.mustMention.some((item) => item.includes("Bran")));
 });
 
 test("playerNarration no debe contener frases de debug", () => {
@@ -67,16 +69,17 @@ test("playerNarration no debe contener frases de debug", () => {
 });
 
 test("cada actionId usa su outcome propio por resultado", () => {
-  const tomas = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("question-tomas-bell"), rawAction: "x", result: "partial_success" });
-  const bite = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("compare-bite-wound"), rawAction: "x", result: "partial_success" });
-  assert.equal(tomas.outcomeKind, "npc_evasion");
-  assert.equal(bite.outcomeKind, "evidence_partial");
-  assert.notEqual(tomas.factualSummary, bite.factualSummary);
+  const nicolas = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("hablar-nicolas"), rawAction: "x", result: "partial_success" });
+  const marca = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("examinar-marca-nicolas"), rawAction: "x", result: "partial_success" });
+  assert.equal(nicolas.outcomeKind, "npc_evasion");
+  assert.equal(marca.outcomeKind, "evidence_partial");
+  assert.notEqual(nicolas.factualSummary, marca.factualSummary);
 });
 
 test("TurnResolution facts incluyen target coherente", () => {
-  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: byId("protect-nicolas-stone"), rawAction: "Proteger a Nicolás", result: "failure" });
-  assert.equal(facts.target.id, "accused-wolf");
+  const protectChoice = redMoon.scenes.find((scene) => scene.id === "tribunal-sello").multipleChoiceOptions.find((choice) => choice.id === "traer-issa-testigo");
+  const facts = outcomes.resolveCoherentTurnFacts({ campaign: redMoon, actor, choice: protectChoice, rawAction: "Llevar a Issa a testificar", result: "failure" });
+  assert.equal(facts.target.id, "issa-mano");
   assert.equal(facts.target.kind, "npc");
   assert.equal(facts.outcomeKind, "ally_harmed");
 });

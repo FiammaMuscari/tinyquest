@@ -194,8 +194,8 @@ export function buildStructuredOptions(room: GameRoom, scene: Scene = getCurrent
       { id: "crisis-reveal-truth", label: "Revelar la verdad aunque alguien pague el precio", intent: "final", suggestedStat: "courage", risk: "critical", availableInPhase: ["climax"] },
       { id: "crisis-save-someone", label: "Salvar a alguien y aceptar una pérdida", intent: "crisis", suggestedStat: "body", risk: "critical", availableInPhase: ["climax"] },
       { id: "crisis-accuse", label: "Acusar al responsable frente a todos", intent: "revelar_prueba", suggestedStat: "charm", risk: "critical", availableInPhase: ["climax"] },
-      { id: "crisis-face-threat", label: "Enfrentar la amenaza bajo la campana", intent: "combatir", suggestedStat: stat, risk: "critical", availableInPhase: ["climax"] },
-      { id: "crisis-flee-proof", label: "Huir con la prueba y dejar la plaza atrás", intent: "crisis", suggestedStat: "luck", risk: "critical", availableInPhase: ["climax"] }
+      { id: "crisis-face-threat", label: "Enfrentar la amenaza de frente", intent: "combatir", suggestedStat: stat, risk: "critical", availableInPhase: ["climax"] },
+      { id: "crisis-flee-proof", label: "Escapar con la prueba antes de que sea tarde", intent: "crisis", suggestedStat: "luck", risk: "critical", availableInPhase: ["climax"] }
     ].slice(0, 4) as StructuredNextOption[];
   }
 
@@ -330,7 +330,9 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
       ? selectedChoice?.dangerOnPartial ?? 0
       : 0;
   const actionDangerDelta = check.outcome === "failure" ? Math.min(1, rawActionDangerDelta) : Math.min(0, rawActionDangerDelta);
-  const requestedDangerGain = actionDangerDelta + (consequence?.dangerDelta ?? 0);
+  // A fumble (natural 1) turns a failure into a small disaster: extra danger.
+  const fumbleDangerDelta = check.fumble ? 1 : 0;
+  const requestedDangerGain = actionDangerDelta + (consequence?.dangerDelta ?? 0) + fumbleDangerDelta;
   const currentRoundDangerGain = room.sessionLog
     .filter((event) => event.sceneId === currentScene.id && event.roundNumber === room.roundInScene + 1)
     .reduce((total, event) => total + Math.max(0, event.dangerDelta ?? 0), 0);
@@ -346,11 +348,13 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
     combatNote = combatNote ? `${combatNote} ${deathCause}` : deathCause;
   }
 
-  const progressDelta = check.outcome === "success"
+  const baseProgress = check.outcome === "success"
     ? selectedChoice?.progressOnSuccess ?? 0.75
     : check.outcome === "partial_success"
       ? Math.min(0.5, (selectedChoice?.progressOnSuccess ?? 0.75) / 2)
       : 0;
+  // A critical (natural 20, widened by luck) gives extra momentum on top of the success.
+  const progressDelta = baseProgress + (check.critical ? 0.5 : 0);
   const sceneProgress = room.sceneProgress + progressDelta;
   const unlockedFlags = selectedChoice?.unlocksFlags ?? [];
   const energyDelta = -energyCost + (consequence?.energyDelta ?? 0);

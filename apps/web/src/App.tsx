@@ -33,6 +33,7 @@ import {
   retrieveNarrativeMemories,
   summarizeMoralProfileForPrompt,
   type Campaign,
+  type CampaignNPC,
   type BotPlayer,
   type Character,
   type CheckResult,
@@ -548,9 +549,10 @@ export function App() {
   const [selectedStat, setSelectedStat] = useState<StatKey>(() => readStoredStat());
   const [usePet, setUsePet] = useState(false);
   const [dice, setDice] = useState<DiceSnapshot | null>(null);
-  const [currentNarration, setCurrentNarration] = useState("Narración: El Paso del Lobo Negro se abre bajo una luna helada. Diálogo: un alma dragón advierte que la traición dejó huellas en la nieve. Consecuencia: las trampas viejas empiezan a despertar. Opciones: cruza, investiga o enfrenta el peligro.");
-  const [npcDialogue, setNpcDialogue] = useState<string[]>(["Alma Dragón: No confundas tesoro con libertad."]);
+  const [currentNarration, setCurrentNarration] = useState("Narración: La aventura espera. Elegí una campaña y armá tu personaje para que el narrador abra la primera escena. Consecuencia: el reloj de peligro todavía está quieto. Opciones: investiga, habla o toma un riesgo.");
+  const [npcDialogue, setNpcDialogue] = useState<string[]>([]);
   const [nextOptions, setNextOptions] = useState<string[]>(["Seguir el objetivo.", "Investigar una pista.", "Usar habilidad o mascota."]);
+  const [enrichedChoiceLabels, setEnrichedChoiceLabels] = useState<Record<string, string>>({});
   const [dmSections, setDmSections] = useState<NarrationResponse["sections"]>();
   const [plotBeat, setPlotBeat] = useState<NarrationResponse["plotBeat"]>();
   const [latestTurnNarration, setLatestTurnNarration] = useState<NarrationResponse | undefined>();
@@ -878,6 +880,21 @@ export function App() {
       setPlotBeat(narration.plotBeat);
       const nextScene = getRoomScenes(nextRoom)[nextRoom.currentSceneIndex];
       const nextChoices = getVisibleActionChoices(nextScene, nextRoom);
+      // Use exact ID mapping from enrichedOptions (preferred), fall back to index-based
+      if (narration.enrichedOptions?.length) {
+        const labels: Record<string, string> = {};
+        for (const opt of narration.enrichedOptions) {
+          if (opt.id && opt.label) labels[opt.id] = opt.label;
+        }
+        if (Object.keys(labels).length) setEnrichedChoiceLabels(labels);
+      } else {
+        const llmOptions = narration.sections?.options ?? narration.nextOptions;
+        if (llmOptions?.length) {
+          const labels: Record<string, string> = {};
+          nextChoices.forEach((choice, i) => { if (llmOptions[i]) labels[choice.id] = llmOptions[i]; });
+          setEnrichedChoiceLabels(labels);
+        }
+      }
       const nextActive = nextRoom.players[nextRoom.activePlayerIndex];
       if (nextActive.type === "human") {
         const nextChoice = nextChoices[0] ?? nextScene.actionChoices[0];
@@ -971,7 +988,8 @@ export function App() {
       <section className="gameFrame">
         <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         <section className="centerColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} />}
+          {!room.sessionComplete && <CastPanel npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
         </section>
@@ -1096,7 +1114,39 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
   );
 }
 
-function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number }) {
+function CastPanel({ npcIds, npcs }: { npcIds: string[]; npcs: CampaignNPC[] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const present = npcIds.map((id) => npcs.find((npc) => npc.id === id)).filter((npc): npc is CampaignNPC => Boolean(npc));
+  if (!present.length) return null;
+  return (
+    <section className="panel castPanel">
+      <PanelTitle title="Personajes en escena" icon={<Users size={16} />} />
+      <p className="castHint">Tocá un nombre para ver quién es.</p>
+      <div className="castList">
+        {present.map((npc) => {
+          const open = openId === npc.id;
+          return (
+            <button key={npc.id} type="button" className={`castCard ${open ? "open" : ""}`} onClick={() => setOpenId(open ? null : npc.id)} aria-expanded={open}>
+              <span className="castHead">
+                <strong>{npc.name}</strong>
+                {npc.role && <span className="castRole">{npc.role}</span>}
+              </span>
+              {open && (
+                <span className="castBody">
+                  <span className="castDesc">{npc.description}</span>
+                  {npc.desire && <span className="castTrait"><em>Quiere:</em> {npc.desire}</span>}
+                  {npc.fear && <span className="castTrait"><em>Teme:</em> {npc.fear}</span>}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy, enrichedLabels }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number; enrichedLabels?: Record<string, string> }) {
   const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.22)), url(${imageUrl})`;
   return (
     <section className="panel scenePanel">
@@ -1113,7 +1163,7 @@ function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraft
           const disabled = !canPayActionEnergy(energy, choice);
           return (
             <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button">
-              <strong>{choice.label}</strong>
+              <strong>{enrichedLabels?.[choice.id] ?? choice.label}</strong>
               <div className="choiceMeta">
                 <div className="choiceStats">
                   {choice.recommendedStats.map((stat) => (
@@ -1354,13 +1404,13 @@ function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTur
 }
 
 function TurnStoryCard({ turn, sceneTitle, dice }: { turn: CinematicTurn; sceneTitle: string; dice: DiceSnapshot | null }) {
-  const narration = turn.event?.narration ?? getTurnNarration(turn);
+  const narration = getTurnNarration(turn);
   const paragraphs = narration.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean);
   const dialogueLines = getTurnDialogue(turn);
   const clues = getTurnClueReveals(turn);
   const danger = getTurnDangerChange(turn);
   const dangerChanged = danger && danger.before !== danger.after;
-  const actionLabel = getStructuredTurn(turn)?.immediateAction.text ?? turn.event?.actionLabel ?? cleanActionText(turn.event?.action ?? "");
+  const actionLabel = getStructuredTurn(turn)?.immediateAction?.text ?? turn.event?.actionLabel ?? cleanActionText(turn.event?.action ?? "");
   return (
     <section className="turnStoryCard">
       {actionLabel && (
@@ -1394,15 +1444,23 @@ function DiceOutcomeCard({ turn, dice }: { turn: CinematicTurn; dice: DiceSnapsh
   const roll = getTurnRoll(turn);
   if (!roll) return null;
   const eventDice = turn.event?.dice;
+  const checkDice = dice?.check ?? eventDice;
   const d20 = dice?.check.d20.value ?? eventDice?.d20.value;
   const d4 = dice?.check.creativeBonus?.value ?? eventDice?.creativeBonus?.value;
   const d6 = dice?.consequenceRoll;
+  const isCritical = Boolean(checkDice?.critical);
+  const isFumble = Boolean(checkDice?.fumble);
   return (
-    <div className={`diceOutcomeCard ${roll.result}`}>
+    <div className={`diceOutcomeCard ${roll.result}${isCritical ? " critical" : ""}${isFumble ? " fumble" : ""}`}>
       <div className="diceOutcomeMain">
         <span>Resultado</span>
         <strong>{roll.label || `${roll.total} vs ${roll.dc}`}</strong>
       </div>
+      {(isCritical || isFumble) && (
+        <div className={`diceOutcomeBadge ${isCritical ? "critical" : "fumble"}`}>
+          {isCritical ? "★ ¡Crítico!" : "✖ ¡Pifia!"}
+        </div>
+      )}
       <div className="dmMiniDice" aria-label="Dados del turno">
         <MiniDiceFace kind="d20" label="d20" value={d20 ?? "—"} />
         <MiniDiceFace kind="d4" label="d4" value={d4 ?? "—"} />

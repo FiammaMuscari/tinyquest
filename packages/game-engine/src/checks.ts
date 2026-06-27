@@ -17,7 +17,18 @@ export function resolveCheck(stats: Stats, selectedStat: StatKey, difficulty: nu
     penalties: 0
   });
   const total = rollBreakdown.total;
-  const outcome = total >= difficulty ? "success" : total >= difficulty - 2 ? "partial_success" : "failure";
+
+  // Luck widens the critical range: 0-2 luck → crit on 20; 3-5 → 19-20; 6-8 → 18-20; 9+ → 17-20.
+  const luck = stats.luck ?? 0;
+  const luckBonus = Math.min(3, Math.floor(luck / 3));
+  const critThreshold = 20 - luckBonus;
+  const fumble = d20.value === 1;
+  const critical = !fumble && d20.value >= critThreshold;
+
+  let outcome: CheckResult["outcome"];
+  if (fumble) outcome = "failure";
+  else if (critical) outcome = "success";
+  else outcome = total >= difficulty ? "success" : total >= difficulty - 2 ? "partial_success" : "failure";
 
   return {
     outcome,
@@ -25,6 +36,9 @@ export function resolveCheck(stats: Stats, selectedStat: StatKey, difficulty: nu
     difficulty,
     d20,
     creativeBonus,
+    critical: critical || undefined,
+    fumble: fumble || undefined,
+    luckBonus: luckBonus || undefined,
     rollBreakdown
   };
 }

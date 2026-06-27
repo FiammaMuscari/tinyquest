@@ -5,7 +5,7 @@ export type ContextCoherenceIssue = { level: "warning" | "error"; code: string; 
 
 const abstractActionPattern = /\b(mover,? cubrir o negociar posición|mover,? cubrir o negociar posicion|proteger lo conseguido|tomar una decisión arriesgada|tomar una decision arriesgada|aceptar un coste|usar presión social|usar presion social|resolver la situación|resolver la situacion|buscar una ventaja|mover al aliado a cubierto|apartar la evidencia de las manos equivocadas)\b/i;
 const genericLinePattern = /la decisión deja una marca clara|la decision deja una marca clara|obliga al grupo a moverse con cuidado|oposición aprovecha la repetición|oposicion aprovecha la repeticion|el peligro sube porque|la tensión aumenta|el peligro gana terreno|algo cambia/i;
-const physicalDangerPattern = /turba|salida|puerta|piedra|campana|bestia|bosque|golpea|cierra|avanza|bloquea|soga|antorcha|aldeanos|grito/i;
+const physicalDangerPattern = /turba|salida|puerta|piedra|campana|bestia|bosque|golpe|golpea|cierra|avanza|bloquea|soga|antorcha|aldeanos|grito|amenaza|arma|acorrala|corre|empuja|rompe|retrocede/i;
 const costPattern = /pero|coste|pierde|mancha|rompe|separa|cierra|bloquea|sube|daña|expone|retrocede|arranca|quita|tapa/i;
 const advantagePattern = /admite|encuentra|nota|confirma|abre|protege|gana|limpia|revela|bloquea|separa|contradice|entrega|desvía|desvia|cae|aparta|obliga|expone|muestra|conserva/i;
 
@@ -45,13 +45,13 @@ export function safeNpcReference(plan: Pick<ResolutionPlan, "validContext" | "np
 function combinedOutputText(output: DungeonNarrationOutput) {
   return [
     output.narration,
-    output.immediateAction.text,
+    output.immediateAction?.text,
     output.consequence.summary,
     output.consequence.physicalChange,
     output.consequence.socialChange,
-    output.worldStateChange.text,
+    output.worldStateChange?.text,
     output.dialogue.map((line) => line.line).join(" "),
-    output.companionMoments.map((moment) => moment.action).join(" ")
+    (output.companionMoments ?? []).map((moment) => moment.action).join(" ")
   ].filter(Boolean).join("\n");
 }
 
@@ -77,7 +77,7 @@ export function validateActionTargetConsistency(plan: ResolutionPlan, output: Du
 
 export function validateSceneObjectConsistency(plan: ResolutionPlan, output: DungeonNarrationOutput): ContextCoherenceIssue[] {
   const issues: ContextCoherenceIssue[] = [];
-  for (const id of output.worldStateChange.changedObjectIds) {
+  for (const id of (output.worldStateChange?.changedObjectIds ?? [])) {
     if (!plan.validContext.presentObjectIds.includes(id)) issues.push(issue("error", "invalid-object", `Objeto cambiado no presente: ${id}.`, id));
   }
   return issues;
@@ -91,7 +91,7 @@ export function validateNpcIntroduction(plan: ResolutionPlan, output: DungeonNar
     const directive = plan.npcDirectives.find((npc) => npc.npcId === line.speakerId);
     if (!directive) continue;
     const knownByName = [...known].some((item) => item.includes(line.speakerName));
-    const hasRoleInName = line.speakerName.includes(",") || /\b(aldeano|aldeana|alcalde|hermana|lobo acusado|testigo|aprendiz|molinero|campanera|alguacil)\b/i.test(line.speakerName);
+    const hasRoleInName = line.speakerName.includes(",") || /\b(inspector|inspectora|guardia|guardián|guardian|subofficer|patrón|patrona|partera|agente|sombra|senador|senadora|juez|jueza|aldeano|aldeana|alcalde|hermana|acusad|testigo|aprendiz|molinero|campanera|alguacil)\b/i.test(line.speakerName);
     const intro = hasRoleInName || output.narration.includes(`${line.speakerName},`) || (directive.stateBefore && output.narration.toLowerCase().includes(directive.stateBefore.toLowerCase()));
     if (!knownByName && !intro) issues.push(issue("warning", "npc-not-introduced", `NPC nuevo sin rol o presentación: ${line.speakerName}.`, line.speakerName));
   }
@@ -280,7 +280,7 @@ export function validateDomainConsistency(plan: ResolutionPlan, output: DungeonN
 
 export function validateObjectAffordance(plan: ResolutionPlan, output: DungeonNarrationOutput): ContextCoherenceIssue[] {
   const text = combinedOutputText(output);
-  const used = new Set([...(plan.validContext.usedObjectIds ?? []), ...output.worldStateChange.changedObjectIds]);
+  const used = new Set([...(plan.validContext.usedObjectIds ?? []), ...(output.worldStateChange?.changedObjectIds ?? [])]);
   if (plan.validContext.targetKind === "object" && plan.validContext.targetId) used.add(plan.validContext.targetId);
   const issues: ContextCoherenceIssue[] = [];
   for (const objectId of used) {

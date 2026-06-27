@@ -27,6 +27,19 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 
 .gameFrame { min-height: 610px; display: grid; grid-template-columns: minmax(240px, .78fr) minmax(520px, 1.62fr) minmax(320px, .95fr); gap: 12px; padding: 14px; border: 1px solid #523e71; border-radius: 8px; background: radial-gradient(circle at 46% 44%, rgba(124, 90, 255, .22), transparent 22%), linear-gradient(90deg, rgba(6,10,20,.95), rgba(20,12,35,.78)), url("https://images.unsplash.com/photo-1518709268805-4e9042af2176?auto=format&fit=crop&w=1600&q=80"); background-size: cover; background-position: center; box-shadow: 0 24px 80px rgba(0,0,0,.42); }
 .panel { padding: 0 14px 14px; min-width: 0; }
+.castPanel { margin-top: 10px; }
+.castHint { margin: 0 0 8px; font-size: 12px; color: #b8a98a; }
+.castList { display: flex; flex-direction: column; gap: 6px; }
+.castCard { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid rgba(180,150,90,.28); background: rgba(20,16,30,.55); color: #f3e9d0; cursor: pointer; transition: border-color .15s, background .15s; }
+.castCard:hover { border-color: rgba(255,215,120,.55); background: rgba(30,24,44,.7); }
+.castCard.open { border-color: rgba(255,215,120,.7); background: rgba(34,26,50,.8); }
+.castHead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.castHead strong { font-size: 15px; color: #ffda8a; }
+.castRole { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #c9a7ff; }
+.castBody { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+.castDesc { font-size: 13px; line-height: 1.4; color: #e6dcc4; }
+.castTrait { font-size: 12px; color: #c0b393; }
+.castTrait em { color: #ffda8a; font-style: normal; font-weight: 700; }
 .panelTitle { display: flex; align-items: center; gap: 8px; width: fit-content; margin: -1px 0 12px -15px; padding: 8px 12px; border-radius: 8px 0 8px 0; background: linear-gradient(90deg, #7339a6, #3c255f); color: #fff7da; text-transform: uppercase; font-weight: 900; font-size: 12px; }
 
 .turnQueue { align-self: stretch; overflow: auto; }
@@ -2007,6 +2020,11 @@ h1 {
 .diceOutcomeCard.success { border-color: rgba(90, 220, 190, .36); }
 .diceOutcomeCard.partial { border-color: rgba(255, 210, 100, .4); }
 .diceOutcomeCard.failure { border-color: rgba(220, 90, 90, .42); }
+.diceOutcomeCard.critical { border-color: rgba(255, 215, 90, .85); box-shadow: 0 0 14px rgba(255, 215, 90, .35); }
+.diceOutcomeCard.fumble { border-color: rgba(220, 60, 60, .85); box-shadow: 0 0 14px rgba(220, 60, 60, .3); }
+.diceOutcomeBadge { display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: .04em; }
+.diceOutcomeBadge.critical { background: rgba(255, 215, 90, .18); color: #ffd95a; border: 1px solid rgba(255, 215, 90, .6); }
+.diceOutcomeBadge.fumble { background: rgba(220, 60, 60, .16); color: #ff7a7a; border: 1px solid rgba(220, 60, 60, .6); }
 .diceOutcomeMain span { display: block; color: #d9b66a; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
 .diceOutcomeMain strong { display: block; font-size: 14px; font-weight: 800; color: #ffda8a; line-height: 1.15; }
 
