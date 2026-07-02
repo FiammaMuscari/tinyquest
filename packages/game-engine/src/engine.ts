@@ -357,7 +357,8 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
   const progressDelta = baseProgress + (check.critical ? 0.5 : 0);
   const sceneProgress = room.sceneProgress + progressDelta;
   const unlockedFlags = selectedChoice?.unlocksFlags ?? [];
-  const energyDelta = -energyCost + (consequence?.energyDelta ?? 0);
+  const energyRestore = check.outcome === "success" ? selectedChoice?.energyRestoreOnSuccess ?? 0 : 0;
+  const energyDelta = -energyCost + energyRestore + (consequence?.energyDelta ?? 0);
   const vitalityDelta = consequence?.vitalityDelta ?? 0;
   const players = room.players.map((player) => player.id === activePlayer.id
     ? {
@@ -690,7 +691,9 @@ export function applyNarration(room: GameRoom, resolution: ActionResolution, nar
   nextRoom.roundInScene = room.roundInScene + (completedRound ? 1 : 0);
   if (completedRound) {
     const energyMax = nextRoom.campaign.energyMax ?? 6;
-    nextRoom.players = regenerateRoundEnergy(nextRoom.players, energyMax, 1);
+    // Economía puntual: la regen por ronda es fija y menor al gasto típico (1-2⚡ por acción).
+    // Las opciones decisivas cuestan 2-3⚡: exigen ahorrar (descansar o elegir acciones gratis).
+    nextRoom.players = regenerateRoundEnergy(nextRoom.players, energyMax, nextRoom.campaign.energyRegenPerRound ?? 1);
     nextRoom.livingState = {
       ...nextRoom.livingState,
       round: nextRoom.roundInScene + 1,

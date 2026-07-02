@@ -13,6 +13,17 @@ export type EndingResolution = {
   rewards: string[];
   losses: string[];
   persistentMarks: string[];
+  plan?: EndingPlan;
+};
+
+// Epílogo composicional: cláusulas secuenciales derivadas del estado real de la partida.
+// tier 1 = mejor final … tier 5 = peor. Las cláusulas se muestran/narran en orden.
+export type EndingPlan = {
+  endingId: string;
+  title: string;
+  tier: 1 | 2 | 3 | 4 | 5;
+  tierLabel: string;
+  clauses: string[];
 };
 
 export type EndingTurnResolution = {
@@ -220,21 +231,60 @@ function endingScoreFromRoom(room: GameRoom): EndingScore {
   };
 }
 
-function buildEndingNarration(room: GameRoom, ending: CampaignEnding, endingType: EndingType, losses: string[], persistentMarks: string[], futureHook: string | null): string {
-  const clues = Array.from(new Set([...room.mysteryClues, ...room.memorySummary.clues])).slice(-3);
-  const accused = room.campaign.npcs.find((npc) => npc.id.includes("accused") || npc.name.toLowerCase().includes("acusado")) ?? room.campaign.npcs[0];
-  const culprit = room.campaign.npcs.find((npc) => npc.id.includes("mayor") || npc.name.toLowerCase().includes("alcalde") || npc.secret) ?? room.campaign.npcs[1] ?? room.campaign.npcs[0];
-  const clueLine = clues.length ? `Las pruebas pesan una por una: ${clues.join("; ")}.` : "Las pruebas reunidas dejan de ser rumores y se vuelven una sola acusación pública.";
-  const costLine = losses[0] ?? (endingType === "good" ? "El coste no desaparece: la aldea queda dividida entre gratitud y vergüenza." : "El coste queda escrito en la memoria del grupo y nadie sale igual del juicio.");
-  const markLine = persistentMarks.length ? `Marca persistente: ${persistentMarks.join(", ")}.` : "La ruta queda marcada en la memoria de la mesa.";
-  const accusedName = accused?.name ?? "el acusado";
-  const culpritName = culprit?.name ?? "el culpable";
-  const secretLine = endingType === "secret"
-    ? "Bajo la explicación aceptable aparece otra capa: la amenaza visible era una firma, no el origen, y alguien había vendido protección antigua por poder inmediato."
-    : endingType === "tragic"
-      ? "La crisis no espera una confesión limpia; obliga a escoger entre salvar cuerpos o salvar la verdad."
-      : "La escena se resuelve sin borrar las contradicciones que la hicieron peligrosa.";
-  return `${ending.title}. ${clueLine} ${accusedName} ya no puede ser tratado como monstruo conveniente: queda vivo, exiliado o condenado según el precio que la mesa aceptó pagar, pero su nombre deja de cargar solo con la mentira. ${culpritName} pierde la comodidad de hablar desde la sombra; la plaza entiende que el miedo fue usado como herramienta y que el culpable necesitaba una víctima antes que una verdad. ${secretLine} ${costLine} El grupo queda señalado por haber elegido en público: algunos vecinos bajan la mirada, otros memorizan sus rostros, y los compañeros saben que una victoria también puede dejar deuda. ${markLine} ${futureHook ?? "No se abren acciones normales: solo queda cargar con la consecuencia."} La última imagen es la plaza en silencio, con la prueba decisiva sobre la madera húmeda y una campana que ya no suena para obedecer.`;
+const endingTierByType: Record<EndingType, { tier: EndingPlan["tier"]; label: string }> = {
+  good: { tier: 1, label: "mejor final" },
+  heroic: { tier: 2, label: "victoria con precio" },
+  secret: { tier: 2, label: "verdad profunda" },
+  bittersweet: { tier: 3, label: "salida agridulce" },
+  false: { tier: 4, label: "resolución falsa" },
+  corrupt: { tier: 4, label: "victoria corrupta" },
+  tragic: { tier: 5, label: "final trágico" }
+};
+
+// Construye el epílogo por cláusulas secuenciales, todas derivadas de estado real:
+// 1) veredicto (dato de campaña), 2) pruebas conocidas, 3) destino de cada NPC según
+// vivo/confianza/hostilidad, 4) tono según endingScore dominante, 5) deuda/peligro final.
+export function buildEndingPlan(room: GameRoom, ending: CampaignEnding, endingType: EndingType, losses: string[], futureHook: string | null): EndingPlan {
+  const { tier, label } = endingTierByType[endingType] ?? endingTierByType.bittersweet;
+  const clauses: string[] = [];
+
+  clauses.push(`${ending.title}. ${ending.description}`);
+
+  const knownTexts = new Set([...room.mysteryClues, ...room.memorySummary.clues]);
+  const knownClues = room.campaign.clues.filter((clue) => knownTexts.has(clue.text) || (clue.label && knownTexts.has(clue.label)));
+  if (knownClues.length) {
+    clauses.push(`Lo que quedó probado: ${knownClues.slice(-3).map((clue) => clue.label ?? clue.text).join("; ")}.`);
+  } else {
+    clauses.push("El caso cierra sin pruebas firmes: la versión oficial sobrevive a la verdad.");
+  }
+
+  const npcStates = room.livingState?.npcStates ?? {};
+  const npcClauses: string[] = [];
+  for (const npc of room.campaign.npcs) {
+    const state = npcStates[npc.id];
+    const name = npc.name.split(",")[0];
+    if (state?.alive === false) npcClauses.push(`${name} no vio el final de esta historia.`);
+    else if ((state?.hostility ?? 0) >= 2) npcClauses.push(`${name} no olvida lo que el grupo le costó.`);
+    else if ((state?.trust ?? 0) >= 2) npcClauses.push(`${name} queda del lado del grupo, y lo dirá cuando importe.`);
+    if (npcClauses.length >= 3) break;
+  }
+  clauses.push(...npcClauses);
+
+  const score = room.livingState?.endingScore ?? {};
+  const dominant = (Object.entries(score) as Array<[string, number]>).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const toneByScore: Record<string, string> = {
+    truth: "El grupo eligió la verdad por encima de la comodidad, y esa elección tiene testigos.",
+    mercy: "Hubo espacio para la misericordia donde la ley solo pedía un culpable.",
+    sacrifice: "Alguien pagó de su bolsillo lo que la historia necesitaba para cerrar.",
+    corruption: "Algo se compró en el camino, y las deudas compradas siempre cobran interés.",
+    chaos: "El desorden que abrieron no se cierra con el telón: alguien lo heredará."
+  };
+  if (dominant && toneByScore[dominant]) clauses.push(toneByScore[dominant]);
+
+  if (losses[0]) clauses.push(losses[0]);
+  if (futureHook) clauses.push(futureHook);
+
+  return { endingId: ending.id, title: ending.title, tier, tierLabel: label, clauses };
 }
 
 export function resolveEndingForRoom(room: GameRoom): EndingResolution {
@@ -273,15 +323,17 @@ export function resolveEndingForRoom(room: GameRoom): EndingResolution {
     ? "Una capa más profunda queda abierta para una campaña futura."
     : null;
 
+  const plan = buildEndingPlan(room, ending, endingType, losses, unlockedFutureHook);
   return {
     shouldEnd: true,
     endingId: ending.id,
     endingType,
     title: ending.title,
-    narration: buildEndingNarration(room, ending, endingType, losses, persistentMarks, unlockedFutureHook),
+    narration: plan.clauses.join("\n\n"),
     unlockedFutureHook,
     rewards,
     losses,
-    persistentMarks
+    persistentMarks,
+    plan
   };
 }

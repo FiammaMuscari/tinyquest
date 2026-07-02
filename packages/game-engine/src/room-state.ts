@@ -1,5 +1,5 @@
 import { isFinalScene } from "./ending-resolution";
-import { createScenesForCampaign } from "./scenes";
+import { createScenesForCampaign, toSceneActionChoice } from "./scenes";
 import type { Campaign, CampaignActionOutcome, CampaignActionType, CrisisOption, GameRoom, Player, Scene, SceneActionChoice } from "./types";
 
 const sceneCache = new Map<string, Scene[]>();
@@ -157,14 +157,16 @@ function fallbackSceneChoices(scene: Scene, room: GameRoom): SceneActionChoice[]
     },
     {
       id: `${scene.id}-rest`,
-      label: active ? `Recuperar aire (${active.name})` : "Recuperar aire",
-      action: "Tomarse un segundo para recuperar aire, ordenar el grupo y preparar una acción con más costo.",
+      label: active ? `Recuperar aliento y ahorrar energía (${active.name})` : "Recuperar aliento y ahorrar energía",
+      action: "Ceder el impulso del turno para recuperar el aliento y guardar energía para una acción decisiva.",
       actionType: "proteger_aliado",
       recommendedStats: ["focus"],
       skillTag: "defend",
       category: "defend",
       riskLevel: "low",
       energyCost: 0,
+      energyRestoreOnSuccess: 2,
+      permanent: true,
       targetId: active?.id ?? scene.id,
       targetKind: "npc",
       possibleOutcomeHint: "Recupera margen narrativo; si falla, el peligro presiona.",
@@ -404,8 +406,23 @@ function followUpSceneChoices(scene: Scene, room: GameRoom): SceneActionChoice[]
 }
 
 
+// Resuelve el nombre real de la entidad objetivo de una opción (NPC, objeto o enemigo).
+function mutationTargetName(choice: SceneActionChoice, room: GameRoom): string | null {
+  const ids = [choice.npcId, choice.objectId, choice.targetId].filter((id): id is string => Boolean(id));
+  for (const id of ids) {
+    const npc = room.campaign.npcs.find((item) => item.id === id);
+    if (npc) return npc.name.split(",")[0];
+    const object = room.campaign.storyObjects?.find((item) => item.id === id);
+    if (object) return object.name;
+    const enemy = room.campaign.enemies.find((item) => item.id === id);
+    if (enemy) return enemy.name;
+  }
+  return null;
+}
+
 function mutateExhaustedChoice(choice: SceneActionChoice, scene: Scene, room: GameRoom): SceneActionChoice | null {
-  const targetName = choice.label.replace(/^(Interrogar|Comparar|Enfrentar|Revisar|Proteger|Abrir|Seguir|Usar)\s+/i, "");
+  const entityName = mutationTargetName(choice, room);
+  const targetName = entityName ?? choice.label.replace(/^(Interrogar|Comparar|Enfrentar|Revisar|Proteger|Abrir|Seguir|Usar)\s+/i, "");
   const variantsByType: Record<string, Array<{ suffix: string; label: string; action: string; progress: number }>> = {
     interrogar_npc: [
       { suffix: "offer", label: `Ofrecer protección a ${targetName}`, action: "Prometer protección concreta para que el testigo se anime a hablar.", progress: 0.75 },
@@ -433,17 +450,35 @@ function mutateExhaustedChoice(choice: SceneActionChoice, scene: Scene, room: Ga
       { suffix: "commit", label: `Cruzar la ruta y aceptar el riesgo`, action: "Avanzar por la ruta aunque el coste pueda subir.", progress: 1.25 }
     ],
     proteger_aliado: [
-      { suffix: "move", label: `Mover al aliado a cubierto`, action: "La protección cambia de forma: mover, cubrir o negociar posición.", progress: 0.75 },
-      { suffix: "shield", label: `Cubrir al aliado con un coste`, action: "Sostener la defensa aceptando daño, deuda o pérdida de posición.", progress: 1 },
-      { suffix: "trust", label: `Pedir confianza al aliado`, action: "Convertir la protección anterior en confianza activa.", progress: 1 }
+      { suffix: "move", label: entityName ? `Mover a ${entityName} a cubierto` : `Mover al aliado a cubierto`, action: "La protección cambia de forma: mover, cubrir o negociar posición.", progress: 0.75 },
+      { suffix: "shield", label: entityName ? `Cubrir a ${entityName} con un coste` : `Cubrir al aliado con un coste`, action: "Sostener la defensa aceptando daño, deuda o pérdida de posición.", progress: 1 },
+      { suffix: "trust", label: entityName ? `Pedir confianza a ${entityName}` : `Pedir confianza al aliado`, action: "Convertir la protección anterior en confianza activa.", progress: 1 }
+    ],
+    negociar: [
+      { suffix: "offer", label: `Mejorar la oferta a ${targetName}`, action: "Subir lo que se pone sobre la mesa para destrabar el trato anterior.", progress: 0.75 },
+      { suffix: "guarantee", label: `Dar una garantía concreta a ${targetName}`, action: "Respaldar la palabra con un objeto, una promesa verificable o una deuda propia.", progress: 1 },
+      { suffix: "price", label: `Aceptar el precio que pide ${targetName}`, action: "Cerrar el trato pagando el coste que antes se evitó.", progress: 1.25 }
+    ],
+    mentir: [
+      { suffix: "sustain", label: `Sostener el engaño ante ${targetName}`, action: "Mantener la historia anterior agregando un detalle verificable.", progress: 0.75 },
+      { suffix: "twist", label: `Cambiar la historia frente a ${targetName}`, action: "Reemplazar la mentira gastada por una versión nueva antes de que la comparen.", progress: 1 },
+      { suffix: "half-truth", label: `Confesar a medias ante ${targetName}`, action: "Entregar una parte real de la verdad para salvar el resto del engaño.", progress: 1 }
+    ],
+    combatir: [
+      { suffix: "flank", label: `Flanquear a ${targetName}`, action: "Cambiar el ángulo del enfrentamiento para quitarle la posición ganada.", progress: 0.75 },
+      { suffix: "disarm", label: `Desarmar a ${targetName}`, action: "Atacar el arma o la herramienta en vez del cuerpo.", progress: 1 },
+      { suffix: "corner", label: `Acorralar a ${targetName}`, action: "Cerrar las salidas y forzar rendición, huida o error.", progress: 1.25 }
     ]
   };
   const type = choice.actionType ?? "tomar_decision_moral";
-  const variants = variantsByType[type] ?? [
-    { suffix: "choice", label: `Buscar otra salida con ${targetName}`, action: "Tomar una decisión concreta usando lo que ya ocurrió.", progress: 0.75 },
-    { suffix: "cost", label: `Aceptar un coste por ${targetName}`, action: "Mover la escena con una decisión clara y coste visible.", progress: 1 },
-    { suffix: "push", label: `Empujar la escena con ${targetName}`, action: "Usar lo logrado para avanzar hacia cierre o crisis.", progress: 1.25 }
-  ];
+  // Sin variantes específicas: solo mutar si hay una entidad real que ancle el texto.
+  // Nunca coser plantillas con el label completo ("Aceptar un coste por <oración>").
+  const variants = variantsByType[type] ?? (entityName ? [
+    { suffix: "angle", label: `Volver sobre ${entityName} desde otro ángulo`, action: `Retomar el intento anterior con ${entityName} cambiando el método y aceptando un coste.`, progress: 0.75 },
+    { suffix: "exposed", label: `Aprovechar lo que ${entityName} dejó expuesto`, action: `Usar la reacción previa de ${entityName} como palanca para una consecuencia nueva.`, progress: 1 },
+    { suffix: "force", label: `Forzar una respuesta de ${entityName}`, action: `Presionar a ${entityName} hasta obtener decisión, ayuda o ruptura.`, progress: 1.25 }
+  ] : null);
+  if (!variants) return null;
   const selected = variants.find((variant) => !room.livingState.actionMemory[`${choice.id}-${variant.suffix}`]?.exhausted);
   if (!selected) return null;
   const outcomeKind = followUpOutcomeKind(type, "partial");
@@ -719,21 +754,39 @@ export function getVisibleActionChoices(scene: Scene, room: GameRoom): SceneActi
   const flags = new Set(room.storyFlags);
   const clueTexts = new Set(room.mysteryClues);
   const clueIds = new Set(room.campaign.clues.filter((clue) => clueTexts.has(clue.text)).map((clue) => clue.id));
-  const visible = scene.actionChoices.filter((choice) => {
-    const required = choice.requiredFlags ?? [];
-    const requiredClues = choice.requiredClues ?? [];
-    const blocked = choice.blockedByFlags ?? [];
-    const exhausted = room.livingState.actionMemory[choice.id]?.exhausted;
-    return !exhausted && required.every((flag) => flags.has(flag)) && requiredClues.every((clueId) => clueIds.has(clueId)) && blocked.every((flag) => !flags.has(flag));
-  });
-  const mutated = scene.actionChoices
-    .filter((choice) => {
-      const required = choice.requiredFlags ?? [];
-      const requiredClues = choice.requiredClues ?? [];
-      const blocked = choice.blockedByFlags ?? [];
-      const exhausted = room.livingState.actionMemory[choice.id]?.exhausted;
-      return exhausted && required.every((flag) => flags.has(flag)) && requiredClues.every((clueId) => clueIds.has(clueId)) && blocked.every((flag) => !flags.has(flag));
-    })
+
+  // Requisitos comunes: flags, pistas, bloqueos, expiración por ronda y confianza del NPC.
+  const meetsRequirements = (choice: SceneActionChoice): boolean => {
+    if ((choice.requiredFlags ?? []).some((flag) => !flags.has(flag))) return false;
+    if ((choice.requiredClues ?? []).some((clueId) => !clueIds.has(clueId))) return false;
+    if ((choice.blockedByFlags ?? []).some((flag) => flags.has(flag))) return false;
+    if (choice.expiresAfterRound !== undefined && room.roundInScene >= choice.expiresAfterRound) return false;
+    if (choice.requiredTrust !== undefined) {
+      const npcId = choice.npcId ?? choice.targetId;
+      const trust = npcId ? room.livingState?.npcStates?.[npcId]?.trust ?? 0 : 0;
+      if (trust < choice.requiredTrust) return false;
+    }
+    return true;
+  };
+  // Agotamiento: flag explícito, o auto-retiro tras 2 usos salvo opciones permanentes.
+  const isExhausted = (choice: SceneActionChoice): boolean => {
+    if (choice.permanent) return false;
+    const memory = room.livingState.actionMemory[choice.id];
+    if (!memory) return false;
+    return Boolean(memory.exhausted) || (memory.uses ?? 0) >= 2;
+  };
+
+  // Opciones desbloqueadas por pistas conocidas (CampaignClue.unlocksActions → pool de campaña).
+  const unlockedActionIds = new Set(room.campaign.clues.filter((clue) => clueIds.has(clue.id)).flatMap((clue) => clue.unlocksActions ?? []));
+  const unlockedChoices = (room.campaign.unlockableOptions ?? [])
+    .filter((option) => unlockedActionIds.has(option.id))
+    .map(toSceneActionChoice)
+    .filter((choice) => !scene.actionChoices.some((item) => item.id === choice.id));
+  const candidates = [...scene.actionChoices, ...unlockedChoices];
+
+  const visible = candidates.filter((choice) => !isExhausted(choice) && meetsRequirements(choice));
+  const mutated = candidates
+    .filter((choice) => isExhausted(choice) && meetsRequirements(choice))
     .map((choice) => mutateExhaustedChoice(choice, scene, room))
     .filter((choice): choice is SceneActionChoice => Boolean(choice));
   const combined = [...visible, ...mutated];

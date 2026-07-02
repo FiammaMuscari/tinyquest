@@ -149,6 +149,11 @@ export type SceneActionChoice = {
   requiredFlags?: string[];
   blockedByFlags?: string[];
   unlocksFlags?: string[];
+  // Economía y ciclo de vida de la opción:
+  energyRestoreOnSuccess?: number;   // ahorrar: éxito devuelve energía (p.ej. descansar)
+  expiresAfterRound?: number;        // deja de estar disponible desde esta ronda de escena
+  permanent?: boolean;               // nunca se agota ni se auto-retira por usos
+  requiredTrust?: number;            // exige npcStates[npcId].trust >= N
   memoryImpact?: string;
   npcReaction?: string;
   combatEffect?: string;
@@ -331,6 +336,10 @@ export type CampaignActionOption = {
   requiredFlags?: string[];
   blockedByFlags?: string[];
   unlocksFlags?: string[];
+  energyRestoreOnSuccess?: number;
+  expiresAfterRound?: number;
+  permanent?: boolean;
+  requiredTrust?: number;
   memoryImpact?: string;
   npcReaction?: string;
   combatEffect?: string;
@@ -498,6 +507,8 @@ export type Campaign = {
   recommendedSkills: string[];
   scenes: CampaignScene[];
   crisisOptions?: CrisisOption[];
+  unlockableOptions?: CampaignActionOption[];  // pool de opciones que las pistas desbloquean vía unlocksActions
+  energyRegenPerRound?: number;                // regen fija por ronda (default 1); gastar > regenerar exige ahorro
   factions?: Array<{ id: string; name: string; agenda: string; pressure?: string }>;
   suspects?: Array<{ id: string; name: string; motive: string; secret?: string; suspicion?: number }>;
   npcs: CampaignNPC[];

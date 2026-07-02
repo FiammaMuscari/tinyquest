@@ -866,34 +866,32 @@ export function App() {
       const latestEvent = nextRoom.sessionLog[0];
       const safeNarration = latestEvent?.narration ?? narration.playerNarration ?? narration.sections?.narration ?? narration.narration;
       const safeConsequence = latestEvent?.consequenceText ?? narration.consequenceText ?? narration.sections?.consequence ?? narration.consequence ?? "La escena cambia de forma concreta.";
+      const nextScene = getRoomScenes(nextRoom)[nextRoom.currentSceneIndex];
+      const nextChoices = getVisibleActionChoices(nextScene, nextRoom);
+      // El motor es la verdad: las opciones mostradas son siempre las reales del motor,
+      // nunca texto suelto del narrador mapeado por posición.
+      const realOptionLabels = nextChoices.map((choice) => choice.label).slice(0, 4);
       setRoom(nextRoom);
       setCurrentNarration(safeNarration);
       setNpcDialogue(narration.npcDialogue);
-      setNextOptions(narration.nextOptions);
+      setNextOptions(realOptionLabels);
       setLatestTurnNarration(narration);
       setDmSections({
         narration: safeNarration,
         dialogue: narration.sections?.dialogue ?? narration.npcDialogue.join(" "),
         consequence: safeConsequence,
-        options: narration.sections?.options ?? narration.nextOptions
+        options: realOptionLabels
       });
       setPlotBeat(narration.plotBeat);
-      const nextScene = getRoomScenes(nextRoom)[nextRoom.currentSceneIndex];
-      const nextChoices = getVisibleActionChoices(nextScene, nextRoom);
-      // Use exact ID mapping from enrichedOptions (preferred), fall back to index-based
+      // El narrador solo puede enriquecer labels si referencia el id exacto de la opción.
       if (narration.enrichedOptions?.length) {
         const labels: Record<string, string> = {};
         for (const opt of narration.enrichedOptions) {
           if (opt.id && opt.label) labels[opt.id] = opt.label;
         }
-        if (Object.keys(labels).length) setEnrichedChoiceLabels(labels);
+        setEnrichedChoiceLabels(labels);
       } else {
-        const llmOptions = narration.sections?.options ?? narration.nextOptions;
-        if (llmOptions?.length) {
-          const labels: Record<string, string> = {};
-          nextChoices.forEach((choice, i) => { if (llmOptions[i]) labels[choice.id] = llmOptions[i]; });
-          setEnrichedChoiceLabels(labels);
-        }
+        setEnrichedChoiceLabels({});
       }
       const nextActive = nextRoom.players[nextRoom.activePlayerIndex];
       if (nextActive.type === "human") {
@@ -917,12 +915,15 @@ export function App() {
         const latestEvent = safeRoom.sessionLog[0];
         const safeNarration = latestEvent?.narration ?? fallback.narration;
         const safeConsequence = latestEvent?.consequenceText ?? fallback.consequence ?? "La escena cambia de forma concreta.";
+        const fallbackScene = getRoomScenes(safeRoom)[safeRoom.currentSceneIndex];
+        const fallbackOptionLabels = getVisibleActionChoices(fallbackScene, safeRoom).map((choice) => choice.label).slice(0, 4);
         setRoom(safeRoom);
         setCurrentNarration(safeNarration);
         setNpcDialogue(fallback.npcDialogue);
-        setNextOptions(fallback.nextOptions);
+        setNextOptions(fallbackOptionLabels);
         setLatestTurnNarration(fallback);
-        setDmSections({ narration: safeNarration, dialogue: fallback.npcDialogue.join(" "), consequence: safeConsequence, options: fallback.nextOptions });
+        setEnrichedChoiceLabels({});
+        setDmSections({ narration: safeNarration, dialogue: fallback.npcDialogue.join(" "), consequence: safeConsequence, options: fallbackOptionLabels });
       }
       setPlotBeat(undefined);
     } finally {
@@ -988,7 +989,7 @@ export function App() {
       <section className="gameFrame">
         <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         <section className="centerColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
           {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
@@ -1157,7 +1158,9 @@ function CastPanel({ sceneId, npcIds, npcs }: { sceneId: string; npcIds: string[
   );
 }
 
-function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy, enrichedLabels }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number; enrichedLabels?: Record<string, string> }) {
+const riskLabels: Record<string, string> = { low: "riesgo bajo", medium: "riesgo medio", high: "riesgo alto" };
+
+function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy, enrichedLabels, roundInScene = 0 }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number; enrichedLabels?: Record<string, string>; roundInScene?: number }) {
   const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.22)), url(${imageUrl})`;
   return (
     <section className="panel scenePanel">
@@ -1172,14 +1175,19 @@ function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraft
         {choices.map((choice) => {
           const energyCost = getActionEnergyCost(choice);
           const disabled = !canPayActionEnergy(energy, choice);
+          const roundsLeft = choice.expiresAfterRound !== undefined ? choice.expiresAfterRound - roundInScene : null;
+          const isCrisis = choice.skillTag === "crisis";
           return (
-            <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button">
+            <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""} ${isCrisis ? "crisisChoice" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button">
               <strong>{enrichedLabels?.[choice.id] ?? choice.label}</strong>
               <div className="choiceMeta">
                 <div className="choiceStats">
                   {choice.recommendedStats.map((stat) => (
                     <span key={stat} className={`statChip stat-${stat}`}>{statLabels[stat]}</span>
                   ))}
+                  {choice.riskLevel && <span className={`riskChip risk-${choice.riskLevel}`}>{riskLabels[choice.riskLevel] ?? choice.riskLevel}</span>}
+                  {roundsLeft !== null && roundsLeft <= 2 && <span className="expiryChip">⏳ {roundsLeft <= 1 ? "última ronda" : `${roundsLeft} rondas`}</span>}
+                  {choice.energyRestoreOnSuccess ? <span className="saveChip">+{choice.energyRestoreOnSuccess}⚡ al lograrlo</span> : null}
                 </div>
                 <span className="choiceCost"><Zap size={10} />{energyCost}{disabled ? <em>−{energyCost - energy}</em> : null}</span>
               </div>
@@ -1305,11 +1313,21 @@ function FinalBanner({ room, onBackToCampaigns, onReplayRoute }: { room: GameRoo
   const rewards = resolved?.rewards ?? [];
   const losses = resolved?.losses ?? [];
   const marks = resolved?.persistentMarks ?? [];
+  const plan = resolved?.plan;
   return (
     <section className="panel finalBanner">
       <PanelTitle title="Final alcanzado" icon={<Sparkles size={17} />} />
-      <h2>{resolved?.title ?? room.finalEnding?.title ?? "Final de la quest"}</h2>
-      <p>{room.finalRecap ?? buildFinalRecap(room)}</p>
+      <h2>
+        {resolved?.title ?? room.finalEnding?.title ?? "Final de la quest"}
+        {plan && <span className={`endingTier tier-${plan.tier}`}>{plan.tierLabel}</span>}
+      </h2>
+      {plan ? (
+        <div className="endingClauses">
+          {plan.clauses.map((clause, index) => <p key={index} className="endingClause" style={{ "--clause-index": index } as React.CSSProperties}>{clause}</p>)}
+        </div>
+      ) : (
+        <p>{room.finalRecap ?? buildFinalRecap(room)}</p>
+      )}
       {resolved?.unlockedFutureHook && <p className="futureHook">{resolved.unlockedFutureHook}</p>}
       <div className="endingGrid">
         <div><strong>Recompensas</strong>{rewards.length ? rewards.map((item) => <span key={item}>{item}</span>) : <span>Ninguna recompensa limpia.</span>}</div>
