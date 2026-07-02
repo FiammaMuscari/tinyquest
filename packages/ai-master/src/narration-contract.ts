@@ -70,6 +70,17 @@ function buildFallbackNarrationText(plan: ResolutionPlan): string {
   return variants[Math.abs(plan.actorId.charCodeAt(0)) % variants.length];
 }
 
+// Never surface a raw clue id in the UI. Prefer a usable LLM-provided title, then the
+// authored title carried by the plan's clueEffect, and only as a last resort humanize
+// the id (hyphens/underscores → spaces) so it never reads like "mordida-falsa".
+function readableClueTitle(plan: ResolutionPlan, clueId: string, llmTitle?: string): string {
+  if (llmTitle && llmTitle.trim() && llmTitle !== clueId) return llmTitle;
+  if (plan.consequence.clueEffect?.clueId === clueId && plan.consequence.clueEffect.clueTitle) {
+    return plan.consequence.clueEffect.clueTitle;
+  }
+  return clueId.replace(/[-_]/g, " ");
+}
+
 export function buildFallbackNarrationOutput(plan: ResolutionPlan): DungeonNarrationOutput {
   const companionMoments = plan.botDirectives.slice(0, 2).map((bot) => ({
     characterId: bot.botId,
@@ -82,7 +93,7 @@ export function buildFallbackNarrationOutput(plan: ResolutionPlan): DungeonNarra
     dialogue: bot.speechStyle?.includes("firmes") ? "Atrás. Primero respira." : bot.speechStyle?.includes("seca") ? "No toquen eso." : undefined
   }));
   const clueReveals: DungeonNarrationOutput["clueReveals"] = plan.cluePolicy.canRevealNewClue
-    ? plan.cluePolicy.allowedClueIds.map((clueId) => ({ clueId, title: clueId, mode: plan.cluePolicy.clueRevealMode === "full" ? "full" : plan.cluePolicy.clueRevealMode === "partial" ? "partial" : "hint", text: plan.consequence.clueEffect?.naturalDescription ?? plan.consequence.clueEffect?.clueTitle ?? clueId }))
+    ? plan.cluePolicy.allowedClueIds.map((clueId) => ({ clueId, title: readableClueTitle(plan, clueId), mode: plan.cluePolicy.clueRevealMode === "full" ? "full" : plan.cluePolicy.clueRevealMode === "partial" ? "partial" : "hint", text: plan.consequence.clueEffect?.naturalDescription ?? plan.consequence.clueEffect?.clueTitle ?? clueId }))
     : [];
   return {
     narration: buildFallbackNarrationText(plan),
@@ -142,7 +153,7 @@ export function repairDungeonNarrationOutput(output: DungeonNarrationOutput, pla
       const ok = allowedClues.has(clue.clueId);
       if (!ok) continuityWarnings.push(`Se eliminó clueReveal no permitido: ${clue.clueId}.`);
       return ok;
-    })
+    }).map((clue) => ({ ...clue, title: readableClueTitle(plan, clue.clueId, clue.title) }))
     : [];
   if (!plan.cluePolicy.canRevealNewClue && output.clueReveals.length) continuityWarnings.push("Se eliminaron clueReveals porque cluePolicy.canRevealNewClue es false.");
   const companionMomentsRaw = output.companionMoments ?? [];

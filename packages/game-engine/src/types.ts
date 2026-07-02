@@ -224,6 +224,24 @@ export type CampaignActionOutcome = {
   narrationHints?: Partial<CampaignNarrationHints>;
 };
 
+export type CrisisOption = {
+  id: string;
+  label: string;
+  actionType: CampaignActionType;
+  targetId?: string;
+  targetKind?: "npc" | "object" | "route" | "faction" | "creature" | "scene";
+  riskLevel: "low" | "medium" | "high";
+  recommendedStats: StatKey[];
+  requiredFlags?: string[];
+  requiredClues?: string[];
+  requiredNpcs?: string[];
+  blockedByFlags?: string[];
+  consequenceHints?: { onSuccess?: string; onFailure?: string };
+  energyCost?: number;
+  progressOnSuccess?: number;
+  endingBias?: Partial<Record<"truth" | "mercy" | "sacrifice" | "corruption" | "chaos", number>>;
+};
+
 export type CampaignGraph = {
   campaignId: string;
   title: string;
@@ -364,6 +382,7 @@ export type CampaignScene = {
   imagePrompt: string;
   ambientSoundPrompt: string;
   multipleChoiceOptions: CampaignActionOption[];
+  crisisOptions?: CrisisOption[];
 };
 
 export type CampaignNPC = {
@@ -478,6 +497,7 @@ export type Campaign = {
   recommendedStats: StatName[];
   recommendedSkills: string[];
   scenes: CampaignScene[];
+  crisisOptions?: CrisisOption[];
   factions?: Array<{ id: string; name: string; agenda: string; pressure?: string }>;
   suspects?: Array<{ id: string; name: string; motive: string; secret?: string; suspicion?: number }>;
   npcs: CampaignNPC[];

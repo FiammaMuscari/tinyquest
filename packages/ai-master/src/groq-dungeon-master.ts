@@ -360,9 +360,13 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       model,
       messages,
       temperature: isQwen ? 0.72 : 0.80,
-      max_tokens: Math.max(220, Math.min(560, Math.ceil(this.policy.maxOutputChars / 4))),
+      max_tokens: Math.max(640, Math.min(1200, Math.ceil(this.policy.maxOutputChars / 3))),
       ...(isQwen ? { reasoning_effort: "none", include_reasoning: false } : {}),
       ...(isGptOss ? { reasoning_effort: "low" } : {}),
+      // gemini-2.5-flash "piensa" por defecto y gasta el presupuesto de tokens antes de
+      // emitir el JSON, truncándolo → el parse falla → fallback en cada turno. Sin thinking
+      // la narración completa entra en el budget.
+      ...(this.isGemini ? { reasoning_effort: "none" } : {}),
       ...(options.forceJson || !isQwen ? { response_format: { type: "json_object" } } : {})
     };
     if (JSON.stringify(body).length > MAX_GROQ_BODY_CHARS) {

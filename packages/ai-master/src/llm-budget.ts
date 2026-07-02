@@ -31,7 +31,7 @@ export const DEFAULT_CHEAP_LLM_POLICY: LlmBudgetPolicy = {
   maxPromptChars: 3200,
   maxOutputChars: 3200,
   useGroqForPlayerTurns: true,
-  useGroqForBotTurns: false,
+  useGroqForBotTurns: true,
   useGroqForMajorMomentsOnly: false,
   cacheEnabled: true,
   retryOnInvalidJson: false
@@ -106,9 +106,12 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     : [];
   const motifs = bundle?.sensoryMotifs.slice(0, 3) ?? [];
 
-  // First sentences of recent narrations — do not start the same way
-  const noRepeat = bundle?.recentNarrationOpenings.slice(0, 4)
-    ?? storyLast.map((s) => s.split(/[.!?]/)[0]).filter(Boolean).slice(0, 3);
+  // Opening fragments of recent narrations — the LLM must NOT start the same way.
+  // Use the first ~12 words so the constraint targets the actual repeated phrase.
+  const noRepeat = (bundle?.recentNarrationOpenings.slice(0, 4)
+    ?? storyLast.map((s) => s.split(/[.!?]/)[0]).filter(Boolean).slice(0, 3))
+    .map((s) => s.split(/\s+/).slice(0, 12).join(" "))
+    .filter(Boolean);
 
   // Visible options to enrich with narrative labels — ground each to its real
   // target entity + current state so the label references the right NPC/object,
@@ -177,7 +180,8 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
       "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",
-      "Continuá voz y tensión desde story[]. No empezar igual que noRepeat.",
+      "VARIÁ LA APERTURA: está PROHIBIDO empezar con las mismas palabras, el mismo sujeto o la misma imagen que cualquier entrada de noRepeat. Abrí cada turno distinto: a veces con una acción, a veces con un diálogo, a veces con un detalle sensorial NUEVO.",
+      "story[] es continuidad de TRAMA y tensión, NO un molde de prosa: no copies su arranque ni sus frases. No repitas motivos ya usados en turnos previos (un objeto que cae, las voces que se cortan, el sudor frío, etc.); avanzá con material nuevo.",
       ...(plan.roll.critical ? ["turn.roll.critical: fue un golpe de suerte extraordinario (20 natural). Narralo como un momento sobresaliente, casi imposible, sin inventar hechos fuera de facts."] : []),
       ...(plan.roll.fumble ? ["turn.roll.fumble: fue una pifia (1 natural). Narrala como un pequeño desastre que se vuelve en contra del actor, dentro de lo que dice consequence."] : []),
       "PROHIBIDO: inventar NPCs/objetos/pistas fuera de scene. No revelar forbidden."

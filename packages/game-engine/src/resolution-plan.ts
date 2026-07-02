@@ -129,7 +129,7 @@ const allowedTargetKindsByAction: Record<string, string[]> = {
   proteger_aliado: ["npc"],
   abrir_ruta: ["route"],
   cerrar_ruta: ["route"],
-  mentir: ["npc", "faction"],
+  mentir: ["npc", "faction", "creature"],
   negociar: ["npc", "faction"],
   combatir: ["creature", "npc"],
   huir: ["route", "scene"],

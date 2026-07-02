@@ -1,6 +1,6 @@
 import { isFinalScene } from "./ending-resolution";
 import { createScenesForCampaign } from "./scenes";
-import type { Campaign, CampaignActionOutcome, CampaignActionType, GameRoom, Player, Scene, SceneActionChoice } from "./types";
+import type { Campaign, CampaignActionOutcome, CampaignActionType, CrisisOption, GameRoom, Player, Scene, SceneActionChoice } from "./types";
 
 const sceneCache = new Map<string, Scene[]>();
 
@@ -483,86 +483,232 @@ function mutateExhaustedChoice(choice: SceneActionChoice, scene: Scene, room: Ga
   };
 }
 
+function knownClueEntriesForRoom(room: GameRoom): Campaign["clues"] {
+  const knownTexts = new Set([...room.mysteryClues, ...room.memorySummary.clues]);
+  return room.campaign.clues.filter((clue) => knownTexts.has(clue.text) || (clue.label && knownTexts.has(clue.label)));
+}
+
+function isNpcAvailable(room: GameRoom, npcId: string): boolean {
+  const state = room.livingState?.npcStates?.[npcId] ?? room.livingState?.secondaryNPCStates?.[npcId];
+  if (state) return state.alive !== false && state.present !== false;
+  return room.campaign.npcs.some((npc) => npc.id === npcId);
+}
+
+function isCrisisOptionAvailable(option: CrisisOption, room: GameRoom, knownClueIds: Set<string>): boolean {
+  const flags = new Set(room.storyFlags);
+  if ((option.requiredFlags ?? []).some((flag) => !flags.has(flag))) return false;
+  if ((option.blockedByFlags ?? []).some((flag) => flags.has(flag))) return false;
+  if ((option.requiredClues ?? []).some((clueId) => !knownClueIds.has(clueId))) return false;
+  if ((option.requiredNpcs ?? []).some((npcId) => !isNpcAvailable(room, npcId))) return false;
+  return true;
+}
+
+// La UI conoce investigate/talk/fight/defend/pet (ver normalizeCategory en scenes.ts).
+const crisisCategoryByActionType: Partial<Record<CampaignActionType, SceneActionChoice["category"]>> = {
+  combatir: "fight",
+  proteger_aliado: "defend",
+  cerrar_ruta: "defend",
+  huir: "investigate",
+  abrir_ruta: "investigate",
+  investigar_objeto: "investigate",
+  comparar_evidencia: "investigate",
+  usar_objeto: "investigate"
+};
+
+const crisisIntentByActionType: Partial<Record<CampaignActionType, SceneActionChoice["intent"]>> = {
+  combatir: "fight",
+  proteger_aliado: "protect",
+  cerrar_ruta: "protect",
+  huir: "flee",
+  abrir_ruta: "flee",
+  revelar_prueba: "sacrifice",
+  tomar_decision_moral: "sacrifice",
+  sacrificar_recurso: "sacrifice"
+};
+
+function crisisOptionToChoice(option: CrisisOption, scene: Scene): SceneActionChoice {
+  const category = crisisCategoryByActionType[option.actionType] ?? "talk";
+  const intent = crisisIntentByActionType[option.actionType] ?? "talk";
+  const statsInScene = option.recommendedStats.filter((stat) => scene.allowedStats.includes(stat));
+  return {
+    id: option.id,
+    label: option.label,
+    action: option.label,
+    actionType: option.actionType,
+    recommendedStats: statsInScene.length > 0 ? statsInScene : option.recommendedStats,
+    skillTag: "crisis",
+    category,
+    intent,
+    riskLevel: option.riskLevel,
+    energyCost: option.energyCost ?? 1,
+    targetId: option.targetId,
+    targetKind: option.targetKind,
+    npcId: option.targetKind === "npc" ? option.targetId : undefined,
+    requiredFlags: option.requiredFlags,
+    requiredClues: option.requiredClues,
+    blockedByFlags: option.blockedByFlags,
+    progressOnSuccess: option.progressOnSuccess ?? (option.riskLevel === "high" ? 1 : 0.75),
+    dangerOnPartial: 1,
+    dangerOnFailure: option.riskLevel === "high" ? 2 : 1,
+    possibleOutcomeHint: option.consequenceHints?.onSuccess
+  };
+}
+
+function derivedCrisisChoices(scene: Scene, room: GameRoom): SceneActionChoice[] {
+  const preferredStat = (...stats: SceneActionChoice["recommendedStats"]) => stats.find((stat) => scene.allowedStats.includes(stat)) ?? scene.allowedStats[0] ?? "courage";
+  const campaignScene = room.campaign.scenes.find((item) => item.id === scene.id);
+  const location = campaignScene?.location ?? scene.title;
+  const knownClues = knownClueEntriesForRoom(room);
+  const latestClue = knownClues[knownClues.length - 1];
+  const clueName = latestClue ? latestClue.label ?? latestClue.text : undefined;
+  const npcId = (scene.npcIds ?? campaignScene?.npcIds ?? []).find((id) => isNpcAvailable(room, id)) ?? room.campaign.npcs.find((npc) => isNpcAvailable(room, npc.id))?.id;
+  const npc = room.campaign.npcs.find((item) => item.id === npcId);
+  const enemyId = scene.enemyIds?.[0] ?? campaignScene?.enemyIds?.[0] ?? room.campaign.enemies[0]?.id;
+  const enemy = room.campaign.enemies.find((item) => item.id === enemyId);
+  const choices: SceneActionChoice[] = [];
+
+  if (npc && clueName) {
+    choices.push({
+      id: "crisis-confront-npc",
+      label: `Confrontar a ${npc.name} con ${clueName}`,
+      action: `Confrontar a ${npc.name} con ${clueName}`,
+      actionType: "confrontar_npc",
+      recommendedStats: [preferredStat("charm", "courage", "mind")],
+      skillTag: "crisis",
+      category: "talk",
+      intent: "talk",
+      riskLevel: "high",
+      energyCost: 1,
+      targetId: npc.id,
+      targetKind: "npc",
+      npcId: npc.id,
+      progressOnSuccess: 1,
+      dangerOnPartial: 1,
+      dangerOnFailure: 1,
+      possibleOutcomeHint: `${npc.name} debe responder ante ${clueName} sin escapatoria.`
+    });
+  }
+  if (clueName && latestClue) {
+    choices.push({
+      id: "crisis-reveal-clue",
+      label: `Presentar ${clueName} ante todos`,
+      action: `Presentar ${clueName} ante todos`,
+      actionType: "revelar_prueba",
+      recommendedStats: [preferredStat("courage", "charm", "mind")],
+      skillTag: "crisis",
+      category: "talk",
+      intent: "sacrifice",
+      riskLevel: "high",
+      energyCost: 1,
+      progressOnSuccess: 1,
+      dangerOnPartial: 1,
+      dangerOnFailure: 1,
+      possibleOutcomeHint: `${clueName} se vuelve pública y ya no se puede retirar.`
+    });
+  }
+  if (npc) {
+    const protectLabel = enemy ? `Proteger a ${npc.name} de ${enemy.name}` : `Sacar a ${npc.name} de ${location}`;
+    choices.push({
+      id: "crisis-protect-npc",
+      label: protectLabel,
+      action: protectLabel,
+      actionType: "proteger_aliado",
+      recommendedStats: [preferredStat("body", "courage", "focus")],
+      skillTag: "crisis",
+      category: "defend",
+      intent: "protect",
+      riskLevel: "high",
+      energyCost: 1,
+      targetId: npc.id,
+      targetKind: "npc",
+      npcId: npc.id,
+      progressOnSuccess: 0.75,
+      dangerOnPartial: 1,
+      dangerOnFailure: 1,
+      possibleOutcomeHint: `${npc.name} queda a salvo, pero otra ventaja se pierde.`
+    });
+  }
+  if (enemy) {
+    choices.push({
+      id: "crisis-face-enemy",
+      label: `Cerrar el paso a ${enemy.name}`,
+      action: `Cerrar el paso a ${enemy.name}`,
+      actionType: "combatir",
+      recommendedStats: [preferredStat("courage", "body", "mind")],
+      skillTag: "crisis",
+      category: "fight",
+      intent: "fight",
+      riskLevel: "high",
+      energyCost: 1,
+      targetId: enemy.id,
+      targetKind: "creature",
+      progressOnSuccess: 0.75,
+      dangerOnPartial: 1,
+      dangerOnFailure: 1,
+      possibleOutcomeHint: `${enemy.name} retrocede solo si alguien paga el riesgo de frente.`
+    });
+  }
+  if (choices.length < 3) {
+    const escapeLabel = `Abandonar ${location} antes de que se cierre`;
+    choices.push({
+      id: "crisis-escape-location",
+      label: escapeLabel,
+      action: escapeLabel,
+      actionType: "huir",
+      recommendedStats: [preferredStat("focus", "body", "luck")],
+      skillTag: "crisis",
+      category: "investigate",
+      intent: "flee",
+      riskLevel: "high",
+      energyCost: 1,
+      progressOnSuccess: 0.5,
+      dangerOnPartial: 1,
+      dangerOnFailure: 1,
+      possibleOutcomeHint: `Salir de ${location} cuesta terreno ganado.`
+    });
+  }
+  if (choices.length < 3) {
+    const objectiveLabel = `A todo o nada: ${scene.objective.replace(/\.$/, "")}`;
+    choices.push({
+      id: "crisis-force-objective",
+      label: objectiveLabel,
+      action: objectiveLabel,
+      actionType: "tomar_decision_moral",
+      recommendedStats: [preferredStat("courage", "mind", "charm")],
+      skillTag: "crisis",
+      category: "talk",
+      intent: "sacrifice",
+      riskLevel: "high",
+      energyCost: 1,
+      progressOnSuccess: 1,
+      dangerOnPartial: 1,
+      dangerOnFailure: 1,
+      possibleOutcomeHint: "El objetivo se fuerza ahora, con el precio que tenga."
+    });
+  }
+  return choices;
+}
+
+export function getCrisisActionChoices(scene: Scene, room: GameRoom): SceneActionChoice[] {
+  const campaignScene = room.campaign.scenes.find((item) => item.id === scene.id);
+  const knownClueIds = new Set(knownClueEntriesForRoom(room).map((clue) => clue.id));
+  const pool: CrisisOption[] = [...(campaignScene?.crisisOptions ?? []), ...(room.campaign.crisisOptions ?? [])];
+  const seen = new Set<string>();
+  const configured = pool
+    .filter((option) => {
+      if (seen.has(option.id)) return false;
+      seen.add(option.id);
+      return isCrisisOptionAvailable(option, room, knownClueIds);
+    })
+    .map((option) => crisisOptionToChoice(option, scene));
+  if (configured.length >= 3) return configured.slice(0, 5);
+  const derived = derivedCrisisChoices(scene, room).filter((choice) => !configured.some((item) => item.id === choice.id));
+  return [...configured, ...derived].slice(0, 5);
+}
+
 export function getVisibleActionChoices(scene: Scene, room: GameRoom): SceneActionChoice[] {
   if (room.dangerClock >= 10 || room.phase === "climax") {
-    const preferredStat = (...stats: SceneActionChoice["recommendedStats"]) => stats.find((stat) => scene.allowedStats.includes(stat)) ?? scene.allowedStats[0] ?? "courage";
-    const stat = preferredStat("courage", "body", "mind");
-    const primaryNpcId = scene.npcIds?.[0] ?? room.campaign.npcs[0]?.id;
-    const primaryEnemyId = scene.enemyIds?.[0] ?? room.campaign.enemies[0]?.id;
-    return [
-      {
-        id: "crisis-reveal-truth",
-        label: "Revelar la verdad aunque alguien pague el precio",
-        action: "Revelar la verdad aunque alguien pague el precio",
-        actionType: "revelar_prueba",
-        recommendedStats: [preferredStat("courage", "charm", "mind")],
-        skillTag: "crisis",
-        category: "talk",
-        intent: "sacrifice",
-        riskLevel: "high",
-        energyCost: 1,
-        progressOnSuccess: 1,
-        dangerOnPartial: 1,
-        dangerOnFailure: 1,
-        possibleOutcomeHint: "La verdad se vuelve pública, pero exige una pérdida inmediata."
-      },
-      {
-        id: "crisis-save-someone",
-        label: "Salvar a alguien y aceptar una pérdida",
-        action: "Salvar a alguien y aceptar una pérdida",
-        actionType: "proteger_aliado",
-        targetId: primaryNpcId,
-        targetKind: "npc",
-        npcId: primaryNpcId,
-        recommendedStats: [preferredStat("body", "courage", "focus")],
-        skillTag: "crisis",
-        category: "defend",
-        intent: "protect",
-        riskLevel: "high",
-        energyCost: 1,
-        progressOnSuccess: 0.75,
-        dangerOnPartial: 1,
-        dangerOnFailure: 1,
-        possibleOutcomeHint: "Alguien queda a salvo, pero otra ventaja se pierde."
-      },
-      {
-        id: "crisis-accuse",
-        label: "Acusar al responsable frente a todos",
-        action: "Acusar al responsable frente a todos",
-        actionType: "confrontar_npc",
-        targetId: primaryNpcId,
-        targetKind: "npc",
-        npcId: primaryNpcId,
-        recommendedStats: [preferredStat("charm", "courage", "mind")],
-        skillTag: "crisis",
-        category: "talk",
-        intent: "talk",
-        riskLevel: "high",
-        energyCost: 1,
-        progressOnSuccess: 1,
-        dangerOnPartial: 1,
-        dangerOnFailure: 1,
-        possibleOutcomeHint: "La plaza debe elegir entre la acusación y el miedo."
-      },
-      {
-        id: "crisis-face-threat",
-        label: "Enfrentar la amenaza bajo la campana",
-        action: "Enfrentar la amenaza bajo la campana",
-        actionType: "combatir",
-        targetId: primaryEnemyId,
-        targetKind: "creature",
-        recommendedStats: [stat],
-        skillTag: "crisis",
-        category: "fight",
-        intent: "fight",
-        riskLevel: "high",
-        energyCost: 1,
-        progressOnSuccess: 0.75,
-        dangerOnPartial: 1,
-        dangerOnFailure: 1,
-        possibleOutcomeHint: "La amenaza retrocede solo si alguien paga el riesgo de frente."
-      }
-    ];
+    return getCrisisActionChoices(scene, room);
   }
 
   const hasConcreteFinalChoices = scene.actionChoices.some((choice) => choice.actionType === "revelar_prueba" || choice.actionType === "tomar_decision_moral" || choice.actionType === "sacrificar_recurso");

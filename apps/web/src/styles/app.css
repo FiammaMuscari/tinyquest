@@ -27,12 +27,19 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 
 .gameFrame { min-height: 610px; display: grid; grid-template-columns: minmax(240px, .78fr) minmax(520px, 1.62fr) minmax(320px, .95fr); gap: 12px; padding: 14px; border: 1px solid #523e71; border-radius: 8px; background: radial-gradient(circle at 46% 44%, rgba(124, 90, 255, .22), transparent 22%), linear-gradient(90deg, rgba(6,10,20,.95), rgba(20,12,35,.78)), url("https://images.unsplash.com/photo-1518709268805-4e9042af2176?auto=format&fit=crop&w=1600&q=80"); background-size: cover; background-position: center; box-shadow: 0 24px 80px rgba(0,0,0,.42); }
 .panel { padding: 0 14px 14px; min-width: 0; }
-.castPanel { margin-top: 10px; }
-.castHint { margin: 0 0 8px; font-size: 12px; color: #b8a98a; }
-.castList { display: flex; flex-direction: column; gap: 6px; }
-.castCard { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid rgba(180,150,90,.28); background: rgba(20,16,30,.55); color: #f3e9d0; cursor: pointer; transition: border-color .15s, background .15s; }
-.castCard:hover { border-color: rgba(255,215,120,.55); background: rgba(30,24,44,.7); }
-.castCard.open { border-color: rgba(255,215,120,.7); background: rgba(34,26,50,.8); }
+/* Cast: chip flotante sobre la escena (no ocupa fila del grid) + modal */
+.castTrigger { position: absolute; top: 12px; right: 12px; z-index: 6; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,215,120,.45); background: rgba(12,9,20,.78); backdrop-filter: blur(4px); color: #ffda8a; font-size: 12px; font-weight: 700; cursor: pointer; transition: border-color .15s, background .15s; }
+.castTrigger:hover { border-color: rgba(255,215,120,.8); background: rgba(28,20,42,.9); }
+.castCount { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: rgba(255,215,120,.22); color: #ffe8b0; font-size: 11px; }
+.castModalBackdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 18px; background: rgba(3,5,12,.66); backdrop-filter: blur(2px); }
+.castModal { width: min(94vw, 520px); max-height: 82vh; overflow-y: auto; padding: 16px 18px 18px; border-radius: 12px; border: 1px solid rgba(255,215,120,.32); background: linear-gradient(180deg, rgba(20,14,30,.98), rgba(12,9,20,.98)); box-shadow: 0 28px 90px rgba(0,0,0,.6); }
+.castModalHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.castModalHead strong { font-size: 16px; color: #ffda8a; }
+.castClose { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); color: #f3e9d0; cursor: pointer; }
+.castClose:hover { background: rgba(255,255,255,.12); }
+.castList { display: flex; flex-direction: column; gap: 8px; }
+.castCard { display: flex; flex-direction: column; gap: 6px; text-align: left; width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(180,150,90,.28); background: rgba(20,16,30,.55); color: #f3e9d0; }
+.castCard.open { border-color: rgba(255,215,120,.55); background: rgba(34,26,50,.8); }
 .castHead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .castHead strong { font-size: 15px; color: #ffda8a; }
 .castRole { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #c9a7ff; }
@@ -55,7 +62,7 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 .miniMeters { grid-column: 1 / -1; display: grid; gap: 5px; font-size: 12px; color: #ffe4a5; }
 .miniMeters span { display: flex; align-items: center; gap: 5px; }
 
-.centerColumn { display: grid; grid-template-rows: 1fr auto; gap: 12px; min-width: 0; }
+.centerColumn { position: relative; display: grid; grid-template-rows: 1fr auto; gap: 12px; min-width: 0; }
 .sceneImage { min-height: 270px; display: flex; align-items: end; border-radius: 8px; padding: 18px; background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,.12); box-shadow: inset 0 -80px 120px rgba(3,6,14,.6); }
 .scenePanel h2 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 46px); color: #ffda8a; text-shadow: 0 2px 16px rgba(0,0,0,.85); }
 .scenePanel p { max-width: 720px; margin: 0 0 12px; font-size: 17px; line-height: 1.45; }

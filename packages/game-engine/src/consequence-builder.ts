@@ -153,7 +153,7 @@ function buildSuccess(input: BuildMechanicalConsequenceInput): MechanicalConsequ
     ? clue.naturalDescription
     : usesTalk
       ? pick([
-          `${npc.label} baja la voz ante ${input.actorName} y admite un detalle que había callado.`,
+          `${npc.label} baja la voz ante ${input.actorName} y revela lo que había callado hasta ahora.`,
           `${npc.label} duda, retrocede un paso y entrega lo que el grupo necesitaba.`
         ], seed)
       : protects

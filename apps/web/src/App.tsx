@@ -989,7 +989,7 @@ export function App() {
         <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
         <section className="centerColumn">
           {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} />}
-          {!room.sessionComplete && <CastPanel npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} />}
+          {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
         </section>
@@ -1114,35 +1114,46 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
   );
 }
 
-function CastPanel({ npcIds, npcs }: { npcIds: string[]; npcs: CampaignNPC[] }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  const present = npcIds.map((id) => npcs.find((npc) => npc.id === id)).filter((npc): npc is CampaignNPC => Boolean(npc));
+function CastPanel({ sceneId, npcIds, npcs }: { sceneId: string; npcIds: string[]; npcs: CampaignNPC[] }) {
+  const [open, setOpen] = useState(false);
+  // Unión: NPCs activos de la escena (npcIds) + los que declaran presencia vía appearsInScenes.
+  const primary = npcIds.map((id) => npcs.find((npc) => npc.id === id)).filter((npc): npc is CampaignNPC => Boolean(npc));
+  const secondary = npcs.filter((npc) => !npcIds.includes(npc.id) && npc.appearsInScenes?.includes(sceneId));
+  const present = [...primary, ...secondary];
   if (!present.length) return null;
   return (
-    <section className="panel castPanel">
-      <PanelTitle title="Personajes en escena" icon={<Users size={16} />} />
-      <p className="castHint">Tocá un nombre para ver quién es.</p>
-      <div className="castList">
-        {present.map((npc) => {
-          const open = openId === npc.id;
-          return (
-            <button key={npc.id} type="button" className={`castCard ${open ? "open" : ""}`} onClick={() => setOpenId(open ? null : npc.id)} aria-expanded={open}>
-              <span className="castHead">
-                <strong>{npc.name}</strong>
-                {npc.role && <span className="castRole">{npc.role}</span>}
-              </span>
-              {open && (
-                <span className="castBody">
-                  <span className="castDesc">{npc.description}</span>
-                  {npc.desire && <span className="castTrait"><em>Quiere:</em> {npc.desire}</span>}
-                  {npc.fear && <span className="castTrait"><em>Teme:</em> {npc.fear}</span>}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+    <>
+      <button type="button" className="castTrigger" onClick={() => setOpen(true)} aria-haspopup="dialog">
+        <Users size={14} />
+        <span>Personajes</span>
+        <span className="castCount">{present.length}</span>
+      </button>
+      {open && (
+        <div className="castModalBackdrop" onClick={() => setOpen(false)} role="presentation">
+          <div className="castModal" role="dialog" aria-label="Personajes en escena" onClick={(event) => event.stopPropagation()}>
+            <div className="castModalHead">
+              <strong>Personajes en escena</strong>
+              <button type="button" className="castClose" onClick={() => setOpen(false)} aria-label="Cerrar"><X size={16} /></button>
+            </div>
+            <div className="castList">
+              {present.map((npc) => (
+                <div key={npc.id} className="castCard open">
+                  <span className="castHead">
+                    <strong>{npc.name}</strong>
+                    {npc.role && <span className="castRole">{npc.role}</span>}
+                  </span>
+                  <span className="castBody">
+                    <span className="castDesc">{npc.description}</span>
+                    {npc.desire && <span className="castTrait"><em>Quiere:</em> {npc.desire}</span>}
+                    {npc.fear && <span className="castTrait"><em>Teme:</em> {npc.fear}</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -50,8 +50,8 @@ test("1) shouldCallGroq bloquea si no hay API key", () => {
   }
 });
 
-test("2) shouldCallGroq bloquea bots por default", () => {
-  const decision = budget.shouldCallGroq(plan({ actorId: "bot-1", actorKind: "bot" }), budget.DEFAULT_CHEAP_LLM_POLICY, budget.createLlmBudgetState(), true);
+test("2) shouldCallGroq bloquea bots cuando useGroqForBotTurns=false", () => {
+  const decision = budget.shouldCallGroq(plan({ actorId: "bot-1", actorKind: "bot" }), { ...budget.DEFAULT_CHEAP_LLM_POLICY, useGroqForBotTurns: false }, budget.createLlmBudgetState(), true);
   assert.equal(decision.allowed, false);
   assert.equal(decision.reason, "bot-turns-disabled");
 });
@@ -117,7 +117,7 @@ test("9) cacheKey cambia si cambia consequence.summary", () => {
 test("10) recordSkippedCall registra fallback esperado cuando Groq no está permitido", () => {
   const state = budget.createLlmBudgetState();
   const p = plan({ actorId: "bot-1", actorKind: "bot" });
-  const decision = budget.shouldCallGroq(p, budget.DEFAULT_CHEAP_LLM_POLICY, state, true);
+  const decision = budget.shouldCallGroq(p, { ...budget.DEFAULT_CHEAP_LLM_POLICY, useGroqForBotTurns: false }, state, true);
   assert.equal(decision.allowed, false);
   budget.recordSkippedCall(state, p, decision.reason);
   assert.deepEqual(state.skippedCalls[0], { reason: "bot-turns-disabled", actorId: "bot-1", sceneId: "chapel", turnId: "turn-1" });
