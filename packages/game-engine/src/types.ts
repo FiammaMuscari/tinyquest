@@ -509,6 +509,7 @@ export type Campaign = {
   crisisOptions?: CrisisOption[];
   unlockableOptions?: CampaignActionOption[];  // pool de opciones que las pistas desbloquean vía unlocksActions
   energyRegenPerRound?: number;                // regen fija por ronda (default 1); gastar > regenerar exige ahorro
+  consequenceBank?: ConsequenceEntry[];        // consecuencias propias; cascada: campaña → banco default
   factions?: Array<{ id: string; name: string; agenda: string; pressure?: string }>;
   suspects?: Array<{ id: string; name: string; motive: string; secret?: string; suspicion?: number }>;
   npcs: CampaignNPC[];
@@ -602,6 +603,26 @@ export type ConsequenceResult = {
   energyDelta: number;
   vitalityDelta?: number;
   clue?: string;
+  entryId?: string;          // entry del banco que salió (para no repetir en la escena)
+  source?: "campaign" | "default";
+};
+
+// Entrada de banco de consecuencias. Los campos de `match` ausentes son comodín.
+export type ConsequenceEntry = {
+  id: string;
+  text: string;
+  match?: {
+    actionTypes?: CampaignActionType[];
+    outcomes?: CheckOutcome[];
+    dangerBands?: Array<"low" | "medium" | "high" | "critical">;
+    targetKinds?: string[];
+  };
+  effects?: {
+    dangerDelta?: number;
+    energyDelta?: number;
+    vitalityDelta?: number;
+    clue?: string;
+  };
 };
 
 export type SessionConfig = {

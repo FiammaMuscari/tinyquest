@@ -201,6 +201,17 @@ export const campaigns: Campaign[] = [
       { id: "bota-huella-object", name: "Molde de la huella de Cora", type: "evidencia", description: "Bota femenina, suela reglamentaria de la Guardia, talla 37. No figura en ningún turno oficial.", location: "muros bajos, escena del crimen", status: "hidden", relatedClues: ["bota-cora"], relatedNPCs: ["cora-sombra", "inspector-bran"], unlocksActions: ["identificar-cora"], unlocksEndings: ["verdad-completa"], history: "Cora la dejó sin darse cuenta de que el barro era demasiado fresco." },
       { id: "cadaver-carvell", name: "Cuerpo de Carvell", type: "evidencia", description: "El cadáver de Carvell antes de que la Guardia lo selle. La herida principal es de hoja recta de 15 centímetros, no de colmillo.", location: "cuartel de la Guardia", status: "found", relatedClues: ["mordida-falsa"], relatedNPCs: ["inspector-bran"], unlocksActions: ["inspeccionar-herida-carvell"], unlocksEndings: ["nicolas-libre"], history: "Cora mató a Carvell con cuchillo y marcó la herida con una garra falsa para incriminar a un licántropo." }
     ],
+    // BORRADOR editable: consecuencias con sabor de campaña (cascada: este banco → default).
+    consequenceBank: [
+      { id: "lr-patrol", text: "Una patrulla de la Guardia del Umbral cambia su ruta: ahora pasa por donde el grupo necesita moverse.", match: { dangerBands: ["low", "medium"] }, effects: { dangerDelta: 1 } },
+      { id: "lr-bran-clock", text: "Bran firma un papel más: el proceso de ejecución avanza un paso mientras el grupo pierde el suyo.", effects: { dangerDelta: 1 } },
+      { id: "lr-mano-doubt", text: "Alguien de la Mano de Bronce ve al grupo actuar y reporta hacia adentro: la red ajusta sus salidas.", match: { actionTypes: ["interrogar_npc", "negociar", "mentir"] } },
+      { id: "lr-seal-echo", text: "Un sello de registro queda incompleto: el rastro burocrático del grupo ahora existe y alguien puede leerlo.", match: { actionTypes: ["investigar_objeto", "comparar_evidencia", "usar_objeto"] } },
+      { id: "lr-silver-cost", text: "La plata líquida de los guardias marca la ropa de alguien del grupo: los licántropos de la ciudad lo olerán.", match: { actionTypes: ["combatir", "proteger_aliado"] }, effects: { vitalityDelta: -1 } },
+      { id: "lr-witness-fear", text: "Un testigo posible ve la escena y decide que testificar cuesta demasiado: una voz menos para el tribunal.", match: { outcomes: ["failure"] } },
+      { id: "lr-cora-shadow", text: "Una capa verde aparece un instante al fondo y desaparece: Cora ya sabe dónde está el grupo.", match: { dangerBands: ["high", "critical"] }, effects: { dangerDelta: 1 } },
+      { id: "lr-senate-hours", text: "El reloj del Senado marca una hora menos para el amanecer: lo que quede por probar tendrá menos tiempo.", match: { dangerBands: ["medium", "high", "critical"] } }
+    ],
     // BORRADOR editable: opciones que las pistas desbloquean (CampaignClue.unlocksActions → este pool).
     unlockableOptions: [
       option("comparar-marca", "Comparar la marca rota con una marca derretida real", "investigate", "mind", "medium", "Pedir a Lena una marca retirada por transformación real y mostrar la diferencia de rotura.", { actionType: "comparar_evidencia", energyCost: 1, targetId: "marca-rota-object", targetKind: "object", objectId: "marca-rota-object", requiredClues: ["marca-rota"], unlocksFlags: ["marca_comparada"], progressOnSuccess: 1, exhausts: true }),

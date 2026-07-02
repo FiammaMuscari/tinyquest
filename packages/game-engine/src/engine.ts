@@ -295,8 +295,16 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
   }
 
   const check = resolveCheck(activePlayer.character.stats, selectedStat, currentScene.difficulty, action, usePet);
-  const consequence = check.outcome === "success" ? undefined : rollConsequence();
   const selectedChoice = findSceneChoiceForAction(getVisibleActionChoices(currentScene, room), action);
+  const consequence = check.outcome === "success" ? undefined : rollConsequence({
+    actionType: selectedChoice?.actionType,
+    targetKind: selectedChoice?.targetKind,
+    outcome: check.outcome,
+    dangerBand: getDangerBand(room.dangerClock),
+    // No repetir la misma consecuencia dentro de la escena actual.
+    usedTexts: room.sessionLog.filter((event) => event.sceneId === currentScene.id && event.consequenceText).map((event) => event.consequenceText as string),
+    campaignBank: room.campaign.consequenceBank
+  });
   const actionType = getNarrativeActionType(selectedChoice, action);
   const actionContract = narrativeDoDont(actionType);
   const coherentFacts = resolveCoherentTurnFacts({ campaign: room.campaign, actor: activePlayer, choice: selectedChoice, rawAction: action, result: check.outcome });
