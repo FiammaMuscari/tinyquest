@@ -308,7 +308,7 @@ export function resolveEndingForRoom(room: GameRoom): EndingResolution {
   const endingType = getEndingType(ending);
   const rewards = room.campaign.rewards.map((reward) => reward.name);
   const losses = endingType === "tragic"
-    ? ["La crisis se cobra una vida, una verdad o la confianza de la aldea."]
+    ? ["La crisis se cobra una vida, una verdad o la confianza de quienes quedaban."]
     : endingType === "heroic"
       ? ["La victoria exige un precio persistente para el grupo."]
       : endingType === "secret"
