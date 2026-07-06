@@ -68,6 +68,20 @@ export function storySceneImageUrl(storyTitle: string, worldName: string, era: s
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=560&height=240&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
 }
 
+// Imagen de escena VIVA durante la partida: se genera con la historia real y se
+// renueva al cambiar de escena. El jugador elige el encuadre: lugar, héroe o ambiente.
+export type SceneImageMode = "place" | "hero" | "mood";
+export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string): string {
+  const base = mode === "hero"
+    ? `Fantasy story illustration: the hero (${heroLine}) inside the scene "${sceneTitle}", taking action. ${objective}.`
+    : mode === "mood"
+      ? `Atmospheric fantasy ambience illustration, abstract cinematic mood for "${sceneTitle}". ${objective}.`
+      : `Fantasy environment concept art, atmospheric wide view of "${sceneTitle}". ${objective}.`;
+  const prompt = `${base} World: ${worldName} (${era}). Tale: ${campaignTitle}. Painted, dramatic light, rich detail, no text`;
+  const seed = nameHash(campaignTitle + sceneTitle + mode) % 100000;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=288&nologo=true&model=flux&seed=${seed}`;
+}
+
 // Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
 // de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
 export function petPortraitUrl(name: string, description: string): string {
@@ -224,6 +238,11 @@ export function useGeneratedPortrait(url: string | undefined, options: { priorit
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
   return { ...state, retry };
 }
+
+// Spinner de carga como data-URI (SVG animado con SMIL): fondo gris + arco girando.
+// Sirve como src de cualquier <img> mientras la IA pinta la imagen real.
+const spinnerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" fill="#23262e"/><circle cx="64" cy="64" r="22" fill="none" stroke="#8b90a0" stroke-width="7" stroke-dasharray="96 42" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 64 64" to="360 64 64" dur="0.9s" repeatCount="indefinite"/></circle></svg>`;
+export const loadingSpinnerDataUri = `data:image/svg+xml;utf8,${encodeURIComponent(spinnerSvg)}`;
 
 // Medallón procedural como data-URI: sirve de placeholder/fallback en cualquier
 // <img> existente (hereda el CSS del selector img) mientras la IA pinta el real.

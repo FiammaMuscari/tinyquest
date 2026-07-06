@@ -241,7 +241,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       { role: "system", content: buildDungeonMasterSystemPrompt(input.selectedCampaign?.narratorVoice) },
       { role: "user", content: input.resolutionPlan ? buildCompactGroqPrompt(input.resolutionPlan, this.policy.maxPromptChars, input, bundle) : "{}" }
     ];
-    const json = await this.callGroqWithFailover(messages, {}, "groq-chat");
+    const json = await this.callGroqWithFailover(messages, { route: "cheap" }, "groq-chat");
     if (input.resolutionPlan) recordGroqCall(this.budgetState, input.resolutionPlan);
     const parsed = await this.parseValidateOrFallback(json, input);
 
@@ -354,7 +354,20 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     ], { model: this.isGemini ? "gemini-2.5-flash" : "llama-3.3-70b-versatile", forceJson: true }, "repair-json");
   }
 
-  private async callGroqWithFailover(messages: GroqMessage[], options: { forceJson?: boolean; maxTokens?: number } = {}, debugLabel = "chat") {
+  private async callGroqWithFailover(messages: GroqMessage[], options: { forceJson?: boolean; maxTokens?: number; route?: "cheap" | "primary" } = {}, debugLabel = "chat") {
+    // Ruteo por valor de la cuota: el free tier de Gemini rinde ~20 requests por DÍA,
+    // así que se reserva para las llamadas que definen la experiencia (forja de
+    // historia, apertura, recap). Las llamadas "cheap" (narración turno a turno,
+    // ~16 por partida) van por Groq (miles/día) con Gemini solo de reserva puntual.
+    const preferCheap = options.route === "cheap" && this.isGemini && (this.failoverGroqKey || this.useLocalProxy);
+    if (preferCheap) {
+      try {
+        return await this.callGroq(messages, { ...options, forceProvider: "groq" }, `${debugLabel}-cheap`);
+      } catch (error) {
+        logDmEvent("provider-failover", { from: this.failoverGroqModel, to: this.model, cause: error instanceof Error ? error.message : "unknown" });
+        return this.callGroq(messages, options, debugLabel);
+      }
+    }
     try {
       return await this.callGroq(messages, options, debugLabel);
     } catch (error) {
@@ -429,7 +442,8 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       "CADA idea del pedido debe convertirse en una FUNCIÓN JUGABLE (personaje, pista, amenaza, objeto, lugar, vínculo emocional, giro, consecuencia o ventaja mecánica) — nunca decoración estética. Si piden 'un perro llamado Firulais', el perro es aliado emocional Y pista móvil Y posible riesgo, no un cameo. En keywordsUsed.how nombrá la función ('Firulais → pista móvil: fue el único que olió al culpable').",
       "hiddenTwists = 3 giros SECRETOS que REINTERPRETAN la evidencia inicial sin contradecirla (la prueba plantada tiene segunda lectura, el testigo vio otra cosa, el objeto robado eligió aparecer). Son capa de motor: JAMÁS los insinúes en premise, summary ni descripciones visibles.",
       "Si el pedido incluye una duración ('3 meses', 'un año'), convertila en ESCALA NARRATIVA: las 4 escenas son saltos temporales con marca en el título ('Semana 2 — el rastro', 'Mes 3 — el juicio'). No la trates como keyword literal.",
-      "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal), risk (qué PERDÉS si fallás — cosas con nombre: tu linaje, tu perro, un juramento), firstMystery (la primera pregunta que pica), timeLimit (el reloj: 'antes del anochecer'). keywordsUsed = por CADA idea del pedido, cómo se usó y con qué función.",
+      "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal, MÁXIMO 20 palabras, frase COMPLETA), risk (qué PERDÉS si fallás — cosas con nombre: tu linaje, tu perro, un juramento; máximo 20 palabras), firstMystery (la primera pregunta que pica), timeLimit (el reloj: 'antes del anochecer', corto). keywordsUsed = por CADA idea del pedido, cómo se usó y con qué función.",
+      "PROHIBIDO el tono de sinopsis genérica: nada de 'la única forma de limpiar tu nombre', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo'. Escribí como novelista: premise de MÁXIMO 3 frases con al menos UN detalle sensorial concreto (un olor, un objeto en una mano, un gesto) y UNA imagen memorable. Todo texto visible debe poder leerse en voz alta sin vergüenza.",
       'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[2-3 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"]}. appearance = cómo se VE el personaje en 1 frase dibujable que SIEMPRE dice: especie o etnia (humana de piel oscura, elfo pálido, vampiro, mestizo animal, lo que sea), género, edad aparente (niño, adulta, anciano), rasgos de cara/cuerpo, ropa y una marca distintiva. Variá MUCHO los cuerpos entre personajes: niños, ancianas, pieles oscuras y claras, criaturas — el elenco no puede ser todo adultos iguales. bond = relación dramática con el héroe en 3-8 palabras ("padre de la víctima · quiere sangre"). whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
     ].join(" ");
     const messages: GroqMessage[] = [

@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl } from "./portraits";
+import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -705,6 +705,19 @@ export function App() {
   const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
 
   const [sceneImageUrl, setSceneImageUrl] = useState(scene.atmosphere.fallbackImage);
+  // Imagen de escena VIVA: generada desde la historia real, renovada por escena.
+  // El jugador elige el encuadre (lugar / su héroe en escena / ambiente) para
+  // ambientarse mientras tira los dados; el asset estático queda de respaldo.
+  const [sceneImageMode, setSceneImageMode] = useState<SceneImageMode>(() => (localStorage.getItem("tiny-quest:scene-image-mode") as SceneImageMode) || "place");
+  function chooseSceneImageMode(mode: SceneImageMode) {
+    setSceneImageMode(mode);
+    localStorage.setItem("tiny-quest:scene-image-mode", mode);
+  }
+  const liveSceneImage = useGeneratedPortrait(
+    room && !room.sessionComplete
+      ? liveSceneImageUrl(sceneImageMode, room.campaign.title, scene.title, scene.objective, selectedWorld.name, selectedWorld.era, heroPortraitSpec(draft).appearance)
+      : undefined
+  );
   const [sceneAudioUrl, setSceneAudioUrl] = useState(scene.atmosphere.fallbackAudio);
   const [soundMood, setSoundMood] = useState(scene.atmosphere.ambientSoundPrompt);
   const [isAudioPlaying, setAudioPlaying] = useState(false);
@@ -1330,7 +1343,7 @@ export function App() {
         {/* La narración vive en la pista central ancha; elección y dados en la columna derecha. */}
         <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
         <section className="centerColumn actionColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={liveSceneImage.src ?? sceneImageUrl} imageForging={liveSceneImage.status === "loading"} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
           {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} styleHint={`${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
@@ -1443,26 +1456,41 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} />
               <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
               <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
-              {improvisedCampaign.forgeNotes?.summary && (
-                <div className="forgedSummary">
-                  {improvisedCampaign.forgeNotes.summary.objective && (
-                    <p><em>Tu misión</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.objective)}{improvisedCampaign.forgeNotes.summary.timeLimit ? ` — ${normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}` : ""}</p>
-                  )}
-                  {improvisedCampaign.forgeNotes.summary.risk && <p><em>En juego</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>}
-                  {improvisedCampaign.forgeNotes.evidence && improvisedCampaign.forgeNotes.evidence.length > 0 && (
-                    <div className="againstYou">
-                      <em>Contra vos</em>
-                      <ul>
-                        {improvisedCampaign.forgeNotes.evidence.slice(0, 3).map((item) => <li key={item}>{normalizeUiText(item)}</li>)}
-                      </ul>
-                    </div>
-                  )}
+              {improvisedCampaign.forgeNotes?.summary?.objective && (
+                <div className="summaryGrid">
+                  <div className="summaryCard mission">
+                    <em>🎯 Tu misión</em>
+                    <p>{normalizeUiText(improvisedCampaign.forgeNotes.summary.objective)}</p>
+                    {improvisedCampaign.forgeNotes.summary.timeLimit && <span className="timeChip">⏳ {normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}</span>}
+                  </div>
                 </div>
+              )}
+              {/* Menos info a la vista: lo que arriesgás se abre solo si querés saberlo. */}
+              {(improvisedCampaign.forgeNotes?.summary?.risk || (improvisedCampaign.forgeNotes?.evidence?.length ?? 0) > 0) && (
+                <details className="stakesFold">
+                  <summary>⚖️ Lo que está en juego — abrilo si te animás</summary>
+                  <div className="summaryGrid">
+                    {improvisedCampaign.forgeNotes?.summary?.risk && (
+                      <div className="summaryCard stakes">
+                        <em>💎 En juego</em>
+                        <p>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>
+                      </div>
+                    )}
+                    {improvisedCampaign.forgeNotes?.evidence && improvisedCampaign.forgeNotes.evidence.length > 0 && (
+                      <div className="summaryCard against">
+                        <em>⚠️ Contra vos</em>
+                        <ul>
+                          {improvisedCampaign.forgeNotes.evidence.slice(0, 3).map((item) => <li key={item}>{normalizeUiText(item)}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </details>
               )}
               {improvisedCampaign.forgeNotes?.heroBond && <p className="heroBondLine">⚔ {normalizeUiText(improvisedCampaign.forgeNotes.heroBond)}</p>}
               {improvisedCampaign.forgeNotes?.keywordsUsed && improvisedCampaign.forgeNotes.keywordsUsed.length > 0 && (
                 <details className="keywordsUsed">
-                  <summary>Cómo se usaron tus ideas</summary>
+                  <summary>💡 Cómo se usaron tus ideas</summary>
                   <div>
                     {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
                       <span key={keyword.idea}>✓ {normalizeUiText(keyword.idea)} → {normalizeUiText(keyword.how)}</span>
@@ -1494,24 +1522,27 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                     onClick={() => setCastPeek({ name: improvisedCampaign.enemies[0].name, description: improvisedCampaign.enemies[0].description, portraitUrl: characterPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`), threat: true, dangerLevel: improvisedCampaign.enemies[0].dangerLevel })}
                   >
                     <NpcPortrait name={improvisedCampaign.enemies[0].name} role="amenaza" size={28} portraitUrl={characterPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`)} />
-                    {improvisedCampaign.enemies[0].name}
+                    <span className="castChipText">
+                      <strong>{improvisedCampaign.enemies[0].name}</strong>
+                      <small>La amenaza de esta historia</small>
+                    </span>
                   </button>
                 )}
               </div>
               {(improvisedCampaign.scenes[0]?.multipleChoiceOptions?.length ?? 0) > 0 && (
                 <div className="firstPaths">
-                  <em>¿Por dónde empezás?</em>
+                  <em>🧭 ¿Por dónde empezás?</em>
                   <ol>
                     {improvisedCampaign.scenes[0].multipleChoiceOptions.slice(0, 3).map((option, index) => (
                       <li key={`path-${index}`}>
-                        {normalizeUiText(option.label)}
+                        <span className="pathLabel">{normalizeUiText(option.label)}</span>
                         {option.recommendedStat && <i className={`statChip stat-${option.recommendedStat}`}>{statLabels[option.recommendedStat]}</i>}
                       </li>
                     ))}
                   </ol>
                 </div>
               )}
-              <em className="teaserHint">Tocá un personaje para ver qué sabe, qué quiere y por qué podría mentirte — sus secretos reales se revelan jugando. Los retratos se pintan de a uno: dales unos minutos.</em>
+              <em className="teaserHint">👆 Tocá un personaje para conocerlo. El resto —secretos, giros, verdades— se descubre jugando.</em>
             </div>
           )}
           {castPeek && <CharacterPeekModal peek={castPeek} onClose={() => setCastPeek(null)} />}
@@ -1621,6 +1652,10 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
   if (src) {
     return <img className={`npcPortrait npcPortraitImg ${status === "loading" ? "portraitForging" : ""}`} src={src} alt="" width={size} height={size} style={{ width: size, height: size }} />;
   }
+  // Generando: spinner gris. Sin retrato posible: medallón procedural.
+  if (status === "loading") {
+    return <img className="npcPortrait" src={loadingSpinnerDataUri} alt={`Generando retrato de ${name}`} width={size} height={size} style={{ width: size, height: size }} />;
+  }
   const hash = nameHash(name);
   const hue = hash % 360;
   const hue2 = (hue + 40 + (hash % 60)) % 360;
@@ -1629,7 +1664,7 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
   const initial = (name.replace(/^(el|la|los|las|un|una)\s+/i, "").trim()[0] ?? "?").toUpperCase();
   const gradientId = `npcGrad-${hash}`;
   return (
-    <svg className={`npcPortrait ${status === "loading" ? "portraitForging" : ""}`} width={size} height={size} viewBox="0 0 46 46" role="img" aria-label={name}>
+    <svg className="npcPortrait" width={size} height={size} viewBox="0 0 46 46" role="img" aria-label={name}>
       <defs>
         <radialGradient id={gradientId} cx="35%" cy="30%" r="80%">
           <stop offset="0%" stopColor={`hsl(${hue}, 55%, 38%)`} />
@@ -1649,7 +1684,8 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
 // URL determinística desde el contenido de la campaña → cacheado, cero re-cómputo.
 function ForgedStoryBanner({ campaign, world }: { campaign: Campaign; world: WorldEra }) {
   const castLine = campaign.npcs.slice(0, 3).map((npc) => npc.appearance ?? npc.name).join("; ");
-  const { src } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine));
+  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine));
+  if (!src && status === "loading") return <div className="forgedBanner bannerLoading" role="status" aria-label="Generando escena"><span className="spin" /></div>;
   if (!src) return null;
   return <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title}`} />;
 }
@@ -1843,7 +1879,9 @@ function HeroAvatarImg({ url, name, className, priority = false }: { url: string
   const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority });
   if (!generated) return <img className={className} src={url} alt={name} />;
   if (src) return <img className={`${className ?? ""} ${status === "loading" ? "portraitForging" : "portraitFade"}`} src={src} alt={name} />;
-  return <img className={`${className ?? ""} ${status === "failed" ? "" : "portraitForging"}`} src={medallionDataUri(name)} alt={name} />;
+  // Cargando: spinner sobre fondo gris; si falló del todo, medallón procedural.
+  if (status === "failed") return <img className={className} src={medallionDataUri(name)} alt={name} />;
+  return <img className={`${className ?? ""} imgLoadingBg`} src={loadingSpinnerDataUri} alt={`Generando retrato de ${name}`} />;
 }
 
 function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcIds: string[]; npcs: CampaignNPC[]; styleHint: string }) {
@@ -1893,11 +1931,24 @@ function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcI
 }
 
 
-function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy, enrichedLabels, roundInScene = 0 }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number; enrichedLabels?: Record<string, string>; roundInScene?: number }) {
+const sceneImageModeOptions: Array<{ id: SceneImageMode; icon: string; label: string }> = [
+  { id: "place", icon: "🏞️", label: "El lugar de la escena" },
+  { id: "hero", icon: "🧝", label: "Tu héroe en escena" },
+  { id: "mood", icon: "🌫️", label: "El ambiente" }
+];
+
+function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, imageForging = false, imageMode, onImageMode, energy, enrichedLabels, roundInScene = 0 }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; imageForging?: boolean; imageMode?: SceneImageMode; onImageMode?: (mode: SceneImageMode) => void; energy: number; enrichedLabels?: Record<string, string>; roundInScene?: number }) {
   const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.22)), url(${imageUrl})`;
   return (
     <section className="panel scenePanel">
-      <div className="sceneImage" style={{ backgroundImage: sceneBg }}>
+      <div className={`sceneImage ${imageForging ? "sceneForging" : ""}`} style={{ backgroundImage: sceneBg }}>
+        {onImageMode && (
+          <div className="sceneImageModes" role="group" aria-label="Qué muestra la imagen de escena">
+            {sceneImageModeOptions.map((option) => (
+              <button key={option.id} type="button" className={imageMode === option.id ? "selected" : ""} title={option.label} onClick={() => onImageMode(option.id)}>{option.icon}</button>
+            ))}
+          </div>
+        )}
         <div>
           <h2>{sceneTitle}</h2>
           <p>{objective}</p>

@@ -3485,6 +3485,54 @@ h1 {
 .againstYou li { color: #ffd9c9; font-size: 12px; line-height: 1.4; }
 .firstPaths li i.statChip { margin-left: 7px; font-size: 9px; vertical-align: 1px; font-style: normal; }
 .forgedBanner { width: 100%; max-height: 170px; object-fit: cover; border-radius: 9px; border: 1px solid rgba(255,191,53,.3); box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+
+/* ── Rediseño del teaser forjado (2026-07-06): cards limpias, nada truncado ── */
+.forgedTeaser { gap: 12px; padding: 14px 16px; }
+.forgedTeaser > strong { font-size: 17px; }
+.forgedTeaser > p { font-size: 12.5px; line-height: 1.55; }
+.summaryGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 9px; }
+.summaryCard { display: grid; gap: 5px; align-content: start; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(117,234,219,.25); background: rgba(4,26,32,.5); }
+.summaryCard em { font-style: normal; font-weight: 900; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #75eadb; }
+.summaryCard p { margin: 0; color: #e6f5f1; font-size: 12.5px; line-height: 1.5; }
+.summaryCard.mission { border-color: rgba(255,191,53,.35); background: rgba(46,32,8,.4); }
+.summaryCard.mission em { color: #ffda8a; }
+.summaryCard.mission p { color: #f5ead2; }
+.summaryCard.against { border-color: rgba(232,100,80,.35); background: rgba(40,12,10,.4); }
+.summaryCard.against em { color: #ff9d7a; }
+.summaryCard.against ul { margin: 0; padding-left: 15px; display: grid; gap: 3px; }
+.summaryCard.against li { color: #ffd9c9; font-size: 12px; line-height: 1.45; }
+.timeChip { justify-self: start; padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(255,191,53,.4); background: rgba(255,191,53,.1); color: #ffda8a; font-size: 10.5px; font-weight: 800; }
+/* Personajes: grilla pareja, retrato + nombre + vínculo siempre alineados. */
+.forgedTeaserCast { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: 8px; }
+.forgedTeaserCast .castChip { width: 100%; justify-content: flex-start; padding: 7px 12px 7px 7px; border-radius: 11px; }
+.castChipText strong { font-size: 12px; line-height: 1.2; }
+.castChipText small { white-space: normal; }
+/* Caminos: texto completo que envuelve, stat al final sin pisar. */
+.firstPaths ol { padding-left: 0; list-style: none; counter-reset: path; }
+.firstPaths li { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); counter-increment: path; }
+.firstPaths li::before { content: counter(path) "."; color: #9b8db5; font-weight: 900; font-size: 11px; }
+.firstPaths .pathLabel { flex: 1 1 auto; min-width: 0; line-height: 1.4; }
+.firstPaths li i.statChip { margin-left: 0; flex: 0 0 auto; }
+
+/* Spinner de carga universal + fondos grises de "generando". */
+.spin { width: 26px; height: 26px; border-radius: 50%; border: 3px solid rgba(255,255,255,.14); border-top-color: #cfd4e0; animation: spinRot .8s linear infinite; }
+@keyframes spinRot { to { transform: rotate(360deg); } }
+.imgLoadingBg { background: #23262e; }
+.bannerLoading { display: grid; place-items: center; min-height: 110px; background: #23262e; }
+/* Premisa contenida: 4 líneas máximo, la historia se descubre jugando. */
+.forgedTeaser > p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.stakesFold summary { color: #9b8db5; font-size: 11px; font-weight: 800; cursor: pointer; list-style: none; }
+.stakesFold summary::before { content: "▸ "; }
+.stakesFold[open] summary::before { content: "▾ "; }
+.stakesFold[open] .summaryGrid { margin-top: 7px; }
+
+/* Imagen de escena viva: selector de encuadre + estado generando. */
+.sceneImage { position: relative; }
+.sceneImageModes { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 2; }
+.sceneImageModes button { width: 26px; height: 26px; padding: 0; border-radius: 7px; border: 1px solid rgba(255,255,255,.2); background: rgba(5,8,18,.72); font-size: 13px; cursor: pointer; line-height: 1; }
+.sceneImageModes button.selected { border-color: #ffbf35; box-shadow: 0 0 8px rgba(255,191,53,.4); }
+.sceneForging::before { content: ""; position: absolute; inset: 0; background: rgba(35,38,46,.5); z-index: 1; }
+.sceneForging::after { content: ""; position: absolute; top: 10px; left: 10px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,255,255,.22); border-top-color: #fff; animation: spinRot .8s linear infinite; z-index: 2; }
 .firstPaths { display: grid; gap: 3px; }
 .firstPaths em { color: #9b8db5; font-style: normal; font-size: 10.5px; font-weight: 800; }
 .firstPaths ol { margin: 0; padding-left: 18px; display: grid; gap: 2px; }

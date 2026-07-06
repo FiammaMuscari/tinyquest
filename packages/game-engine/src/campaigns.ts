@@ -697,10 +697,10 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     // Notas visibles del lobby: resumen jugable, keywords usadas, vínculo y evidencia.
     forgeNotes: {
       summary: content.summary ? {
-        objective: content.summary.objective ? clampText(content.summary.objective, "", 140) : undefined,
-        risk: content.summary.risk ? clampText(content.summary.risk, "", 140) : undefined,
+        objective: content.summary.objective ? clampText(content.summary.objective, "", 240) : undefined,
+        risk: content.summary.risk ? clampText(content.summary.risk, "", 240) : undefined,
         firstMystery: content.summary.firstMystery ? clampText(content.summary.firstMystery, "", 160) : undefined,
-        timeLimit: content.summary.timeLimit ? clampText(content.summary.timeLimit, "", 80) : undefined
+        timeLimit: content.summary.timeLimit ? clampText(content.summary.timeLimit, "", 110) : undefined
       } : undefined,
       keywordsUsed: Array.isArray(content.keywordsUsed)
         ? content.keywordsUsed.slice(0, 6).map((item) => ({ idea: clampText(item?.idea, "", 40), how: clampText(item?.how, "", 90) })).filter((item) => item.idea && item.how)
