@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import ts from "typescript";
 
-const key = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY;
+const geminiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+const key = process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY || geminiKey;
 if (!key) {
   console.log(JSON.stringify({
     skipped: true,
@@ -137,13 +138,39 @@ function analyzeTurn(turn, output, plan) {
 
 const campaign = engine.campaigns.find((item) => item.id === campaignId) ?? engine.defaultCampaign;
 let room = engine.createGameRoom({ selectedCampaign: campaign, humanCharacter: engine.createCharacter({ name: "Fiamy" }), botCount: 2, id: `groq-smoke-${Date.now()}` });
+// SMOKE_PROVIDER=gemini prueba el mismo camino que usa el juego con VITE_MASTER_PROVIDER=gemini.
+const useGemini = process.env.SMOKE_PROVIDER === "gemini" && Boolean(geminiKey);
 const provider = new GroqDungeonMasterProvider({
-  GROQ_API_KEY: key,
-  GROQ_MODEL: process.env.GROQ_MODEL,
+  ...(useGemini
+    ? { provider: "gemini", GEMINI_API_KEY: geminiKey, GEMINI_MODEL: process.env.GEMINI_MODEL, GROQ_API_KEY: process.env.GROQ_API_KEY || process.env.VITE_GROQ_API_KEY, GROQ_MODEL: process.env.GROQ_MODEL }
+    : { GROQ_API_KEY: key, GROQ_MODEL: process.env.GROQ_MODEL }),
   policy: { maxCallsPerRun: Number(process.env.GROQ_MAX_CALLS ?? 3), maxCallsPerScene: 2, useGroqForBotTurns: false }
 });
 const random = seeded(Number(process.env.GROQ_SMOKE_SEED ?? 20260620));
 const turns = [];
+
+// Escena de apertura narrada por el LLM (misma vía que usa startSolo en la UI).
+let opening = null;
+try {
+  const firstScene = engine.getRoomScenes(room)[0];
+  const sceneNpcs = (firstScene.npcIds?.length
+    ? campaign.npcs.filter((npc) => firstScene.npcIds.includes(npc.id))
+    : campaign.npcs
+  ).slice(0, 4).map((npc) => ({ name: npc.name, role: npc.role, description: npc.description, desire: npc.desire, fear: npc.fear }));
+  opening = await provider.generateOpeningScene({
+    campaignTitle: campaign.title,
+    narratorVoice: campaign.narratorVoice,
+    premise: campaign.premise ?? campaign.storyHook,
+    storyHook: campaign.storyHook,
+    stakes: campaign.stakes,
+    scene: { title: firstScene.title, objective: firstScene.objective },
+    npcs: sceneNpcs,
+    optionLabels: firstScene.actionChoices.map((choice) => choice.label).slice(0, 4),
+    playerNames: room.players.map((player) => player.name)
+  });
+} catch (error) {
+  opening = { error: error instanceof Error ? error.message : String(error) };
+}
 
 for (let index = 0; index < maxTurns && !room.sessionComplete; index += 1) {
   const selected = pickAction(room, index);
@@ -175,5 +202,6 @@ console.log(JSON.stringify({
   totalRepairsApplied: turns.reduce((total, turn) => total + turn.repairsApplied, 0),
   repeatedProblems,
   recommendation,
+  opening,
   turns
 }, null, 2));

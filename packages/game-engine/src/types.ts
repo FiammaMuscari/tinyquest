@@ -400,6 +400,10 @@ export type CampaignNPC = {
   description: string;
   motive: string;
   role?: string;
+  /** Retrato generado (IA o asset). Sin esto, la UI dibuja un medallón procedural. */
+  portraitUrl?: string;
+  /** Aspecto físico dibujable (para prompts de retrato). */
+  appearance?: string;
   secret?: string;
   alibi?: string;
   fear?: string;
@@ -993,7 +997,104 @@ export type FinalRecapResponse = {
   recap: string;
 };
 
+// Opening scene narrated by the LLM at session start. Only public NPC data crosses
+// this boundary: secrets/alibis/whatTheyHide must never reach the opening prompt.
+export type OpeningSceneRequest = {
+  campaignTitle: string;
+  narratorVoice?: NarratorVoice;
+  premise: string;
+  storyHook?: string;
+  stakes?: string[];
+  scene: { title: string; objective: string };
+  npcs: Array<{ name: string; role?: string; description?: string; desire?: string; fear?: string }>;
+  optionLabels: string[];
+  playerNames: string[];
+  /** Cómo entran los héroes a la historia según la perspectiva elegida (exterior/interior). */
+  perspectiveEntry?: string;
+};
+
+export type OpeningSceneResponse = {
+  narration: string;
+  dialogue?: string;
+};
+
+// Improvised story mode (Fase A): the LLM authors the fiction; the engine keeps the
+// proven template mechanics (options, stats, dice, endings). Only narrative content
+// crosses this boundary — no outcome kinds, no difficulty numbers, no rules.
+export type ImprovisedSceneContent = {
+  title: string;
+  objective: string;
+  /** Physical object the players can examine in this scene (feeds the option label). */
+  keyObject: string;
+  /** Risky route out of / deeper into the scene (feeds the option label). */
+  escapeRoute: string;
+};
+
+export type ImprovisedNpcContent = {
+  name: string;
+  role: string;
+  description: string;
+  motive: string;
+  secret: string;
+  desire?: string;
+  fear?: string;
+  /** Aspecto físico dibujable, imaginado por el LLM — alimenta el retrato generado. */
+  appearance?: string;
+};
+
+export type ImprovisedStoryContent = {
+  title: string;
+  genre: string;
+  premise: string;
+  storyHook: string;
+  hiddenTruth: string;
+  themeSkill: string;
+  twist: string;
+  stakes: string[];
+  threat: { name: string; description: string; specialMove: string };
+  scenes: ImprovisedSceneContent[];
+  npcs: ImprovisedNpcContent[];
+  clues: Array<{ title: string; text: string; sceneIndex: number }>;
+};
+
+// Mundo sellado: ambiente central + reglas inmutables que el narrador respeta
+// pero que el jugador descubre poco a poco (nunca se muestran de entrada).
+export type WorldEra = {
+  id: string;
+  name: string;
+  era: string;
+  /** Única línea visible al elegir mundo: intriga sin spoiler. */
+  tagline: string;
+  ambience: string;
+  worldRules: string[];
+  /** Instrucciones de tono/elementos para la Forja de historias de este mundo. */
+  forgeSeasoning: string;
+  /** Historia madre escrita a mano (ej: luna-roja para Veldaran); sin esto, se forja. */
+  authoredCampaignId?: string;
+  entry: { exterior: string; interior: string };
+};
+
+export type StoryPerspective = "exterior" | "interior";
+
+export type ImprovisedWorldContext = {
+  worldName: string;
+  era: string;
+  ambience: string;
+  rules: string[];
+  seasoning: string;
+  perspective: StoryPerspective;
+  entryLine: string;
+};
+
+export type ImprovisedStoryRequest = {
+  userPrompt: string;
+  playerNames?: string[];
+  worldContext?: ImprovisedWorldContext;
+};
+
 export interface DungeonMasterProvider {
   generateNarration(input: NarrationRequest): Promise<NarrationResponse>;
   generateFinalRecap(input: FinalRecapRequest): Promise<FinalRecapResponse>;
+  generateOpeningScene?(input: OpeningSceneRequest): Promise<OpeningSceneResponse>;
+  generateImprovisedStory?(input: ImprovisedStoryRequest): Promise<ImprovisedStoryContent>;
 }

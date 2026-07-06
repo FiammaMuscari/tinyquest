@@ -1,6 +1,7 @@
-import type { DungeonMasterProvider, FinalRecapRequest, FinalRecapResponse, NarrationRequest, NarrationResponse } from "@tiny-quest/game-engine";
+import type { DungeonMasterProvider, FinalRecapRequest, FinalRecapResponse, ImprovisedStoryContent, ImprovisedStoryRequest, NarrationRequest, NarrationResponse, OpeningSceneRequest, OpeningSceneResponse } from "@tiny-quest/game-engine";
 import { buildNarrativeIngredientBundle } from "@tiny-quest/game-engine";
-import { narrationResponseSchema } from "./schemas";
+import { improvisedStorySchema, narrationResponseSchema } from "./schemas";
+import { repairLooseJson } from "./json-repair";
 import { buildDungeonMasterSystemPrompt } from "./prompt-builder";
 import { buildFallbackNarrationOutput, parseDungeonNarrationOutput, toLegacyNarrationFields } from "./narration-contract";
 import { buildCompactGroqPrompt, createLlmBudgetState, DEFAULT_CHEAP_LLM_POLICY, getNarrationCacheKey, recordGroqCall, recordSkippedCall, shouldCallGroq, type LlmBudgetPolicy, type LlmBudgetState } from "./llm-budget";
@@ -161,6 +162,11 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   private readonly model: string;
   private readonly useLocalProxy: boolean;
   private readonly isGemini: boolean;
+  // Groq credentials kept even when Gemini is the primary provider: the free tier of
+  // Gemini returns 429/503 under load, and falling straight to the local template makes
+  // the narration flat. Groq is the second line before the deterministic fallback.
+  private readonly failoverGroqKey?: string;
+  private readonly failoverGroqModel: string;
   private readonly policy: LlmBudgetPolicy;
   private readonly budgetState: LlmBudgetState;
   private cacheHits = 0;
@@ -178,6 +184,8 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       this.apiKey = env.GROQ_API_KEY || env.VITE_GROQ_API_KEY;
       this.model = env.GROQ_MODEL || env.VITE_GROQ_MODEL || "openai/gpt-oss-120b";
     }
+    this.failoverGroqKey = env.GROQ_API_KEY || env.VITE_GROQ_API_KEY;
+    this.failoverGroqModel = env.GROQ_MODEL || env.VITE_GROQ_MODEL || "openai/gpt-oss-120b";
     this.useLocalProxy = !this.apiKey && typeof window !== "undefined";
     this.policy = { ...DEFAULT_CHEAP_LLM_POLICY, ...(env.policy ?? {}) };
     this.budgetState = createLlmBudgetState();
@@ -233,7 +241,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       { role: "system", content: buildDungeonMasterSystemPrompt(input.selectedCampaign?.narratorVoice) },
       { role: "user", content: input.resolutionPlan ? buildCompactGroqPrompt(input.resolutionPlan, this.policy.maxPromptChars, input, bundle) : "{}" }
     ];
-    const json = await this.callGroq(messages, {}, "groq-chat");
+    const json = await this.callGroqWithFailover(messages, {}, "groq-chat");
     if (input.resolutionPlan) recordGroqCall(this.budgetState, input.resolutionPlan);
     const parsed = await this.parseValidateOrFallback(json, input);
 
@@ -346,27 +354,128 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     ], { model: this.isGemini ? "gemini-2.5-flash" : "llama-3.3-70b-versatile", forceJson: true }, "repair-json");
   }
 
-  private async callGroq(messages: GroqMessage[], options: { model?: string; forceJson?: boolean } = {}, debugLabel = "chat") {
+  private async callGroqWithFailover(messages: GroqMessage[], options: { forceJson?: boolean; maxTokens?: number } = {}, debugLabel = "chat") {
+    try {
+      return await this.callGroq(messages, options, debugLabel);
+    } catch (error) {
+      // Gemini free tier drops calls (429/503) under load; retry once against Groq
+      // before surrendering the turn to the deterministic template.
+      const canFailover = this.isGemini && (this.failoverGroqKey || this.useLocalProxy);
+      if (!canFailover) throw error;
+      logDmEvent("provider-failover", { from: this.model, to: this.failoverGroqModel, cause: error instanceof Error ? error.message : "unknown" });
+      return this.callGroq(messages, { ...options, forceProvider: "groq" }, `${debugLabel}-failover`);
+    }
+  }
+
+  async generateOpeningScene(input: OpeningSceneRequest): Promise<OpeningSceneResponse> {
+    const system = [
+      "Sos el narrador de Tiny Quest, una aventura de misterio en español rioplatense neutro.",
+      input.narratorVoice ? `Voz del narrador: ${JSON.stringify(input.narratorVoice)}.` : "",
+      "Escribí la ESCENA DE APERTURA de la historia como el primer capítulo de una novela: tiempo presente, sensorial, concreta, con los héroes ya dentro de la escena.",
+      "Prohibido el meta-lenguaje: nada de 'campaña', 'jugador', 'opciones', 'misión', 'objetivo', 'dados'.",
+      "Usá SOLO los NPC listados (no inventes nombres) y solo su información pública.",
+      "Cerrá con la tensión apuntando a la primera decisión, sin enumerar acciones posibles.",
+      'Respondé SOLO JSON válido: {"narration":"2 párrafos, 90-160 palabras","dialogue":"una línea dicha por un NPC listado, formato Nombre: \\"...\\""}'
+    ].filter(Boolean).join(" ");
+    const payload = {
+      historia: input.campaignTitle,
+      premisa: input.premise,
+      gancho: input.storyHook,
+      enJuego: input.stakes?.slice(0, 2),
+      escena: input.scene,
+      npcs: input.npcs.slice(0, 4),
+      heroes: input.playerNames.slice(0, 4),
+      puntoDeEntrada: input.perspectiveEntry,
+      primerasDecisiones: input.optionLabels.slice(0, 4)
+    };
+    const json = await this.callGroqWithFailover([
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify(payload) }
+    ], { forceJson: true }, "opening-scene");
+    const parsed = parseGroqJson(json) as { narration?: unknown; dialogue?: unknown };
+    if (typeof parsed.narration !== "string" || parsed.narration.trim().length < 60) throw new Error("El narrador no produjo una apertura utilizable.");
+    return {
+      narration: parsed.narration.trim(),
+      dialogue: typeof parsed.dialogue === "string" && parsed.dialogue.trim() ? parsed.dialogue.trim() : undefined
+    };
+  }
+
+  async generateImprovisedStory(input: ImprovisedStoryRequest): Promise<ImprovisedStoryContent> {
+    const world = input.worldContext;
+    const wish = input.userPrompt?.trim() ?? "";
+    const system = [
+      "Sos el arquitecto de historias de Tiny Quest, un juego de misterio narrativo en español.",
+      "Diseñá una historia jugable de 4 escenas con un culpable oculto.",
+      ...(world ? [
+        `La historia ocurre en ${world.worldName} (${world.era}). Ambiente sellado: ${world.ambience}`,
+        `REGLAS INMUTABLES del mundo — respetalas en premisa, pistas y giro, pero NO las enuncies de golpe: el grupo las descubre jugando: ${world.rules.join(" · ")}`,
+        `Tono y elementos de este mundo: ${world.seasoning}`,
+        `Punto de entrada de los héroes (perspectiva ${world.perspective}): ${world.entryLine} La escena 1 arranca exactamente ahí.`
+      ] : []),
+      // El pedido del equipo manda: el mundo es el escenario, no una excusa para ignorarlo.
+      ...(wish ? [
+        `PEDIDO ESPECIAL DEL EQUIPO — OBLIGATORIO, tiene prioridad sobre el tono por defecto del mundo: "${wish}".`,
+        "Integrá CADA elemento del pedido de forma central y visible (criaturas, tono, cantidad de NPCs, traiciones, lo que pidan): tienen que notarse en la premisa, los NPCs y las escenas, no de decorado.",
+        "Si un elemento del pedido tensa el ambiente, adaptalo al mundo sin descartarlo (ej: una estirpe o facción propia de este mundo que encarne lo pedido). Las reglas inmutables son el único límite."
+      ] : ["No hay pedido especial: diseñá la historia central del mundo y sorprendé al equipo."]),
+      "Reglas de diseño: la premisa plantea una injusticia o misterio con reloj (algo malo pasa si el grupo no actúa);",
+      "hiddenTruth contradice la explicación visible; cada pista acerca al culpable sin nombrarlo directo;",
+      "los NPC tienen secreto propio (uno protege al culpable o ES parte del engaño); la escena 4 es el clímax donde se decide el final.",
+      "keyObject y escapeRoute de cada escena son cosas FÍSICAS y concretas de ese lugar (van en botones de acción, cortos).",
+      "Tono: fantasía oscura apta para todo público.",
+      "NOMBRES con peso de saga épica (El Señor de los Anillos, Canción de Hielo y Fuego, The Witcher): lugares con historia en el nombre, personas con epíteto o linaje, casas o estirpes con apellido propio. PROHIBIDO lo genérico ('el Sabio', 'la Guardiana', 'el Herrero') y PROHIBIDO copiar ejemplos de otros mundos: inventá nombres originales que puedan abrir un capítulo de libro.",
+      'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[2-3 x {"name","role","description","motive","secret","desire","fear","appearance"}],"clues":[3 x {"title","text","sceneIndex":1-4}]}. appearance = cómo se VE el personaje en 1 frase dibujable que SIEMPRE dice: especie o etnia (humana de piel oscura, elfo pálido, vampiro, mestizo animal, lo que sea), género, edad aparente (niño, adulta, anciano), rasgos de cara/cuerpo, ropa y una marca distintiva. Variá MUCHO los cuerpos entre personajes: niños, ancianas, pieles oscuras y claras, criaturas — el elenco no puede ser todo adultos iguales.'
+    ].join(" ");
+    const messages: GroqMessage[] = [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify({ pedidoDelEquipo: input.userPrompt.slice(0, 600), heroes: input.playerNames?.slice(0, 4) }) }
+    ];
+    // El LLM a veces devuelve JSON malformado o truncado por límite de tokens:
+    // se intenta crudo → reparado, y si nada sirve se pide la historia de nuevo una vez.
+    const attempt = async (): Promise<ImprovisedStoryContent | null> => {
+      const json = await this.callGroqWithFailover(messages, { forceJson: true, maxTokens: 2600 }, "story-forge");
+      for (const candidate of [json, repairLooseJson(json)]) {
+        try {
+          const parsed = improvisedStorySchema.safeParse(parseGroqJson(candidate));
+          if (parsed.success) return parsed.data;
+          logDmEvent("story-forge", { ok: false, issues: parsed.error.issues.map((issue) => issue.path.join(".")).slice(0, 8) });
+        } catch (error) {
+          logDmEvent("story-forge", { ok: false, parseError: error instanceof Error ? error.message.slice(0, 120) : "parse failed" });
+        }
+      }
+      return null;
+    };
+    const story = (await attempt()) ?? (await attempt());
+    if (!story) {
+      throw new Error("El narrador se trabó escribiendo la historia. Tocá Reintentar — suele salir a la segunda.");
+    }
+    logDmEvent("story-forge", { ok: true, title: story.title, scenes: story.scenes.length, npcs: story.npcs.length });
+    return story;
+  }
+
+  private async callGroq(messages: GroqMessage[], options: { model?: string; forceJson?: boolean; forceProvider?: "groq"; maxTokens?: number } = {}, debugLabel = "chat") {
+    const useGemini = this.isGemini && options.forceProvider !== "groq";
+    const apiKey = options.forceProvider === "groq" ? this.failoverGroqKey : this.apiKey;
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.apiKey) headers.Authorization = `Bearer ${this.apiKey}`;
-    const model = options.model ?? this.model;
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    const model = options.model ?? (options.forceProvider === "groq" ? this.failoverGroqModel : this.model);
     const isQwen = model.startsWith("qwen/");
     const isGptOss = model.startsWith("openai/gpt-oss");
-    const directUrl = this.isGemini
+    const directUrl = useGemini
       ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
       : "https://api.groq.com/openai/v1/chat/completions";
-    const endpoint = this.useLocalProxy ? (this.isGemini ? "/api/gemini/chat" : "/api/groq/chat") : directUrl;
+    const endpoint = this.useLocalProxy ? (useGemini ? "/api/gemini/chat" : "/api/groq/chat") : directUrl;
     let body = {
       model,
       messages,
       temperature: isQwen ? 0.72 : 0.80,
-      max_tokens: Math.max(640, Math.min(1200, Math.ceil(this.policy.maxOutputChars / 3))),
+      max_tokens: options.maxTokens ?? Math.max(640, Math.min(1200, Math.ceil(this.policy.maxOutputChars / 3))),
       ...(isQwen ? { reasoning_effort: "none", include_reasoning: false } : {}),
       ...(isGptOss ? { reasoning_effort: "low" } : {}),
       // gemini-2.5-flash "piensa" por defecto y gasta el presupuesto de tokens antes de
       // emitir el JSON, truncándolo → el parse falla → fallback en cada turno. Sin thinking
       // la narración completa entra en el budget.
-      ...(this.isGemini ? { reasoning_effort: "none" } : {}),
+      ...(useGemini ? { reasoning_effort: "none" } : {}),
       ...(options.forceJson || !isQwen ? { response_format: { type: "json_object" } } : {})
     };
     if (JSON.stringify(body).length > MAX_GROQ_BODY_CHARS) {
@@ -390,7 +499,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       });
     }
     if (!response.ok) {
-      const provider = this.isGemini ? "Gemini" : "Groq";
+      const provider = useGemini ? "Gemini" : "Groq";
       const error = response.status === 429 ? `${provider} rate limit: espera unos segundos antes del siguiente turno.` : `${provider} request failed: ${response.status}`;
       writeLlmDebug({ ...debugBase, error });
       throw new Error(error);
@@ -398,7 +507,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     const content = data.choices?.[0]?.message?.content;
     if (!content) {
-      const error = `${this.isGemini ? "Gemini" : "Groq"} response did not include content.`;
+      const error = `${useGemini ? "Gemini" : "Groq"} response did not include content.`;
       writeLlmDebug({ ...debugBase, error });
       throw new Error(error);
     }

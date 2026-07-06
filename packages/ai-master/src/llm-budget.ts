@@ -34,7 +34,7 @@ export const DEFAULT_CHEAP_LLM_POLICY: LlmBudgetPolicy = {
   useGroqForBotTurns: true,
   useGroqForMajorMomentsOnly: false,
   cacheEnabled: true,
-  retryOnInvalidJson: false
+  retryOnInvalidJson: true
 };
 
 export function createLlmBudgetState(initial: Partial<LlmBudgetState> = {}): LlmBudgetState {
@@ -177,6 +177,7 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     noRepeat: noRepeat.length ? noRepeat : undefined,
     optionsToLabel: optionsToLabel.length ? optionsToLabel : undefined,
     rules: [
+      "narration: 1-2 párrafos CORTOS, máximo ~90 palabras en total. Cada frase se gana su lugar; sin relleno atmosférico.",
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
       "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",

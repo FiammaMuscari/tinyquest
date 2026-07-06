@@ -14,6 +14,7 @@ export * from "./abilities";
 export * from "./character";
 export * from "./scenes";
 export * from "./campaigns";
+export * from "./worlds";
 export * from "./bots";
 export * from "./bot-personality";
 export * from "./room-state";

@@ -118,7 +118,10 @@ function physicalFallback(input: BuildMechanicalConsequenceInput) {
   return pick([
     "Una puerta cercana se cierra de golpe y deja a todos en guardia.",
     "Un objeto cae al suelo y el ruido corta las voces del lugar.",
-    "Alguien se mueve rápido y el grupo retrocede un paso."
+    "Alguien se mueve rápido y el grupo retrocede un paso.",
+    "Una luz cambia de posición al fondo: alguien más está atento a la escena.",
+    "Se oyen pasos que se detienen justo al otro lado del muro.",
+    "Una corriente de aire apaga una llama cercana y el lugar queda a media luz."
   ], seedFor(input));
 }
 

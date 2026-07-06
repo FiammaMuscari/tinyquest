@@ -122,8 +122,8 @@ export function applyMemoryUpdate<T extends { memorySummary: MemorySummary }>(ga
   return { ...gameState, memorySummary };
 }
 
-export function createSoloRoom(humanCharacter = createCharacter(), selectedCampaign: Campaign = defaultCampaign): GameRoom {
-  return createGameRoom({ mode: "solo_test", humanCharacter, selectedCampaign, botCount: 2 });
+export function createSoloRoom(humanCharacter = createCharacter(), selectedCampaign: Campaign = defaultCampaign, botCount = 2): GameRoom {
+  return createGameRoom({ mode: "solo_test", humanCharacter, selectedCampaign, botCount });
 }
 
 export function createMultiplayerRoom(hostCharacter: Character, guestCharacter: Character, selectedCampaign: Campaign): GameRoom {

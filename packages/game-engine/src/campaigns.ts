@@ -1,4 +1,4 @@
-﻿import type { Campaign, CampaignActionOption, StatName, WorldTheme } from "./types";
+﻿import type { Campaign, CampaignActionOption, ImprovisedStoryContent, StatName, WorldTheme } from "./types";
 
 const campaignBgImages: Record<string, string> = {
   "dukes-last-mask": "/assets/campaigns/masked-duke.webp",
@@ -586,6 +586,138 @@ campaigns.splice(0, campaigns.length, ...narrativeSeeds.map((seed) => {
 
 
 export const defaultCampaign = campaigns.find((item) => item.id === "luna-roja") ?? campaigns[0];
+
+// ─── Historia improvisada (Fase A) ────────────────────────────────────────────
+// El LLM entrega SOLO ficción (ImprovisedStoryContent); acá se ensambla sobre la
+// misma estructura mecánica probada de narrativeCampaign: categorías de opción,
+// stats, dificultad, enemigo, finales y flags quedan idénticos a la plantilla.
+
+export const IMPROVISED_CAMPAIGN_ID = "historia-improvisada";
+
+function clampText(value: unknown, fallback: string, max = 400): string {
+  const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
+  const chosen = text || fallback;
+  if (chosen.length <= max) return chosen;
+  const cut = chosen.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).trimEnd()}…`;
+}
+
+// "Examinar Un farol..." → "Examinar un farol...": baja solo artículos iniciales,
+// sin tocar nombres propios.
+function asFragment(text: string): string {
+  return text.replace(/^(Un|Una|Unos|Unas|El|La|Los|Las)\s/, (article) => article.toLowerCase());
+}
+
+export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campaign {
+  const slug = IMPROVISED_CAMPAIGN_ID;
+  const sceneContent = Array.from({ length: 4 }, (_, index) => ({
+    title: clampText(content.scenes?.[index]?.title, `Escena ${index + 1}`, 80),
+    objective: clampText(
+      content.scenes?.[index]?.objective,
+      index === 3 ? "Elegir final mediante pruebas, costes y estados vivos." : "Abrir una ruta sin agotar las pistas ni contradecir la memoria.",
+      180
+    ),
+    keyObject: clampText(content.scenes?.[index]?.keyObject, "el objeto que no encaja", 70),
+    escapeRoute: clampText(content.scenes?.[index]?.escapeRoute, "una ruta lateral peligrosa", 70)
+  }));
+
+  const npcSource = Array.isArray(content.npcs) ? content.npcs.slice(0, 3) : [];
+  while (npcSource.length < 2) {
+    npcSource.push(npcSource.length === 0
+      ? { name: "Testigo de la verdad incómoda", role: "npc principal", description: "Sabe más de lo que admite y cambia con el peligro.", motive: "Sobrevivir sin entregar su secreto.", secret: "Protege una ruta o una culpa antigua." }
+      : { name: "Vigía de puerta cerrada", role: "secundario", description: "Vende rumor, bloquea paso o abre ruta con coste.", motive: "No quedar marcado por la facción dominante.", secret: "Cobra deudas de la amenaza oculta." });
+  }
+  const npcs = npcSource.map((npc, index) => ({
+    id: `${slug}-npc-${index + 1}`,
+    name: clampText(npc?.name, `Testigo ${index + 1}`, 48),
+    description: clampText(npc?.description, "Sabe más de lo que admite.", 240),
+    motive: clampText(npc?.motive, "Sobrevivir sin entregar su secreto.", 180),
+    role: clampText(npc?.role, index === 0 ? "npc principal" : "secundario", 48),
+    secret: clampText(npc?.secret, "Protege una culpa antigua.", 220),
+    desire: npc?.desire ? clampText(npc.desire, "", 160) : undefined,
+    fear: npc?.fear ? clampText(npc.fear, "", 160) : undefined,
+    appearance: npc?.appearance ? clampText(npc.appearance, "", 180) : undefined
+  }));
+
+  const clues = Array.from({ length: 3 }, (_, index) => {
+    const clue = content.clues?.[index];
+    const sceneIndex = Math.min(Math.max(Math.round(Number(clue?.sceneIndex) || index + 1), 1), 4);
+    return {
+      id: `${slug}-clue-${index + 1}`,
+      text: clampText(clue?.text, "Una prueba física contradice la explicación pública.", 220),
+      sceneId: `${slug}-scene-${sceneIndex}`,
+      unlocksFlags: [`${slug}_clue_${index + 1}`]
+    };
+  });
+  const clueIdForScene = (index: number) =>
+    clues.find((clue) => clue.sceneId === `${slug}-scene-${index + 1}`)?.id ?? clues[Math.min(index, clues.length - 1)].id;
+
+  const threatName = clampText(content.threat?.name, "Amenaza encubierta", 60);
+
+  return campaign({
+    id: slug,
+    title: clampText(content.title, "Historia improvisada", 80),
+    genre: clampText(content.genre, "fantasía oscura improvisada", 80),
+    description: clampText(content.premise, "Una historia forjada al momento por el equipo.", 320),
+    storyHook: clampText(content.storyHook, clampText(content.premise, "Una historia única forjada por el grupo.", 240), 240),
+    difficulty: "normal",
+    recommendedStats: ["mind", "courage", "focus", "charm"],
+    recommendedSkills: [clampText(content.themeSkill, "investigación", 40), "investigacion", "objetos", "dialogo"],
+    npcs,
+    enemies: [{
+      id: `${slug}-amenaza`,
+      name: threatName,
+      description: clampText(content.threat?.description, "No siempre debe combatirse; puede exponerse, calmarse o desviarse.", 220),
+      vitality: 10,
+      attackBonus: 3,
+      defense: 13,
+      dangerLevel: 3,
+      weaknessStats: ["mind", "charm", "courage"],
+      specialMove: clampText(content.threat?.specialMove, "Escalar peligro y bloquear una ruta", 120)
+    }],
+    clues,
+    possibleEndings: [
+      { id: "good_truth_mercy", title: "Verdad con misericordia", description: "La culpa se prueba sin destruir a todos los inocentes." },
+      { id: "heroic_cost", title: "Victoria con precio", description: "El grupo salva a otros y pierde algo persistente." },
+      { id: "bittersweet_escape", title: "Salida amarga", description: "Sobreviven con una verdad incompleta." },
+      { id: "tragic_collapse", title: "Derrumbe trágico", description: "El peligro crítico decide por todos." },
+      { id: "corrupt_victory", title: "Victoria corrupta", description: "Ganan usando un poder que deja marca." },
+      { id: "false_resolution", title: "Resolución falsa", description: "Una explicación cómoda tapa el secreto real." },
+      { id: "secret_deep_truth", title: "La verdad bajo la verdad", description: "Se abre el secreto profundo y un desbloqueo futuro." }
+    ],
+    legendaryPets: ["Sabueso del Umbral", "Polilla de Cripta", "Alma Dragonica"],
+    rewards: [{ id: `${slug}-story-mark`, name: "Marca Narrativa", description: "Persistente: altera diálogos, costes o visiones sin resolver automáticamente misterios." }],
+    imagePrompt: `${clampText(content.genre, "fantasía oscura", 80)}, fantasía oscura, objetos tocables, decisiones tensas`,
+    ambientSoundPrompt: `${clampText(content.genre, "fantasía oscura", 80)}, campanas bajas, lluvia, madera, respiración contenida`,
+    narratorGuidance: "Historia improvisada por el equipo: respetá su premisa y sus NPCs al pie de la letra. Cada turno debe cambiar estado real y cerrar con presión concreta.",
+    premise: clampText(content.premise, "Una historia forjada al momento.", 400),
+    hiddenTruth: clampText(content.hiddenTruth, "La explicación visible fue manipulada; el secreto real requiere cruzar pistas, objetos y relaciones.", 300),
+    mainConflict: "Resolver la verdad sin dejar que peligro, facciones o reliquias rompan la partida.",
+    stakes: (Array.isArray(content.stakes) && content.stakes.length ? content.stakes : ["rutas pueden bloquearse", "NPCs pueden huir o traicionar"]).slice(0, 3).map((stake) => clampText(stake, "", 140)).filter(Boolean),
+    twists: content.twist ? [{ id: `${slug}-twist-1`, title: "Giro", trigger: "clímax o pista final", reveal: clampText(content.twist, "", 240) }] : undefined,
+    endingConditions: Object.fromEntries(["good_truth_mercy", "heroic_cost", "bittersweet_escape", "tragic_collapse", "corrupt_victory", "false_resolution", "secret_deep_truth"].map((id) => [id, "Final compuesto por EndingPlan según pistas, peligro y decisiones."])),
+    scenes: sceneContent.map((scene, index) => ({
+      id: `${slug}-scene-${index + 1}`,
+      title: scene.title,
+      description: `${scene.objective} Lugar físico con NPCs activos, objetos relevantes y rutas con coste.`,
+      objective: scene.objective,
+      allowedStats: ["mind", "charm", "courage", "focus"],
+      difficulty: 12 + index,
+      clueIds: [clueIdForScene(index)],
+      npcIds: npcs.map((npc) => npc.id),
+      enemyIds: index >= 1 ? [`${slug}-amenaza`] : undefined,
+      hasCombat: index >= 1,
+      imagePrompt: `${scene.title}, ${clampText(content.genre, "fantasía oscura", 80)}, detalle concreto`,
+      ambientSoundPrompt: `${scene.title}, tensión ambiental`,
+      multipleChoiceOptions: [
+        option(`${slug}-${index + 1}-object`, `Examinar ${asFragment(scene.keyObject)}`, "investigate", "mind", "low", "Confirmar o dañar una pista concreta.", { unlocksClues: [clueIdForScene(index)], memoryImpact: "El objeto examinado conserva una marca física comparable con testigos o heridas." }),
+        option(`${slug}-${index + 1}-npc`, `Presionar a ${npcs[index % npcs.length].name}`, "talk", "charm", "medium", "Obtener ayuda, mentira o traición con coste.", { memoryImpact: "El NPC cambia actitud y alguien toma nota." }),
+        option(`${slug}-${index + 1}-route`, `Forzar ${asFragment(scene.escapeRoute)}`, "defend", "courage", "high", "Abrir avance con peligro o pérdida de objeto.", { dangerOnFailure: 2, progressOnSuccess: 1 })
+      ]
+    }))
+  });
+}
 
 export function campaignById(id: string): Campaign {
   return campaigns.find((item) => item.id === id) ?? defaultCampaign;

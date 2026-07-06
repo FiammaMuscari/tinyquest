@@ -1,6 +1,47 @@
 import { z } from "zod";
 import { dungeonNarrationOutputSchema } from "./narration-contract";
 
+// Historia improvisada: el LLM entrega SOLO ficción; los huecos los rellena
+// buildImprovisedCampaign con la plantilla probada, así que casi todo es laxo.
+export const improvisedStorySchema = z.object({
+  title: z.string().min(3),
+  genre: z.string().catch("fantasía oscura"),
+  premise: z.string().min(20),
+  storyHook: z.string().catch(""),
+  hiddenTruth: z.string().catch(""),
+  themeSkill: z.string().catch("investigación"),
+  twist: z.string().catch(""),
+  stakes: z.array(z.string()).catch([]),
+  threat: z.object({
+    name: z.string().catch("Amenaza encubierta"),
+    description: z.string().catch(""),
+    specialMove: z.string().catch("")
+  }).catch({ name: "Amenaza encubierta", description: "", specialMove: "" }),
+  // buildImprovisedCampaign rellena títulos/nombres vacíos y usa solo las primeras
+  // 4 escenas / 3 NPCs / 3 pistas: una entrada extra o incompleta no invalida la historia.
+  scenes: z.array(z.object({
+    title: z.string().catch(""),
+    objective: z.string().catch(""),
+    keyObject: z.string().catch(""),
+    escapeRoute: z.string().catch("")
+  })).min(3),
+  npcs: z.array(z.object({
+    name: z.string().catch(""),
+    role: z.string().catch("secundario"),
+    description: z.string().catch(""),
+    motive: z.string().catch(""),
+    secret: z.string().catch(""),
+    desire: z.string().optional().catch(undefined),
+    fear: z.string().optional().catch(undefined),
+    appearance: z.string().optional().catch(undefined)
+  })).min(1),
+  clues: z.array(z.object({
+    title: z.string().catch(""),
+    text: z.string().catch(""),
+    sceneIndex: z.number().catch(1)
+  })).min(1)
+});
+
 export const memorySummarySchema = z.object({
   clues: z.array(z.string()),
   unresolvedThreads: z.array(z.string()),

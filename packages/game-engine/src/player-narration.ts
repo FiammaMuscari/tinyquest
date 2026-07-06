@@ -117,14 +117,16 @@ export function buildVisibleConsequence(turn: TurnResolution): string {
   return shortConsequence(turn.visibleConsequence);
 }
 
-function pickVariant(actorId: string, variants: string[]): string {
-  const hash = actorId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+// Seed must vary per turn, not only per actor — hashing actorId alone locks each
+// player to the same variant for the whole session.
+function pickVariant(seedText: string, variants: string[]): string {
+  const hash = seedText.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   return variants[hash % variants.length];
 }
 
 export function buildPlayerNarration(turn: TurnResolution, sceneTitle = "la escena"): string {
   const actor = turn.actor.name;
-  const actorId = turn.actor.id;
+  const actorId = `${turn.actor.id}:${turn.check?.total ?? 0}:${turn.check?.d20?.value ?? 0}:${turn.dangerDelta ?? 0}:${turn.factualSummary?.length ?? 0}`;
   const target = cleanPublicName(turn.target?.label);
   const type: CampaignActionType | undefined = turn.campaignActionType;
   const result = turn.result;
@@ -156,7 +158,7 @@ export function buildPlayerNarration(turn: TurnResolution, sceneTitle = "la esce
   if (type === "investigar_objeto" || type === "usar_objeto") {
     if (result === "success") {
       const variants = [
-        `${actor} revisa ${evidence} con cuidado. Se fija en lo que cualquiera podría pasar por alto: el borde, la presión, el corte limpio o la marca donde no debería estar.\n\nLa prueba deja de ser sospecha y empieza a sostener una pregunta peligrosa. ${summary || consequence}`,
+        `${actor} revisa ${evidence} con cuidado. Se fija en lo que cualquiera podría pasar por alto: el borde, la presión, el corte limpio o la marca donde no debería estar.\n\nLo que era una corazonada ahora tiene forma, peso y un dueño posible. ${summary || consequence}`,
         `${actor} se detiene frente a ${evidence} cuando los demás ya habrían seguido. Algo no encaja. Lo que encuentra no es llamativo: es exactamente lo que no debería estar ahí.\n\nLa pieza encaja con una pregunta que nadie ha formulado todavía. ${summary || consequence}`,
         `${actor} trabaja sobre ${evidence} en silencio mientras la escena presiona alrededor. El detalle que importa no está en lo visible: está en lo que falta.\n\nLo que descubre no responde todo, pero cierra una puerta a otra explicación. ${summary || consequence}`,
       ];

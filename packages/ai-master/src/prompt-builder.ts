@@ -90,7 +90,7 @@ export function buildDungeonMasterSystemPrompt(_narratorVoice?: NarratorVoice) {
     "NUNCA cambies resultado del dado. NUNCA uses forbidden de turn.",
     "Si optionsToLabel tiene entradas, generá enrichedOptions con una etiqueta narrativa concreta (que referencie objeto/persona de la escena) por cada id.",
     "Respondé SOLO con JSON válido. Sin Markdown. Sin texto fuera del JSON.",
-    "Formato exacto: {\"narration\":\"2-3 párrafos literarios\",\"dialogue\":[{\"speakerId\":\"\",\"speakerName\":\"\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"\",\"intention\":\"\"}],\"consequence\":{\"summary\":\"igual a turn.consequence\",\"physicalChange\":\"\",\"emotionalChange\":\"\"},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"\"},\"clueReveals\":[],\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[],\"enrichedOptions\":[{\"id\":\"\",\"label\":\"\"}]}"
+    "Formato exacto: {\"narration\":\"1-2 párrafos cortos (máx ~90 palabras)\",\"dialogue\":[{\"speakerId\":\"\",\"speakerName\":\"\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"\",\"intention\":\"\"}],\"consequence\":{\"summary\":\"igual a turn.consequence\",\"physicalChange\":\"\",\"emotionalChange\":\"\"},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"\"},\"clueReveals\":[],\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[],\"enrichedOptions\":[{\"id\":\"\",\"label\":\"\"}]}"
   ].join(" ");
 }
 
@@ -424,7 +424,7 @@ export function buildDungeonMasterPayload(input: NarrationRequest, narrative: Na
       ? buildNarratorVoiceSection(input.selectedCampaign.narratorVoice)
       : undefined,
     responseContract: {
-      narration: "2 a 3 párrafos de prosa narrativa adulta: 1) acción física concreta con un objeto o detalle sensorial de la escena, 2) tensión emocional real entre personajes (puede incluir deseo, lealtad rota, miedo o vínculo que cambia), 3) señal oblicua de giro o misterio si storyContext lo permite. Evitar informe seco y frases genéricas.",
+      narration: "1 a 2 párrafos CORTOS (máximo ~90 palabras en total): 1) acción física concreta con un objeto o detalle sensorial de la escena, 2) tensión emocional o señal de giro. Cada frase tiene que ganarse su lugar; nada de relleno atmosférico.",
       npcDialogue: ["PNJ: una frase breve con deseo, amenaza o mentira."],
       consequence: "Una frase clara: que cambia ahora por el resultado del dado.",
       nextOptions: ["Accion concreta con persona/lugar/objeto", "Accion concreta con persona/lugar/objeto"],

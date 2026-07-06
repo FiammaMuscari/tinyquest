@@ -44,30 +44,44 @@ function allowedSpeakerIds(plan: ResolutionPlan) {
   return new Set([plan.actorId, "narrator", ...plan.validContext.presentNpcIds, ...plan.botDirectives.map((bot) => bot.botId)]);
 }
 
+// Per-turn entropy: mixes roll, danger and action so the same actor doesn't repeat
+// the same variant every turn (actorId alone is constant for the whole session).
+function fallbackVariantSeed(plan: ResolutionPlan): number {
+  return plan.roll.total * 3 + plan.scene.dangerAfter * 7 + plan.scene.dangerBefore * 2 + plan.actionText.length + plan.actorId.length;
+}
+
 function buildFallbackNarrationText(plan: ResolutionPlan): string {
   const actor = plan.actorName;
   const consequence = plan.consequence.physicalChange ?? plan.consequence.socialChange ?? plan.consequence.summary;
   const target = plan.validContext.targetId?.replace(/_/g, " ") ?? plan.scene.title;
+  const seed = fallbackVariantSeed(plan);
   if (plan.roll.result === "success") {
     const variants = [
       `${actor} actúa antes de que la escena se cierre. El movimiento es preciso y el cambio, visible. ${consequence}`,
       `${actor} encuentra el ángulo correcto y lo aprovecha. ${consequence}`,
       `${actor} lee la situación y se mueve primero. ${consequence}`,
+      `${actor} espera medio segundo más que los demás, y ese medio segundo alcanza. ${consequence}`,
+      `Nadie ve venir el movimiento de ${actor} hasta que ya está hecho. ${consequence}`,
+      `${actor} hace exactamente lo necesario, sin ruido ni gesto de más. ${consequence}`,
     ];
-    return variants[Math.abs(plan.actorId.charCodeAt(0)) % variants.length];
+    return variants[Math.abs(seed) % variants.length];
   }
   if (plan.roll.result === "partial") {
     const variants = [
       `${actor} avanza sobre ${target}, pero no sin coste. ${consequence}`,
       `${actor} logra algo concreto, aunque la escena responde con presión. ${consequence}`,
+      `${actor} consigue la mitad de lo que buscaba; la otra mitad queda a la vista de todos. ${consequence}`,
+      `El intento de ${actor} funciona, pero deja una marca que alguien va a notar. ${consequence}`,
     ];
-    return variants[Math.abs(plan.actorId.charCodeAt(0)) % variants.length];
+    return variants[Math.abs(seed) % variants.length];
   }
   const variants = [
     `${actor} intenta mover la escena, pero algo falla antes de completarse. ${consequence}`,
     `${actor} presiona demasiado rápido. El momento se cierra antes de que pueda aprovecharlo. ${consequence}`,
+    `${actor} calcula mal por poco, y ese poco basta para que la escena se le dé vuelta. ${consequence}`,
+    `El plan de ${actor} choca contra algo que no estaba a la vista. ${consequence}`,
   ];
-  return variants[Math.abs(plan.actorId.charCodeAt(0)) % variants.length];
+  return variants[Math.abs(seed) % variants.length];
 }
 
 // Never surface a raw clue id in the UI. Prefer a usable LLM-provided title, then the
