@@ -6,6 +6,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Narrative RPG with AI as Dungeon Master. Short sessions (~15 min), 3 scenes, deterministic dice rules (d20+stat+d4), LLM narrator (Groq, default `llama-3.3-70b-versatile`) that **only narrates facts already resolved by the engine**. Spanish-first gameplay, local-first, multiplayer-ready architecture.
 
+## Before exploring — token saver
+
+Read `docs/refactor-map.md` FIRST when touching UI (`App.tsx` / `app.css`) or
+verifying in the browser. It has grep anchors, CSS danger zones, E2E recipes and
+known traps. Rules that always apply:
+
+- `App.tsx` (~2500 lines) and `app.css` (~3500 lines): grep anchors, read ranges — never whole files.
+- Restart the dev server after touching `packages/ai-master/**` (stale bundle = ghost bugs).
+- Verify UI at **1360×700** (Fiamy's viewport).
+- Keep `docs/refactor-map.md` updated when you move/rename sections — that file is the map.
+
 ## Commands
 
 ```bash
