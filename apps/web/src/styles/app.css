@@ -3449,6 +3449,25 @@ h1 {
 .peekSealed { margin: 10px 0 0; font-size: 11px; color: #9b8db5; border-top: 1px dashed rgba(155,141,181,.3); padding-top: 8px; }
 
 .heroSummaryActions { display: grid; gap: 6px; justify-items: stretch; }
+.heroSummaryPet { display: inline-flex; align-items: center; gap: 6px; }
+.portraitStatus { color: #ffda8a; font-size: 11px; margin: 0; animation: forgePulse 1.6s ease-in-out infinite; }
+
+/* Rasgos del retrato: género en pills, piel/ojos en swatches de color. */
+.lookPicker { display: grid; gap: 7px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(217,168,77,.2); background: rgba(4,12,25,.45); }
+.lookGroup { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; }
+.lookGroup > span { color: #9b8db5; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.lookPills { display: flex; flex-wrap: wrap; gap: 5px; }
+.lookPills button { padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04); color: #d8c9f5; font-size: 11px; font-weight: 700; cursor: pointer; }
+.lookPills button.selected { border-color: #ffbf35; color: #ffda8a; background: rgba(255,191,53,.12); box-shadow: 0 0 10px rgba(255,191,53,.25); }
+.lookSwatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.lookSwatches button { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.22); cursor: pointer; transition: transform .12s ease; }
+.lookSwatches button:hover:not(:disabled) { transform: scale(1.12); }
+.lookSwatches button.selected { border-color: #ffbf35; box-shadow: 0 0 10px rgba(255,191,53,.5); transform: scale(1.12); }
+
+/* Tab Compañero: retrato de criatura propio junto al detalle. */
+.petDetail { display: flex; gap: 13px; align-items: center; }
+.petDetail .npcPortrait { flex: 0 0 auto; }
+.petDetailText { display: grid; gap: 6px; min-width: 0; }
 
 /* Forja de héroe: columna de retrato con botón Reimaginar. */
 .heroPortraitColumn { display: grid; gap: 7px; justify-items: center; }

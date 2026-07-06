@@ -58,6 +58,14 @@ export type AbilityProgression = {
   progressTarget: number;
 };
 
+// Rasgos visibles elegidos por el jugador; alimentan el prompt del retrato
+// generado. Todos opcionales: sin elección, la IA decide libremente.
+export type CharacterLook = {
+  gender?: string;
+  skinTone?: string;
+  eyeColor?: string;
+};
+
 export type Character = {
   name: string;
   species: string;
@@ -69,6 +77,7 @@ export type Character = {
   weakness: string;
   groupRole: string;
   avatarUrl: string;
+  look?: CharacterLook;
   stats: Stats;
   vitality: number;
   energy: number;

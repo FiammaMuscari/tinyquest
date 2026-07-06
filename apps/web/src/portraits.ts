@@ -34,6 +34,13 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&model=flux&seed=${seed}`;
 }
 
+// Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
+// de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
+export function petPortraitUrl(name: string, description: string): string {
+  const prompt = `Fantasy RPG magical creature companion portrait, adorable but epic, full body, dark moody lighting, detailed illustration: ${name}, ${description}. Dark blurred background`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
+}
+
 export function isGeneratedPortraitUrl(url: string | undefined): url is string {
   return typeof url === "string" && url.startsWith("http");
 }
@@ -76,12 +83,14 @@ async function idbPut(key: string, blob: Blob): Promise<void> {
 let activeFetches = 0;
 const waitingForSlot: Array<() => void> = [];
 
-async function acquireSlot(): Promise<void> {
+// `priority` salta la cola: el retrato del héroe que la jugadora está mirando
+// se pinta antes que los prefetch del elenco.
+async function acquireSlot(priority: boolean): Promise<void> {
   if (activeFetches < MAX_CONCURRENT_FETCHES) {
     activeFetches += 1;
     return;
   }
-  await new Promise<void>((resolve) => waitingForSlot.push(resolve));
+  await new Promise<void>((resolve) => (priority ? waitingForSlot.unshift(resolve) : waitingForSlot.push(resolve)));
   activeFetches += 1;
 }
 
@@ -94,11 +103,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchPortraitBlob(url: string): Promise<Blob> {
+async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
   let lastError: unknown = new Error("portrait fetch failed");
   for (const delay of RETRY_DELAYS_MS) {
     if (delay > 0) await sleep(delay);
-    await acquireSlot();
+    await acquireSlot(priority);
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -124,7 +133,7 @@ async function fetchPortraitBlob(url: string): Promise<Blob> {
 const readyObjectUrls = new Map<string, string>();
 const inFlight = new Map<string, Promise<string>>();
 
-export function loadPortrait(url: string): Promise<string> {
+export function loadPortrait(url: string, options: { priority?: boolean } = {}): Promise<string> {
   const ready = readyObjectUrls.get(url);
   if (ready) return Promise.resolve(ready);
   const pending = inFlight.get(url);
@@ -132,7 +141,7 @@ export function loadPortrait(url: string): Promise<string> {
   const promise = (async () => {
     let blob = await idbGet(url).catch(() => undefined);
     if (!blob) {
-      blob = await fetchPortraitBlob(url);
+      blob = await fetchPortraitBlob(url, options.priority ?? false);
       await idbPut(url, blob).catch(() => undefined); // sin persistencia sigue funcionando en memoria
     }
     const objectUrl = URL.createObjectURL(blob);
@@ -151,7 +160,8 @@ export type PortraitStatus = "idle" | "loading" | "ready" | "failed";
 // reporta estado para animar "forjando retrato" y expone retry manual. Si la serie
 // de descargas falla (servicio saturado), sigue reintentando solo cada 30s mientras
 // el componente esté montado: el retrato "llega tarde" en vez de no llegar nunca.
-export function useGeneratedPortrait(url: string | undefined): { src: string | null; status: PortraitStatus; retry: () => void } {
+export function useGeneratedPortrait(url: string | undefined, options: { priority?: boolean } = {}): { src: string | null; status: PortraitStatus; retry: () => void } {
+  const { priority = false } = options;
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ src: string | null; status: PortraitStatus }>({ src: null, status: url ? "loading" : "idle" });
   useEffect(() => {
@@ -163,7 +173,7 @@ export function useGeneratedPortrait(url: string | undefined): { src: string | n
     let timer: number | undefined;
     const run = (roundsLeft: number) => {
       setState((prev) => ({ src: prev.src, status: "loading" }));
-      loadPortrait(url)
+      loadPortrait(url, { priority })
         .then((src) => alive && setState({ src, status: "ready" }))
         .catch(() => {
           if (!alive) return;
@@ -176,7 +186,7 @@ export function useGeneratedPortrait(url: string | undefined): { src: string | n
       alive = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [url, attempt]);
+  }, [url, attempt, priority]);
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
   return { ...state, retry };
 }

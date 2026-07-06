@@ -1,10 +1,10 @@
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Brain, Cat, Dices, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
+import { Bot, Brain, Dices, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
 import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { characterPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, useGeneratedPortrait } from "./portraits";
+import { characterPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -40,6 +40,7 @@ import {
   summarizeMoralProfileForPrompt,
   type Campaign,
   type CampaignNPC,
+  type CharacterLook,
   type BotPlayer,
   type Character,
   type CheckResult,
@@ -597,11 +598,16 @@ export function App() {
       if (!sameIdentity && currentUrl !== nextUrl) setDraft(createCharacter({ ...draftRef.current, avatarUrl: nextUrl }));
     }, 800);
     return () => clearTimeout(timer);
-  }, [draft.name, draft.species, draft.role, draft.concept]);
+  }, [draft.name, draft.species, draft.role, draft.concept, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor]);
   function reimagineHeroPortrait(seedNonce: number) {
     manualAvatarRef.current = false;
     const spec = heroPortraitSpec(draftRef.current);
     setDraft(createCharacter({ ...draftRef.current, avatarUrl: characterPortraitUrl(spec.name, spec.appearance, spec.styleHint, seedNonce) }));
+  }
+  // Elegir un rasgo del retrato implica querer el retrato generado: sale del modo
+  // manual (retrato clásico fijo) para que el efecto auto-regenere con el rasgo.
+  function unlockAutoPortrait() {
+    manualAvatarRef.current = false;
   }
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => readStoredCampaignId());
   // Historia improvisada: campaña generada por el LLM en runtime; no vive en el registro estático.
@@ -1252,6 +1258,7 @@ export function App() {
         partyMode={partyMode}
         onChoosePartyMode={choosePartyMode}
         onReimagineHero={reimagineHeroPortrait}
+        onUnlockAutoPortrait={unlockAutoPortrait}
       />
     );
   }
@@ -1309,12 +1316,14 @@ export function App() {
   );
 }
 
-function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, partyMode, onChoosePartyMode, onReimagineHero }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; partyMode: "alone" | "companions"; onChoosePartyMode: (mode: "alone" | "companions") => void; onReimagineHero: (seedNonce: number) => void }) {
+function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, partyMode, onChoosePartyMode, onReimagineHero, onUnlockAutoPortrait }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; partyMode: "alone" | "companions"; onChoosePartyMode: (mode: "alone" | "companions") => void; onReimagineHero: (seedNonce: number) => void; onUnlockAutoPortrait: () => void }) {
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
   // Ficha rápida de un personaje forjado (click en un chip del teaser).
   const [castPeek, setCastPeek] = useState<CastPeek | null>(null);
+  // Estado del retrato del héroe: avisa que la personalización tarda (con prioridad en la cola).
+  const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
   const improvisedSelected = improvisedCampaign !== null && selectedCampaign.id === improvisedCampaign.id;
   const canForge = forgePrompt.trim().length >= 12 && !forgingStory;
   const mpBlocked = improvisedSelected || !selectedWorld.authoredCampaignId;
@@ -1404,7 +1413,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   </button>
                 )}
               </div>
-              <em className="teaserHint">Tocá un personaje para conocerlo — lo que esconde queda sellado hasta que lo descubras.</em>
+              <em className="teaserHint">Tocá un personaje para conocerlo — lo que esconde queda sellado hasta que lo descubras. Los retratos se pintan de a uno: dales un par de minutos.</em>
             </div>
           )}
           {castPeek && <CharacterPeekModal peek={castPeek} onClose={() => setCastPeek(null)} />}
@@ -1415,18 +1424,18 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
 
         {editingHero ? (
           <section className="heroEditWrap lobbyHeroGrid soloHero">
-            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} />
+            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
             <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Listo, guardar héroe</button>
           </section>
         ) : (
           <section className="panel heroSummary">
             <PanelTitle title="2 · Tu héroe" icon={<Wand2 size={17} />} />
             <div className="heroSummaryRow">
-              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} />
+              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} priority />
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
-                <span className="heroSummaryPet">Compañero: {draft.pet.name}</span>
+                <span className="heroSummaryPet"><NpcPortrait name={draft.pet.name} portraitUrl={petPortraitUrl(draft.pet.name, draft.pet.description)} size={22} /> {draft.pet.name}</span>
               </div>
               <div className="heroSummaryActions">
                 <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
@@ -1435,6 +1444,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                 </button>
               </div>
             </div>
+            {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
           </section>
         )}
       </section>
@@ -1479,9 +1489,9 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
         const next = room && (room.activePlayerIndex + 1) % players.length === index;
         return (
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
-            <div className="avatar"><HeroAvatarImg url={player.type === "bot" ? characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía") : player.character.avatarUrl} name={player.name} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
+            <div className="avatar"><HeroAvatarImg url={player.type === "bot" ? characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía") : player.character.avatarUrl} name={player.name} priority={player.type === "human"} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
             <div><strong>{player.name}</strong><span>{player.character.species} · {player.character.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
-            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span><span><Cat size={13} /> {player.character.pet.name}</span></div>
+            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span><span><NpcPortrait name={player.character.pet.name} portraitUrl={petPortraitUrl(player.character.pet.name, player.character.pet.description)} size={14} /> {player.character.pet.name}</span></div>
           </article>
         );
       })}
@@ -1609,20 +1619,43 @@ function ForgeRitual() {
   );
 }
 
-// Identidad visual del héroe: nombre + linaje + oficio + concepto arman el prompt.
-// Misma identidad → misma cara (seed por nombre, caché por URL).
+// Identidad visual del héroe: rasgos elegidos (género/piel/ojos) + nombre + linaje
+// + oficio + concepto arman el prompt. Misma identidad → misma cara (seed por
+// nombre, caché por URL). Los rasgos van PRIMERO para que la imagen los respete.
 function heroPortraitSpec(draft: Character): { name: string; appearance: string; styleHint: string } {
   const selectedSpecies = species.find((item) => item.name === draft.species);
-  const appearance = [`${draft.species} ${draft.role}, heroic protagonist`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
+  const look = draft.look ?? {};
+  const traits = [look.gender, look.skinTone && `piel ${look.skinTone}`, look.eyeColor && `ojos ${look.eyeColor}`].filter(Boolean).join(", ");
+  const appearance = [traits, `${draft.species} ${draft.role}, heroic protagonist`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
   return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
 }
+
+// Opciones de rasgos del retrato: etiquetas en español (van directo al prompt)
+// + color de muestra para el swatch. Click en el elegido = soltar la elección.
+const lookGenderOptions = ["femenino", "masculino", "andrógino"] as const;
+const lookSkinOptions = [
+  { label: "pálida", color: "#f2e3d5" },
+  { label: "clara", color: "#eac9a8" },
+  { label: "trigueña", color: "#c98d5f" },
+  { label: "morena", color: "#8d5a3b" },
+  { label: "oscura", color: "#553524" },
+  { label: "cenicienta", color: "#9aa0a8" }
+] as const;
+const lookEyeOptions = [
+  { label: "marrones", color: "#6b4226" },
+  { label: "ámbar", color: "#d19a3d" },
+  { label: "verdes", color: "#4e8d5b" },
+  { label: "azules", color: "#4a7fc1" },
+  { label: "grises", color: "#9aa4ad" },
+  { label: "violetas", color: "#8a5fc1" }
+] as const;
 
 // Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
 // medallón data-URI de placeholder (sigue siendo un <img>, así hereda el CSS
 // de .avatar img / .heroPortrait / .heroSummaryRow img sin tocar selectores).
-function HeroAvatarImg({ url, name, className }: { url: string; name: string; className?: string }) {
+function HeroAvatarImg({ url, name, className, priority = false }: { url: string; name: string; className?: string; priority?: boolean }) {
   const generated = isGeneratedPortraitUrl(url);
-  const { src, status } = useGeneratedPortrait(generated ? url : undefined);
+  const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority });
   if (!generated) return <img className={className} src={url} alt={name} />;
   if (src) return <img className={`${className ?? ""} ${status === "loading" ? "portraitForging" : "portraitFade"}`} src={src} alt={name} />;
   return <img className={`${className ?? ""} ${status === "failed" ? "" : "portraitForging"}`} src={medallionDataUri(name)} alt={name} />;
@@ -2316,7 +2349,7 @@ const builderTabList = [
 ] as const;
 type BuilderTab = typeof builderTabList[number]["id"];
 
-function CharacterDesigner({ draft, setDraft, disabled, onReimagine }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; onReimagine?: (seedNonce: number) => void }) {
+function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAutoPortrait }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; onReimagine?: (seedNonce: number) => void; onUnlockAutoPortrait?: () => void }) {
   const spentPoints = totalExtraPoints(draft.stats);
   const remainingPoints = 8 - spentPoints;
   const selectedSpecies = species.find((item) => item.name === draft.species) ?? species[0];
@@ -2330,6 +2363,12 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine }: { draft: 
     if (delta > 0 && (remainingPoints <= 0 || draft.stats[stat] >= 4)) return;
     if (delta < 0 && draft.stats[stat] <= 1) return;
     setDraft(createCharacter({ ...draft, stats: { ...draft.stats, [stat]: draft.stats[stat] + delta } }));
+  }
+  // Estado del retrato para avisar "personalizando…" (con prioridad: tu cara primero).
+  const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
+  function chooseLook(patch: Partial<CharacterLook>) {
+    onUnlockAutoPortrait?.();
+    setDraft(createCharacter({ ...draft, look: { ...draft.look, ...patch } }));
   }
   return (
     <section className="panel designer designerForge">
@@ -2347,10 +2386,37 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine }: { draft: 
                 <Sparkles size={13} /> Reimaginar
               </button>
             )}
+            {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
           </div>
           <div className="heroIdentityFields">
             <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
             <label>Concepto<input value={draft.concept} onChange={(event) => setDraft(createCharacter({ ...draft, concept: event.target.value }))} disabled={disabled} /></label>
+            <div className="lookPicker">
+              <div className="lookGroup">
+                <span>Género</span>
+                <div className="lookPills">
+                  {lookGenderOptions.map((option) => (
+                    <button key={option} type="button" className={draft.look?.gender === option ? "selected" : ""} onClick={() => chooseLook({ gender: draft.look?.gender === option ? undefined : option })} disabled={disabled}>{option}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="lookGroup">
+                <span>Piel</span>
+                <div className="lookSwatches">
+                  {lookSkinOptions.map((option) => (
+                    <button key={option.label} type="button" title={`Piel ${option.label}`} aria-label={`Piel ${option.label}`} className={draft.look?.skinTone === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ skinTone: draft.look?.skinTone === option.label ? undefined : option.label })} disabled={disabled} />
+                  ))}
+                </div>
+              </div>
+              <div className="lookGroup">
+                <span>Ojos</span>
+                <div className="lookSwatches">
+                  {lookEyeOptions.map((option) => (
+                    <button key={option.label} type="button" title={`Ojos ${option.label}`} aria-label={`Ojos ${option.label}`} className={draft.look?.eyeColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ eyeColor: draft.look?.eyeColor === option.label ? undefined : option.label })} disabled={disabled} />
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="avatarPicker heroAvatarPicker">{avatarOptions.map((avatar) => <button className={draft.avatarUrl === avatar ? "selected" : ""} key={avatar} type="button" onClick={() => setDraft(createCharacter({ ...draft, avatarUrl: avatar }))} disabled={disabled} aria-label="Elegir retrato"><img src={avatar} alt="" /></button>)}</div>
           </div>
         </div>
@@ -2417,10 +2483,14 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine }: { draft: 
                 </button>
               ))}
             </div>
-            <div className="builderDetail">
-              <p><strong>Pasiva</strong>{selectedPet.passiveAbility}</p>
-              <p><strong>Activa</strong>{selectedPet.activeAbility}</p>
-              <p><strong>Recarga</strong>{selectedPet.cooldownTurns} turnos entre usos del +1d4.</p>
+            <div className="builderDetail petDetail">
+              {/* La compañera tiene SU retrato generado, separado del héroe. */}
+              <NpcPortrait name={selectedPet.name} portraitUrl={petPortraitUrl(selectedPet.name, selectedPet.description)} size={72} />
+              <div className="petDetailText">
+                <p><strong>Pasiva</strong>{selectedPet.passiveAbility}</p>
+                <p><strong>Activa</strong>{selectedPet.activeAbility}</p>
+                <p><strong>Recarga</strong>{selectedPet.cooldownTurns} turnos entre usos del +1d4.</p>
+              </div>
             </div>
           </>
         )}

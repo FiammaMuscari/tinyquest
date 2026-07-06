@@ -53,6 +53,12 @@ section** — an outdated map costs more than no map.
 - The forge prompt (`groq-dungeon-master.ts`, story-forge section) REQUIRES
   `appearance` to state species/ethnicity, gender, apparent age, skin/features —
   that's what makes portraits show niños/ancianas/vampiros/mestizos correctly.
+- Hero look picker (`lookPicker` in CharacterDesigner): gender/skin/eyes stored in
+  `Character.look` (optional, engine types.ts) — traits go FIRST in the prompt
+  (`heroPortraitSpec`). Choosing a trait calls `onUnlockAutoPortrait` (exits
+  manual/classic-avatar mode). `petPortraitUrl` gives the companion its own
+  creature image (designer pet tab, hero summary, queue). `loadPortrait`/hook
+  accept `{ priority: true }` — hero portraits jump the download queue.
 - Hero portrait auto-generates from identity (name/linaje/oficio/concepto),
   debounced 800ms, in an effect in `App()`. Picking a classic avatar from the
   picker disables auto-gen (manual mode); "Reimaginar" re-enables it with a

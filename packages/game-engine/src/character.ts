@@ -32,6 +32,7 @@ export function createCharacter(input: Partial<Character> = {}): Character {
     weakness: input.weakness ?? selectedSpecies.quirk,
     groupRole: input.groupRole ?? selectedRole.playstyle,
     avatarUrl: input.avatarUrl ?? "/assets/avatars/avatar-1.webp",
+    look: input.look,
     stats,
     ...derived,
     pet: selectedPet,
