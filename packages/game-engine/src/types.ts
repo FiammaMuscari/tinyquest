@@ -64,6 +64,8 @@ export type CharacterLook = {
   gender?: string;
   skinTone?: string;
   eyeColor?: string;
+  /** Qué imagen usa de avatar: retrato de frente o cuerpo entero. */
+  avatarShot?: "face" | "fullbody";
 };
 
 export type Character = {
@@ -409,6 +411,10 @@ export type CampaignNPC = {
   description: string;
   motive: string;
   role?: string;
+  /** Relación dramática con el héroe, visible desde el lobby ("tu hermano menor · testigo incómodo"). */
+  bond?: string;
+  /** Por qué podría mentirte — público, sin revelar el secreto real. */
+  whyMightLie?: string;
   /** Retrato generado (IA o asset). Sin esto, la UI dibuja un medallón procedural. */
   portraitUrl?: string;
   /** Aspecto físico dibujable (para prompts de retrato). */
@@ -539,6 +545,13 @@ export type Campaign = {
   ambientSoundPrompt: string;
   narratorGuidance: string;
   premise?: string;
+  /** Notas de forja visibles en el lobby (resumen jugable, keywords usadas, vínculo con el héroe, evidencia). Solo campañas improvisadas. */
+  forgeNotes?: {
+    summary?: { objective?: string; risk?: string; firstMystery?: string; timeLimit?: string };
+    keywordsUsed?: Array<{ idea: string; how: string }>;
+    heroBond?: string;
+    evidence?: string[];
+  };
   hiddenTruth?: string;
   mainConflict?: string;
   stakes?: string[];
@@ -1049,6 +1062,10 @@ export type ImprovisedNpcContent = {
   fear?: string;
   /** Aspecto físico dibujable, imaginado por el LLM — alimenta el retrato generado. */
   appearance?: string;
+  /** Relación dramática con el héroe (visible, sin spoiler). */
+  bond?: string;
+  /** Por qué podría mentirte (visible, sin revelar el secreto). */
+  whyMightLie?: string;
 };
 
 export type ImprovisedStoryContent = {
@@ -1064,6 +1081,14 @@ export type ImprovisedStoryContent = {
   scenes: ImprovisedSceneContent[];
   npcs: ImprovisedNpcContent[];
   clues: Array<{ title: string; text: string; sceneIndex: number }>;
+  /** Card de resumen jugable: qué lograr, qué se pierde, primer misterio, reloj. */
+  summary?: { objective?: string; risk?: string; firstMystery?: string; timeLimit?: string };
+  /** Cómo se usó cada idea del pedido especial ("elfos → Clan Lunargenta"). */
+  keywordsUsed?: Array<{ idea: string; how: string }>;
+  /** Frase que ata al héroe (linaje/oficio/compañero) al conflicto. */
+  heroBond?: string;
+  /** Evidencia inicial concreta de la acusación/conflicto (puede ser falsa). */
+  evidence?: string[];
 };
 
 // Mundo sellado: ambiente central + reglas inmutables que el narrador respeta
@@ -1099,6 +1124,8 @@ export type ImprovisedStoryRequest = {
   userPrompt: string;
   playerNames?: string[];
   worldContext?: ImprovisedWorldContext;
+  /** El héroe ya forjado: la historia debe atarse a su identidad (nunca copiar su nombre en NPCs sin explicar el vínculo). */
+  hero?: { name: string; species: string; role: string; petName: string; concept: string };
 };
 
 export interface DungeonMasterProvider {

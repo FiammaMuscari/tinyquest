@@ -33,13 +33,28 @@ export const improvisedStorySchema = z.object({
     secret: z.string().catch(""),
     desire: z.string().optional().catch(undefined),
     fear: z.string().optional().catch(undefined),
-    appearance: z.string().optional().catch(undefined)
+    appearance: z.string().optional().catch(undefined),
+    bond: z.string().optional().catch(undefined),
+    whyMightLie: z.string().optional().catch(undefined)
   })).min(1),
   clues: z.array(z.object({
     title: z.string().catch(""),
     text: z.string().catch(""),
     sceneIndex: z.number().catch(1)
-  })).min(1)
+  })).min(1),
+  // Bloques nuevos, todos opcionales: si el LLM los omite o los rompe, la historia sigue válida.
+  summary: z.object({
+    objective: z.string().optional().catch(undefined),
+    risk: z.string().optional().catch(undefined),
+    firstMystery: z.string().optional().catch(undefined),
+    timeLimit: z.string().optional().catch(undefined)
+  }).optional().catch(undefined),
+  keywordsUsed: z.array(z.object({
+    idea: z.string().catch(""),
+    how: z.string().catch("")
+  })).optional().catch(undefined),
+  heroBond: z.string().optional().catch(undefined),
+  evidence: z.array(z.string()).optional().catch(undefined)
 });
 
 export const memorySummarySchema = z.object({

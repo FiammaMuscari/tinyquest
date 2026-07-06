@@ -637,7 +637,9 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     secret: clampText(npc?.secret, "Protege una culpa antigua.", 220),
     desire: npc?.desire ? clampText(npc.desire, "", 160) : undefined,
     fear: npc?.fear ? clampText(npc.fear, "", 160) : undefined,
-    appearance: npc?.appearance ? clampText(npc.appearance, "", 180) : undefined
+    appearance: npc?.appearance ? clampText(npc.appearance, "", 180) : undefined,
+    bond: npc?.bond ? clampText(npc.bond, "", 90) : undefined,
+    whyMightLie: npc?.whyMightLie ? clampText(npc.whyMightLie, "", 160) : undefined
   }));
 
   const clues = Array.from({ length: 3 }, (_, index) => {
@@ -692,6 +694,20 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     ambientSoundPrompt: `${clampText(content.genre, "fantasía oscura", 80)}, campanas bajas, lluvia, madera, respiración contenida`,
     narratorGuidance: "Historia improvisada por el equipo: respetá su premisa y sus NPCs al pie de la letra. Cada turno debe cambiar estado real y cerrar con presión concreta.",
     premise: clampText(content.premise, "Una historia forjada al momento.", 400),
+    // Notas visibles del lobby: resumen jugable, keywords usadas, vínculo y evidencia.
+    forgeNotes: {
+      summary: content.summary ? {
+        objective: content.summary.objective ? clampText(content.summary.objective, "", 140) : undefined,
+        risk: content.summary.risk ? clampText(content.summary.risk, "", 140) : undefined,
+        firstMystery: content.summary.firstMystery ? clampText(content.summary.firstMystery, "", 160) : undefined,
+        timeLimit: content.summary.timeLimit ? clampText(content.summary.timeLimit, "", 80) : undefined
+      } : undefined,
+      keywordsUsed: Array.isArray(content.keywordsUsed)
+        ? content.keywordsUsed.slice(0, 6).map((item) => ({ idea: clampText(item?.idea, "", 40), how: clampText(item?.how, "", 90) })).filter((item) => item.idea && item.how)
+        : undefined,
+      heroBond: content.heroBond ? clampText(content.heroBond, "", 220) : undefined,
+      evidence: Array.isArray(content.evidence) ? content.evidence.slice(0, 3).map((item) => clampText(item, "", 140)).filter(Boolean) : undefined
+    },
     hiddenTruth: clampText(content.hiddenTruth, "La explicación visible fue manipulada; el secreto real requiere cruzar pistas, objetos y relaciones.", 300),
     mainConflict: "Resolver la verdad sin dejar que peligro, facciones o reliquias rompan la partida.",
     stakes: (Array.isArray(content.stakes) && content.stakes.length ? content.stakes : ["rutas pueden bloquearse", "NPCs pueden huir o traicionar"]).slice(0, 3).map((stake) => clampText(stake, "", 140)).filter(Boolean),

@@ -66,6 +66,25 @@ section** — an outdated map costs more than no map.
   back to plain equality or reloads will clobber rerolled portraits.
 - NPC portraitUrl is stamped in `forgeStory` (App) from the LLM's `appearance`.
 
+## Lobby flow (4 steps, spec de Fiamy 2026-07-06)
+
+- LobbyScreen renders: `1 · Elegí mundo` (worldGrid) → `2 · Definí el conflicto`
+  (pills + ideas input + `ForgeRitual` + `forgedTeaser`) → `3 · Forjá tu héroe`
+  (summary o `CharacterDesigner`) → `4 · Revisá y empezá` (`finalStep`: questTemper + CTA).
+- CTA gating: disabled until `lookComplete(draft)` (género+piel+ojos obligatorios)
+  and hero saved (`!editingHero`). Without look, NO hero image is generated at all.
+- Two hero images: face (`characterPortraitUrl`) + fullbody (`fullBodyPortraitUrl`),
+  same seed; `shotToggle` switches preserving the seed (regex replace on the URL).
+  `avatarShot` lives in `Character.look`.
+- Quest temper: `getQuestTemper/applyQuestTemper` (engine `quest-temper.ts`) —
+  +1 most-demanded stat, −1 least-demanded, from scenes' allowedStats; applied to
+  a COPY at `startSolo` (draft untouched); shown as chips in `finalStep`.
+- Forge extras (all optional, schema-lax): `Campaign.forgeNotes` carries
+  summary{objective,risk,firstMystery,timeLimit}, keywordsUsed[{idea,how}],
+  heroBond, evidence[]; NPCs carry bond + whyMightLie (public, no spoilers).
+  Forge input now includes `hero` and forbids NPCs reusing the hero's name
+  unless bond explains it. maxTokens 3400.
+
 ## CSS zones (apps/web/src/styles/app.css)
 
 - Choice cards / actionColumn: scoped `.actionColumn` overrides + media

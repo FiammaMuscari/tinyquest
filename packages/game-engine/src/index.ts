@@ -67,3 +67,4 @@ export * from "./testing/narrativeSimulation";
 export * from "./consequence-builder";
 
 export * from "./context-coherence";
+export * from "./quest-temper";

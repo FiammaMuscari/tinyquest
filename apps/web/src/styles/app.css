@@ -3469,6 +3469,34 @@ h1 {
 .petDetail .npcPortrait { flex: 0 0 auto; }
 .petDetailText { display: grid; gap: 6px; min-width: 0; }
 
+/* ── Flujo en 4 pasos + forja enriquecida (2026-07-06 tarde) ────────────────── */
+.stepDivider { margin-top: 6px; padding-top: 10px; border-top: 1px dashed rgba(217,168,77,.22); }
+.forgedSummary { display: grid; gap: 4px; padding: 9px 11px; border-radius: 9px; border: 1px solid rgba(117,234,219,.25); background: rgba(4,26,32,.5); }
+.forgedSummary p { margin: 0; color: #d8f5ef; font-size: 12px; line-height: 1.4; }
+.forgedSummary em { color: #75eadb; font-style: normal; font-weight: 800; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; margin-right: 7px; }
+.heroBondLine { margin: 0; color: #ffda8a; font-size: 12px; font-weight: 700; line-height: 1.4; }
+.keywordsUsed { display: flex; flex-wrap: wrap; gap: 5px 10px; align-items: baseline; }
+.keywordsUsed em { color: #9b8db5; font-style: normal; font-size: 10.5px; font-weight: 800; }
+.keywordsUsed span { color: #9ff7ec; font-size: 11px; }
+.firstPaths { display: grid; gap: 3px; }
+.firstPaths em { color: #9b8db5; font-style: normal; font-size: 10.5px; font-weight: 800; }
+.firstPaths ol { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.firstPaths li { color: #e8d9ff; font-size: 12px; }
+.castChipText { display: grid; gap: 1px; text-align: left; min-width: 0; }
+.castChipText small { color: #9b8db5; font-size: 9.5px; font-weight: 600; line-height: 1.2; }
+.peekBond { margin: 0 0 6px; color: #ffda8a; font-size: 12.5px; font-weight: 800; }
+.finalStep { display: grid; gap: 10px; }
+.questTemper { color: #d8c9f5; font-size: 12.5px; line-height: 1.6; }
+.questTemper .statChip.strained { opacity: .8; filter: saturate(.6); text-decoration: line-through rgba(255,120,90,.6) 1.5px; }
+.startHint { margin: 0; color: #ffc977; font-size: 12px; }
+.shotToggle { display: flex; gap: 4px; }
+.shotToggle button { padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04); color: #d8c9f5; font-size: 10.5px; font-weight: 800; cursor: pointer; }
+.shotToggle button.selected { border-color: #ffbf35; color: #ffda8a; background: rgba(255,191,53,.12); }
+.heroPortraitFrame.fullbodyFrame { height: 150px; }
+.heroPortraitFrame.fullbodyFrame .heroPortrait { object-position: top; }
+.portraitStatus.lookNeeded { color: #ffc977; animation: none; }
+.sheetBlock strong { display: block; }
+
 /* Forja de héroe: columna de retrato con botón Reimaginar. */
 .heroPortraitColumn { display: grid; gap: 7px; justify-items: center; }
 .reimagineButton { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,191,53,.45); background: rgba(56,36,10,.5); color: #ffda8a; font-size: 11px; font-weight: 800; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }

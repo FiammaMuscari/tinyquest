@@ -424,16 +424,20 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       "keyObject y escapeRoute de cada escena son cosas FÍSICAS y concretas de ese lugar (van en botones de acción, cortos).",
       "Tono: fantasía oscura apta para todo público.",
       "NOMBRES con peso de saga épica (El Señor de los Anillos, Canción de Hielo y Fuego, The Witcher): lugares con historia en el nombre, personas con epíteto o linaje, casas o estirpes con apellido propio. PROHIBIDO lo genérico ('el Sabio', 'la Guardiana', 'el Herrero') y PROHIBIDO copiar ejemplos de otros mundos: inventá nombres originales que puedan abrir un capítulo de libro.",
-      'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[2-3 x {"name","role","description","motive","secret","desire","fear","appearance"}],"clues":[3 x {"title","text","sceneIndex":1-4}]}. appearance = cómo se VE el personaje en 1 frase dibujable que SIEMPRE dice: especie o etnia (humana de piel oscura, elfo pálido, vampiro, mestizo animal, lo que sea), género, edad aparente (niño, adulta, anciano), rasgos de cara/cuerpo, ropa y una marca distintiva. Variá MUCHO los cuerpos entre personajes: niños, ancianas, pieles oscuras y claras, criaturas — el elenco no puede ser todo adultos iguales.'
+      "PROHIBIDO que un NPC use el nombre o apellido del héroe, SALVO que bond lo explique explícitamente ('tu hermano menor', 'prima de tu madre'). El conflicto DEBE atarse a la identidad del héroe (heroe del payload: linaje, oficio, compañero, concepto) — escribí heroBond: 1 frase que explique por qué ESTE héroe no puede irse (su juramento, su oficio, su compañero o su sello lo atan).",
+      "La acusación o conflicto necesita EVIDENCIA inicial concreta (evidence: 2-3 pruebas físicas, pueden ser falsas o plantadas: 'el mapa apareció doblado en tu capa'). Sin evidencia la acusación se siente arbitraria; con evidencia se siente misterio.",
+      "summary = card jugable: objective (qué lograr, imperativo, 1 frase), risk (qué se pierde si fallás), firstMystery (la primera pregunta que pica: '¿quién puso X junto a Y?'), timeLimit (el reloj: 'antes del anochecer'). keywordsUsed = por CADA idea del pedido especial, cómo la usaste ('elfos' → 'Clan Lunargenta').",
+      'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[2-3 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."]}. appearance = cómo se VE el personaje en 1 frase dibujable que SIEMPRE dice: especie o etnia (humana de piel oscura, elfo pálido, vampiro, mestizo animal, lo que sea), género, edad aparente (niño, adulta, anciano), rasgos de cara/cuerpo, ropa y una marca distintiva. Variá MUCHO los cuerpos entre personajes: niños, ancianas, pieles oscuras y claras, criaturas — el elenco no puede ser todo adultos iguales. bond = relación dramática con el héroe en 3-8 palabras ("padre de la víctima · quiere sangre"). whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
     ].join(" ");
     const messages: GroqMessage[] = [
       { role: "system", content: system },
-      { role: "user", content: JSON.stringify({ pedidoDelEquipo: input.userPrompt.slice(0, 600), heroes: input.playerNames?.slice(0, 4) }) }
+      { role: "user", content: JSON.stringify({ pedidoDelEquipo: input.userPrompt.slice(0, 600), heroes: input.playerNames?.slice(0, 4), heroe: input.hero }) }
     ];
     // El LLM a veces devuelve JSON malformado o truncado por límite de tokens:
     // se intenta crudo → reparado, y si nada sirve se pide la historia de nuevo una vez.
     const attempt = async (): Promise<ImprovisedStoryContent | null> => {
-      const json = await this.callGroqWithFailover(messages, { forceJson: true, maxTokens: 2600 }, "story-forge");
+      // Los bloques nuevos (summary/keywords/evidence/bonds) piden más espacio de salida.
+      const json = await this.callGroqWithFailover(messages, { forceJson: true, maxTokens: 3400 }, "story-forge");
       for (const candidate of [json, repairLooseJson(json)]) {
         try {
           const parsed = improvisedStorySchema.safeParse(parseGroqJson(candidate));

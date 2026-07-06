@@ -34,6 +34,14 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&model=flux&seed=${seed}`;
 }
 
+// Imagen de cuerpo entero del héroe: template propio (de pies a cabeza, pose de
+// aventura). Convive con el retrato de frente: dos URLs, dos cachés, un avatar a elección.
+export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
+  const prompt = `Fantasy RPG full body character concept art, standing heroic pose, head to toe visible, dark moody lighting, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  const seed = (nameHash(name) + seedNonce * 7919) % 100000;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=384&nologo=true&model=flux&seed=${seed}`;
+}
+
 // Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
 // de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
 export function petPortraitUrl(name: string, description: string): string {

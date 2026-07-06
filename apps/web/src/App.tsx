@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { characterPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait } from "./portraits";
+import { characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -13,6 +13,8 @@ import {
   campaigns,
   defaultWorldId,
   perspectiveEntryLine,
+  getQuestTemper,
+  applyQuestTemper,
   worldById,
   worldEras,
   chooseVisibleBotAction,
@@ -589,20 +591,32 @@ export function App() {
     const current = draftRef.current.avatarUrl;
     if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
     if (manualAvatarRef.current) return;
+    // La primera selección (género/piel/ojos) es obligatoria: sin ella no se forja imagen.
+    if (!lookComplete(draftRef.current)) return;
     const timer = setTimeout(() => {
-      const spec = heroPortraitSpec(draftRef.current);
-      const nextUrl = characterPortraitUrl(spec.name, spec.appearance, spec.styleHint);
+      const urls = heroImageUrls(draftRef.current);
+      const shot = draftRef.current.look?.avatarShot ?? "face";
+      const nextUrl = urls[shot];
       const currentUrl = draftRef.current.avatarUrl;
       // Misma identidad con otra seed = retrato reimaginado a propósito: se respeta.
       const sameIdentity = isGeneratedPortraitUrl(currentUrl) && currentUrl.replace(/seed=\d+$/, "") === nextUrl.replace(/seed=\d+$/, "");
-      if (!sameIdentity && currentUrl !== nextUrl) setDraft(createCharacter({ ...draftRef.current, avatarUrl: nextUrl }));
+      if (!sameIdentity && currentUrl !== nextUrl) {
+        // Se piden las DOS imágenes (frente y cuerpo entero) para poder alternar al instante.
+        void loadPortrait(urls.face, { priority: true }).catch(() => undefined);
+        void loadPortrait(urls.fullbody, { priority: true }).catch(() => undefined);
+        setDraft(createCharacter({ ...draftRef.current, avatarUrl: nextUrl }));
+      }
     }, 800);
     return () => clearTimeout(timer);
   }, [draft.name, draft.species, draft.role, draft.concept, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor]);
   function reimagineHeroPortrait(seedNonce: number) {
+    if (!lookComplete(draftRef.current)) return;
     manualAvatarRef.current = false;
-    const spec = heroPortraitSpec(draftRef.current);
-    setDraft(createCharacter({ ...draftRef.current, avatarUrl: characterPortraitUrl(spec.name, spec.appearance, spec.styleHint, seedNonce) }));
+    const urls = heroImageUrls(draftRef.current, seedNonce);
+    void loadPortrait(urls.face, { priority: true }).catch(() => undefined);
+    void loadPortrait(urls.fullbody, { priority: true }).catch(() => undefined);
+    const shot = draftRef.current.look?.avatarShot ?? "face";
+    setDraft(createCharacter({ ...draftRef.current, avatarUrl: urls[shot] }));
   }
   // Elegir un rasgo del retrato implica querer el retrato generado: sale del modo
   // manual (retrato clásico fijo) para que el efecto auto-regenere con el rasgo.
@@ -873,7 +887,8 @@ export function App() {
       embeddingProvider: new MockEmbeddingProvider(),
       store: new InMemoryVectorStore()
     });
-    const nextRoom = createSoloRoom(draft, campaignToPlay, partyMode === "companions" ? 2 : 0);
+    // El temple de la quest: copia del héroe con +1/−1 según lo que exige ESTA historia.
+    const nextRoom = createSoloRoom(applyQuestTemper(draft, campaignToPlay), campaignToPlay, partyMode === "companions" ? 2 : 0);
     setRoom(nextRoom);
     const firstScene = getRoomScenes(nextRoom).find((candidate) => candidate.id === nextRoom.initialSceneId) ?? getRoomScenes(nextRoom)[0];
     setSelectedActionDraftId(firstScene.actionChoices[0].id);
@@ -935,6 +950,8 @@ export function App() {
       const content = await masterProvider.generateImprovisedStory({
         userPrompt: extraWish.trim(),
         playerNames: [draft.name],
+        // La historia debe atarse a la identidad del héroe (y no robarle el nombre a un NPC).
+        hero: { name: draft.name, species: draft.species, role: draft.role, petName: draft.pet.name, concept: draft.concept },
         worldContext: {
           worldName: world.name,
           era: world.era,
@@ -1324,6 +1341,10 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   const [castPeek, setCastPeek] = useState<CastPeek | null>(null);
   // Estado del retrato del héroe: avisa que la personalización tarda (con prioridad en la cola).
   const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
+  // Paso 3 obligatorio antes de empezar: el héroe necesita rasgos (género/piel/ojos).
+  const heroLookDone = lookComplete(draft);
+  // El temple de la quest: la historia elegida sube una stat y baja otra en la partida.
+  const questTemper = getQuestTemper(selectedCampaign);
   const improvisedSelected = improvisedCampaign !== null && selectedCampaign.id === improvisedCampaign.id;
   const canForge = forgePrompt.trim().length >= 12 && !forgingStory;
   const mpBlocked = improvisedSelected || !selectedWorld.authoredCampaignId;
@@ -1342,7 +1363,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
 
       <section className="lobbyLayout">
         <section className="panel lobbyThemesPanel storyBuilder">
-          <PanelTitle title="1 · Armá tu historia" icon={<Sparkles size={17} />} />
+          <PanelTitle title="1 · Elegí mundo" icon={<Sparkles size={17} />} />
           <div className="worldGrid">
             {worldEras.map((world) => (
               <button key={world.id} type="button" className={`worldCard ${world.id === selectedWorld.id ? "selected" : ""}`} onClick={() => onSelectWorld(world.id)} disabled={forgingStory && world.id !== selectedWorld.id} title={world.authoredCampaignId ? "Historia madre lista · online disponible" : "La historia se forja al elegirlo"}>
@@ -1352,6 +1373,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               </button>
             ))}
           </div>
+          <div className="stepDivider"><PanelTitle title="2 · Definí el conflicto" icon={<Brain size={17} />} /></div>
           <div className="quickChoices">
             <div className="quickChoiceGroup">
               <span>Entrás</span>
@@ -1374,12 +1396,12 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               value={forgePrompt}
               onChange={(event) => setForgePrompt(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter" && canForge) onForgeStory(forgePrompt.trim()); }}
-              placeholder="⚡ Pedido especial al narrador (opcional): elfos oscuros, un circo maldito, un traidor…"
+              placeholder="⚡ Tus ideas para el narrador (opcional): elfos, dinastías, un traidor en la familia…"
               disabled={forgingStory}
-              aria-label="Pedido especial para la historia del mundo"
+              aria-label="Ideas para la historia del mundo"
             />
             <button type="button" className="soloButton forgeButton" disabled={!canForge} onClick={() => onForgeStory(forgePrompt.trim())}>
-              {forgingStory ? "Forjando…" : "Reforjar"}
+              {forgingStory ? "Forjando…" : "Reforjar historia"}
             </button>
           </div>
           {forgingStory && <ForgeRitual />}
@@ -1388,6 +1410,26 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
             <div className="forgedTeaser">
               <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
               <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
+              {improvisedCampaign.forgeNotes?.summary && (
+                <div className="forgedSummary">
+                  {improvisedCampaign.forgeNotes.summary.objective && <p><em>Objetivo</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.objective)}</p>}
+                  {improvisedCampaign.forgeNotes.summary.risk && <p><em>Riesgo</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>}
+                  {improvisedCampaign.forgeNotes.summary.firstMystery && <p><em>Primer misterio</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.firstMystery)}</p>}
+                  {improvisedCampaign.forgeNotes.summary.timeLimit && <p><em>Reloj</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}</p>}
+                  {improvisedCampaign.forgeNotes.evidence && improvisedCampaign.forgeNotes.evidence.length > 0 && (
+                    <p><em>Evidencia</em>{improvisedCampaign.forgeNotes.evidence.map((item) => normalizeUiText(item)).join(" · ")}</p>
+                  )}
+                </div>
+              )}
+              {improvisedCampaign.forgeNotes?.heroBond && <p className="heroBondLine">⚔ {normalizeUiText(improvisedCampaign.forgeNotes.heroBond)}</p>}
+              {improvisedCampaign.forgeNotes?.keywordsUsed && improvisedCampaign.forgeNotes.keywordsUsed.length > 0 && (
+                <div className="keywordsUsed">
+                  <em>Tus ideas en la historia:</em>
+                  {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
+                    <span key={keyword.idea}>✓ {normalizeUiText(keyword.idea)} → {normalizeUiText(keyword.how)}</span>
+                  ))}
+                </div>
+              )}
               <div className="forgedTeaserCast">
                 {improvisedCampaign.npcs.map((npc, index) => (
                   <button
@@ -1395,10 +1437,13 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                     type="button"
                     className="castChip castChipButton"
                     style={{ "--chip-i": index } as CSSProperties}
-                    onClick={() => setCastPeek({ name: npc.name, role: npc.role, description: npc.description, desire: npc.desire, fear: npc.fear, portraitUrl: npc.portraitUrl })}
+                    onClick={() => setCastPeek({ name: npc.name, role: npc.role, description: npc.description, desire: npc.desire, fear: npc.fear, portraitUrl: npc.portraitUrl, bond: npc.bond, whyMightLie: npc.whyMightLie })}
                   >
                     <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl} size={28} />
-                    {npc.name}
+                    <span className="castChipText">
+                      <strong>{npc.name}</strong>
+                      {npc.bond && <small>{normalizeUiText(npc.bond)}</small>}
+                    </span>
                   </button>
                 ))}
                 {improvisedCampaign.enemies[0] && (
@@ -1413,23 +1458,30 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   </button>
                 )}
               </div>
-              <em className="teaserHint">Tocá un personaje para conocerlo — lo que esconde queda sellado hasta que lo descubras. Los retratos se pintan de a uno: dales un par de minutos.</em>
+              {(improvisedCampaign.scenes[0]?.multipleChoiceOptions?.length ?? 0) > 0 && (
+                <div className="firstPaths">
+                  <em>Primeros caminos posibles:</em>
+                  <ol>
+                    {improvisedCampaign.scenes[0].multipleChoiceOptions.slice(0, 3).map((option, index) => (
+                      <li key={`path-${index}`}>{normalizeUiText(option.label)}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              <em className="teaserHint">Tocá un personaje para ver qué sabe, qué quiere y por qué podría mentirte — sus secretos reales se revelan jugando. Los retratos se pintan de a uno: dales unos minutos.</em>
             </div>
           )}
           {castPeek && <CharacterPeekModal peek={castPeek} onClose={() => setCastPeek(null)} />}
-          <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory}>
-            <Play size={20} /> {forgingStory ? "Forjando tu historia…" : "Empezar la historia"}
-          </button>
         </section>
 
         {editingHero ? (
           <section className="heroEditWrap lobbyHeroGrid soloHero">
             <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
-            <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Listo, guardar héroe</button>
+            <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Guardar héroe y continuar</button>
           </section>
         ) : (
           <section className="panel heroSummary">
-            <PanelTitle title="2 · Tu héroe" icon={<Wand2 size={17} />} />
+            <PanelTitle title="3 · Forjá tu héroe" icon={<Wand2 size={17} />} />
             <div className="heroSummaryRow">
               <HeroAvatarImg url={draft.avatarUrl} name={draft.name} priority />
               <div className="heroSummaryInfo">
@@ -1439,14 +1491,27 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               </div>
               <div className="heroSummaryActions">
                 <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
-                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} title="La IA imagina tu retrato según nombre, linaje y oficio">
-                  <Sparkles size={13} /> Retrato IA
+                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel y ojos en Editar héroe"}>
+                  <Sparkles size={13} /> Reimaginar héroe
                 </button>
               </div>
             </div>
+            {!heroLookDone && <p className="startHint">Tu héroe todavía no tiene cara: entrá a <strong>Editar héroe</strong> y elegí género, piel y ojos para forjar su retrato.</p>}
             {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
           </section>
         )}
+
+        <section className="panel finalStep">
+          <PanelTitle title="4 · Revisá y empezá" icon={<Play size={17} />} />
+          <div className="questTemper">
+            Esta historia templa tu <em className={`statChip stat-${questTemper.blessed}`}>{statLabels[questTemper.blessed]} +1</em> y descuida tu <em className={`statChip stat-${questTemper.strained} strained`}>{statLabels[questTemper.strained]} −1</em> durante la partida.
+          </div>
+          <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory || editingHero || !heroLookDone}>
+            <Play size={20} /> {forgingStory ? "Forjando tu historia…" : !heroLookDone ? "Forjá tu héroe para empezar" : editingHero ? "Guardá tu héroe para empezar" : "Empezar la historia"}
+          </button>
+          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 3: tu héroe necesita género, piel y ojos para que el narrador lo vea.</p>}
+          {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
+        </section>
       </section>
     </main>
   );
@@ -1566,7 +1631,21 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
 
 // Ficha pública de un personaje forjado: lo que el jugador puede leer antes de
 // jugar. Nunca incluye secret/whatTheyHide/alibi — eso se descubre en la partida.
-type CastPeek = { name: string; role?: string; description: string; desire?: string; fear?: string; portraitUrl?: string; threat?: boolean; dangerLevel?: number };
+type CastPeek = { name: string; role?: string; description: string; desire?: string; fear?: string; portraitUrl?: string; threat?: boolean; dangerLevel?: number; bond?: string; whyMightLie?: string };
+
+// La personalización física del héroe es obligatoria antes de forjar su retrato.
+function lookComplete(draft: Character): boolean {
+  return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor);
+}
+
+// Las dos imágenes del héroe con el mismo seed: retrato de frente y cuerpo entero.
+function heroImageUrls(draft: Character, nonce = 0): { face: string; fullbody: string } {
+  const spec = heroPortraitSpec(draft);
+  return {
+    face: characterPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce),
+    fullbody: fullBodyPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce)
+  };
+}
 
 function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => void }) {
   return (
@@ -1584,9 +1663,11 @@ function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => 
             {peek.threat && typeof peek.dangerLevel === "number" && <span className="peekDanger">Peligro {peek.dangerLevel}/10</span>}
           </div>
         </div>
+        {peek.bond && <p className="peekBond">{normalizeUiText(peek.bond)}</p>}
         <p className="peekDesc">{normalizeUiText(peek.description)}</p>
         {peek.desire && <p className="peekTrait"><em>Quiere</em>{normalizeUiText(peek.desire)}</p>}
         {peek.fear && <p className="peekTrait"><em>Teme</em>{normalizeUiText(peek.fear)}</p>}
+        {peek.whyMightLie && <p className="peekTrait"><em>Podría mentirte</em>{normalizeUiText(peek.whyMightLie)}</p>}
         <p className="peekSealed">Lo que esconde queda sellado hasta que lo descubras jugando.</p>
       </div>
     </div>
@@ -2366,9 +2447,20 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   }
   // Estado del retrato para avisar "personalizando…" (con prioridad: tu cara primero).
   const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
+  const heroLookDone = lookComplete(draft);
+  const currentShot = draft.look?.avatarShot ?? "face";
   function chooseLook(patch: Partial<CharacterLook>) {
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { ...draft.look, ...patch } }));
+  }
+  // Alterna entre retrato de frente y cuerpo entero SIN regenerar: conserva la seed
+  // actual (mismo rostro en ambas tomas) reescribiéndola en la URL de la otra toma.
+  function chooseShot(shot: "face" | "fullbody") {
+    const urls = heroImageUrls(draft);
+    const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
+    const nextUrl = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl) ? urls[shot].replace(/seed=\d+$/, `seed=${currentSeed}`) : urls[shot];
+    onUnlockAutoPortrait?.();
+    setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: nextUrl }));
   }
   return (
     <section className="panel designer designerForge">
@@ -2377,16 +2469,23 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
       <div className="forgeLeft">
         <div className="heroIdentity">
           <div className="heroPortraitColumn">
-            <div className="heroPortraitFrame">
-              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" />
+            <div className={`heroPortraitFrame ${currentShot === "fullbody" ? "fullbodyFrame" : ""}`}>
+              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
             </div>
-            {/* Nonce al azar: cada click es una cara nueva; la elegida persiste en avatarUrl. */}
+            {heroLookDone && (
+              <div className="shotToggle" role="group" aria-label="Tipo de imagen del avatar">
+                <button type="button" className={currentShot === "face" ? "selected" : ""} onClick={() => chooseShot("face")} disabled={disabled}>Frente</button>
+                <button type="button" className={currentShot === "fullbody" ? "selected" : ""} onClick={() => chooseShot("fullbody")} disabled={disabled}>Cuerpo</button>
+              </div>
+            )}
+            {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
-              <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled} title="La IA imagina otra cara para la misma identidad">
-                <Sparkles size={13} /> Reimaginar
+              <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled || !heroLookDone} title={heroLookDone ? "La IA imagina otra cara para la misma identidad" : "Elegí género, piel y ojos primero"}>
+                <Sparkles size={13} /> Reimaginar héroe
               </button>
             )}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
+            {!heroLookDone && <span className="portraitStatus lookNeeded">Elegí género, piel y ojos →</span>}
           </div>
           <div className="heroIdentityFields">
             <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
@@ -2497,7 +2596,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
       </div>
 
       <div className="forgeRight">
-        <div className="pointsBar"><strong>{remainingPoints}</strong><span>puntos de forja</span><em>{spentPoints}/8 usados · máx. 4</em></div>
+        <div className="pointsBar"><strong>{remainingPoints}</strong><span>puntos de forja</span><em>{spentPoints}/8 asignados sobre los valores base · máx. 4 por stat</em></div>
         <div className="statBarsPanel">
           {(Object.keys(statLabels) as StatKey[]).map((stat) => (
             <div className="statBarRow" key={stat}>
@@ -2531,9 +2630,9 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
         </div>
         <div className="heroSheet">
           <h3>Ficha viva</h3>
-          <p><strong>{selectedSpecies.name}</strong>{selectedSpecies.passiveTrait}</p>
-          <p><strong>{selectedRole.name}</strong>{selectedRole.specialAbility}</p>
-          <p><strong>{selectedPet.name}</strong>{selectedPet.activeAbility}</p>
+          <p className="sheetBlock"><strong>Quién sos</strong>{selectedSpecies.name} · {selectedRole.name} · {selectedPet.name}</p>
+          <p className="sheetBlock"><strong>Qué te ayuda</strong>{selectedSpecies.passiveTrait} {selectedRole.specialAbility} {selectedPet.activeAbility}</p>
+          <p className="sheetBlock"><strong>Qué te complica</strong>{selectedSpecies.quirk} {selectedRole.limitation}</p>
         </div>
       </div>
     </section>
