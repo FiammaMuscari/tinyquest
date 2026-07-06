@@ -711,7 +711,20 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     hiddenTruth: clampText(content.hiddenTruth, "La explicación visible fue manipulada; el secreto real requiere cruzar pistas, objetos y relaciones.", 300),
     mainConflict: "Resolver la verdad sin dejar que peligro, facciones o reliquias rompan la partida.",
     stakes: (Array.isArray(content.stakes) && content.stakes.length ? content.stakes : ["rutas pueden bloquearse", "NPCs pueden huir o traicionar"]).slice(0, 3).map((stake) => clampText(stake, "", 140)).filter(Boolean),
-    twists: content.twist ? [{ id: `${slug}-twist-1`, title: "Giro", trigger: "clímax o pista final", reveal: clampText(content.twist, "", 240) }] : undefined,
+    // Giros: el principal + los ocultos que reinterpretan evidencia (capa ENGINE,
+    // el lobby jamás los muestra; el DM los puede soltar en escenas avanzadas).
+    twists: (() => {
+      const twistList = [
+        ...(content.twist ? [{ id: `${slug}-twist-1`, title: "Giro", trigger: "clímax o pista final", reveal: clampText(content.twist, "", 240) }] : []),
+        ...(Array.isArray(content.hiddenTwists) ? content.hiddenTwists.slice(0, 3).map((twist, index) => ({
+          id: `${slug}-twist-${index + 2}`,
+          title: `Reinterpretación ${index + 1}`,
+          trigger: index === 0 ? "mitad de la aventura" : index === 1 ? "escena 3 o pista fuerte" : "antes del clímax",
+          reveal: clampText(twist, "", 240)
+        })).filter((twist) => twist.reveal) : [])
+      ];
+      return twistList.length ? twistList : undefined;
+    })(),
     endingConditions: Object.fromEntries(["good_truth_mercy", "heroic_cost", "bittersweet_escape", "tragic_collapse", "corrupt_victory", "false_resolution", "secret_deep_truth"].map((id) => [id, "Final compuesto por EndingPlan según pistas, peligro y decisiones."])),
     scenes: sceneContent.map((scene, index) => ({
       id: `${slug}-scene-${index + 1}`,

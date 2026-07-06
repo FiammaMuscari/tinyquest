@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait, worldCardImageUrl } from "./portraits";
+import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -1440,27 +1440,35 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {forgeError && !forgingStory && <p className="storyForgeError">{forgeError} <button type="button" className="ghostButton retryForge" onClick={() => onForgeStory(forgePrompt.trim())}>Reintentar</button></p>}
           {improvisedSelected && !forgingStory && improvisedCampaign && (
             <div className="forgedTeaser">
+              <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} />
               <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
               <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
               {improvisedCampaign.forgeNotes?.summary && (
                 <div className="forgedSummary">
-                  {improvisedCampaign.forgeNotes.summary.objective && <p><em>Objetivo</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.objective)}</p>}
-                  {improvisedCampaign.forgeNotes.summary.risk && <p><em>Riesgo</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>}
-                  {improvisedCampaign.forgeNotes.summary.firstMystery && <p><em>Primer misterio</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.firstMystery)}</p>}
-                  {improvisedCampaign.forgeNotes.summary.timeLimit && <p><em>Reloj</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}</p>}
+                  {improvisedCampaign.forgeNotes.summary.objective && (
+                    <p><em>Tu misión</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.objective)}{improvisedCampaign.forgeNotes.summary.timeLimit ? ` — ${normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}` : ""}</p>
+                  )}
+                  {improvisedCampaign.forgeNotes.summary.risk && <p><em>En juego</em>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>}
                   {improvisedCampaign.forgeNotes.evidence && improvisedCampaign.forgeNotes.evidence.length > 0 && (
-                    <p><em>Evidencia</em>{improvisedCampaign.forgeNotes.evidence.map((item) => normalizeUiText(item)).join(" · ")}</p>
+                    <div className="againstYou">
+                      <em>Contra vos</em>
+                      <ul>
+                        {improvisedCampaign.forgeNotes.evidence.slice(0, 3).map((item) => <li key={item}>{normalizeUiText(item)}</li>)}
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}
               {improvisedCampaign.forgeNotes?.heroBond && <p className="heroBondLine">⚔ {normalizeUiText(improvisedCampaign.forgeNotes.heroBond)}</p>}
               {improvisedCampaign.forgeNotes?.keywordsUsed && improvisedCampaign.forgeNotes.keywordsUsed.length > 0 && (
-                <div className="keywordsUsed">
-                  <em>Tus ideas en la historia:</em>
-                  {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
-                    <span key={keyword.idea}>✓ {normalizeUiText(keyword.idea)} → {normalizeUiText(keyword.how)}</span>
-                  ))}
-                </div>
+                <details className="keywordsUsed">
+                  <summary>Cómo se usaron tus ideas</summary>
+                  <div>
+                    {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
+                      <span key={keyword.idea}>✓ {normalizeUiText(keyword.idea)} → {normalizeUiText(keyword.how)}</span>
+                    ))}
+                  </div>
+                </details>
               )}
               <div className="forgedTeaserCast">
                 {improvisedCampaign.npcs.map((npc, index) => (
@@ -1492,10 +1500,13 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               </div>
               {(improvisedCampaign.scenes[0]?.multipleChoiceOptions?.length ?? 0) > 0 && (
                 <div className="firstPaths">
-                  <em>Primeros caminos posibles:</em>
+                  <em>¿Por dónde empezás?</em>
                   <ol>
                     {improvisedCampaign.scenes[0].multipleChoiceOptions.slice(0, 3).map((option, index) => (
-                      <li key={`path-${index}`}>{normalizeUiText(option.label)}</li>
+                      <li key={`path-${index}`}>
+                        {normalizeUiText(option.label)}
+                        {option.recommendedStat && <i className={`statChip stat-${option.recommendedStat}`}>{statLabels[option.recommendedStat]}</i>}
+                      </li>
                     ))}
                   </ol>
                 </div>
@@ -1632,6 +1643,15 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
       <text x="23" y="27.5" textAnchor="middle" fontSize="15" fontWeight="900" fill="#fff3d8" style={{ textShadow: "0 1px 4px rgba(0,0,0,.8)" }}>{initial}</text>
     </svg>
   );
+}
+
+// Banner de la historia forjada: el mundo elegido con el elenco creado en escena.
+// URL determinística desde el contenido de la campaña → cacheado, cero re-cómputo.
+function ForgedStoryBanner({ campaign, world }: { campaign: Campaign; world: WorldEra }) {
+  const castLine = campaign.npcs.slice(0, 3).map((npc) => npc.appearance ?? npc.name).join("; ");
+  const { src } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine));
+  if (!src) return null;
+  return <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title}`} />;
 }
 
 // Card de mundo con arte generado: paisaje/mapa característico pintado por IA,

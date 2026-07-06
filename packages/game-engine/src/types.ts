@@ -1090,6 +1090,8 @@ export type ImprovisedStoryContent = {
   heroBond?: string;
   /** Evidencia inicial concreta de la acusación/conflicto (puede ser falsa). */
   evidence?: string[];
+  /** Capa ENGINE: giros que REINTERPRETAN la evidencia inicial. Jamás se muestran al crear. */
+  hiddenTwists?: string[];
 };
 
 // Mundo sellado: ambiente central + reglas inmutables que el narrador respeta

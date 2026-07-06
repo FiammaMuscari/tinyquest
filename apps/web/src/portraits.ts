@@ -59,6 +59,15 @@ export function worldCardImageUrl(worldId: string, name: string, era: string, ta
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=252&nologo=true&model=flux&seed=${nameHash(worldId) % 100000}`;
 }
 
+// Ilustración de escena de la historia forjada: el mundo elegido CON los personajes
+// creados interactuando. No es edición de la imagen del mundo (img2img no existe en
+// el tier gratis): es una generación nueva que hereda mundo + elenco, cacheada por
+// título. Cero uso de Gemini — las imágenes van siempre por Pollinations.
+export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, castLine: string): string {
+  const prompt = `Epic fantasy story illustration, cinematic wide shot in the world of ${worldName} (${era}): the tale "${storyTitle}". Characters together in a tense scene: ${castLine}. Painted, dramatic light, rich detail, no text`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=560&height=240&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
+}
+
 // Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
 // de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
 export function petPortraitUrl(name: string, description: string): string {

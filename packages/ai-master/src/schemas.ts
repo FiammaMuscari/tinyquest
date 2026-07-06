@@ -54,7 +54,8 @@ export const improvisedStorySchema = z.object({
     how: z.string().catch("")
   })).optional().catch(undefined),
   heroBond: z.string().optional().catch(undefined),
-  evidence: z.array(z.string()).optional().catch(undefined)
+  evidence: z.array(z.string()).optional().catch(undefined),
+  hiddenTwists: z.array(z.string()).optional().catch(undefined)
 });
 
 export const memorySummarySchema = z.object({
