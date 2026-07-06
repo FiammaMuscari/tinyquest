@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait } from "./portraits";
+import { characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait, worldCardImageUrl } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -1362,18 +1362,41 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
       </header>
 
       <section className="lobbyLayout">
+        {editingHero ? (
+          <section className="heroEditWrap lobbyHeroGrid soloHero heroSpecial">
+            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
+            <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Guardar héroe y continuar</button>
+          </section>
+        ) : (
+          <section className="panel heroSummary heroSpecial">
+            <PanelTitle title="1 · Forjá tu héroe" icon={<Wand2 size={17} />} />
+            <div className="heroSummaryRow">
+              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} priority />
+              <div className="heroSummaryInfo">
+                <strong>{draft.name}</strong>
+                <span>{draft.species} · {draft.role}</span>
+                <span className="heroSummaryPet"><NpcPortrait name={draft.pet.name} portraitUrl={petPortraitUrl(draft.pet.name, draft.pet.description)} size={22} /> {draft.pet.name}</span>
+              </div>
+              <div className="heroSummaryActions">
+                <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
+                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel y ojos en Editar héroe"}>
+                  <Sparkles size={13} /> Reimaginar héroe
+                </button>
+              </div>
+            </div>
+            {!heroLookDone && <p className="startHint">Tu héroe todavía no tiene cara: entrá a <strong>Editar héroe</strong> y elegí género, piel y ojos para forjar su retrato.</p>}
+            {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
+          </section>
+        )}
+
         <section className="panel lobbyThemesPanel storyBuilder">
-          <PanelTitle title="1 · Elegí mundo" icon={<Sparkles size={17} />} />
+          <PanelTitle title="2 · Elegí mundo" icon={<Sparkles size={17} />} />
           <div className="worldGrid">
             {worldEras.map((world) => (
-              <button key={world.id} type="button" className={`worldCard ${world.id === selectedWorld.id ? "selected" : ""}`} onClick={() => onSelectWorld(world.id)} disabled={forgingStory && world.id !== selectedWorld.id} title={world.authoredCampaignId ? "Historia madre lista · online disponible" : "La historia se forja al elegirlo"}>
-                <em>{world.era}</em>
-                <strong>{world.name}</strong>
-                <span>{world.tagline}</span>
-              </button>
+              <WorldCard key={world.id} world={world} selected={world.id === selectedWorld.id} disabled={forgingStory && world.id !== selectedWorld.id} onSelect={() => onSelectWorld(world.id)} />
             ))}
           </div>
-          <div className="stepDivider"><PanelTitle title="2 · Definí el conflicto" icon={<Brain size={17} />} /></div>
+          <div className="stepDivider"><PanelTitle title="3 · Forjá tu historia" icon={<Zap size={17} />} /></div>
           <div className="quickChoices">
             <div className="quickChoiceGroup">
               <span>Entrás</span>
@@ -1474,33 +1497,6 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {castPeek && <CharacterPeekModal peek={castPeek} onClose={() => setCastPeek(null)} />}
         </section>
 
-        {editingHero ? (
-          <section className="heroEditWrap lobbyHeroGrid soloHero">
-            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
-            <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Guardar héroe y continuar</button>
-          </section>
-        ) : (
-          <section className="panel heroSummary">
-            <PanelTitle title="3 · Forjá tu héroe" icon={<Wand2 size={17} />} />
-            <div className="heroSummaryRow">
-              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} priority />
-              <div className="heroSummaryInfo">
-                <strong>{draft.name}</strong>
-                <span>{draft.species} · {draft.role}</span>
-                <span className="heroSummaryPet"><NpcPortrait name={draft.pet.name} portraitUrl={petPortraitUrl(draft.pet.name, draft.pet.description)} size={22} /> {draft.pet.name}</span>
-              </div>
-              <div className="heroSummaryActions">
-                <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
-                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel y ojos en Editar héroe"}>
-                  <Sparkles size={13} /> Reimaginar héroe
-                </button>
-              </div>
-            </div>
-            {!heroLookDone && <p className="startHint">Tu héroe todavía no tiene cara: entrá a <strong>Editar héroe</strong> y elegí género, piel y ojos para forjar su retrato.</p>}
-            {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
-          </section>
-        )}
-
         <section className="panel finalStep">
           <PanelTitle title="4 · Revisá y empezá" icon={<Play size={17} />} />
           <div className="questTemper">
@@ -1509,7 +1505,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory || editingHero || !heroLookDone}>
             <Play size={20} /> {forgingStory ? "Forjando tu historia…" : !heroLookDone ? "Forjá tu héroe para empezar" : editingHero ? "Guardá tu héroe para empezar" : "Empezar la historia"}
           </button>
-          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 3: tu héroe necesita género, piel y ojos para que el narrador lo vea.</p>}
+          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel y ojos para que el narrador lo vea.</p>}
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
         </section>
       </section>
@@ -1626,6 +1622,26 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
       <path d="M9 38 Q23 26 37 38 L37 41 Q23 45 9 41 Z" fill="rgba(8,10,16,.55)" />
       <text x="23" y="27.5" textAnchor="middle" fontSize="15" fontWeight="900" fill="#fff3d8" style={{ textShadow: "0 1px 4px rgba(0,0,0,.8)" }}>{initial}</text>
     </svg>
+  );
+}
+
+// Card de mundo con arte generado: paisaje/mapa característico pintado por IA,
+// cacheado para siempre. Hasta que llega la imagen, queda el gradiente de base.
+function WorldCard({ world, selected, disabled, onSelect }: { world: WorldEra; selected: boolean; disabled: boolean; onSelect: () => void }) {
+  const { src } = useGeneratedPortrait(worldCardImageUrl(world.id, world.name, world.era, world.tagline));
+  return (
+    <button
+      type="button"
+      className={`worldCard ${selected ? "selected" : ""} ${src ? "hasArt" : ""}`}
+      style={src ? { backgroundImage: `linear-gradient(180deg, rgba(4,8,18,.18) 0%, rgba(4,8,18,.55) 55%, rgba(3,6,14,.92) 100%), url(${src})` } : undefined}
+      onClick={onSelect}
+      disabled={disabled}
+      title={world.authoredCampaignId ? "Historia madre lista · online disponible" : "La historia se forja al elegirlo"}
+    >
+      <em>{world.era}</em>
+      <strong>{world.name}</strong>
+      <span>{world.tagline}</span>
+    </button>
   );
 }
 

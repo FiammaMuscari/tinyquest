@@ -42,6 +42,13 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=384&nologo=true&model=flux&seed=${seed}`;
 }
 
+// Arte de mundo para las cards del lobby: paisaje/mapa pintado que caracteriza al
+// mundo. Seed por id → misma imagen siempre, cacheada como cualquier retrato.
+export function worldCardImageUrl(worldId: string, name: string, era: string, tagline: string): string {
+  const prompt = `Epic fantasy illustrated world vista and map of ${name} (${era}): ${tagline}. Painted atlas style, dramatic light, rich detail, atmospheric, no text, no letters`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=252&nologo=true&model=flux&seed=${nameHash(worldId) % 100000}`;
+}
+
 // Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
 // de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
 export function petPortraitUrl(name: string, description: string): string {

@@ -3497,6 +3497,26 @@ h1 {
 .portraitStatus.lookNeeded { color: #ffc977; animation: none; }
 .sheetBlock strong { display: block; }
 
+/* ── Pulido de lobby: logo contenido, mundos con arte, héroe protagonista ───── */
+.lobbyHeader .brandLogo { width: min(210px, 100%); }
+.lobbyHeader { padding: 8px 18px; margin-bottom: 10px; }
+.lobbyHeaderActions { display: flex !important; flex-direction: row; gap: 10px; align-items: center; justify-content: flex-end; }
+.lobbyHeaderActions .ghostButton { white-space: nowrap; }
+
+/* Cards de mundo con paisaje generado: el arte manda, el texto se apoya abajo. */
+.worldCard.hasArt { background-size: cover; background-position: center; min-height: 148px; align-content: end; text-shadow: 0 1px 6px rgba(0,0,0,.85); border-color: rgba(255,255,255,.2); }
+.worldCard.hasArt em { color: #9ff7ec; text-shadow: 0 1px 4px rgba(0,0,0,.9); }
+.worldCard.hasArt strong { font-size: 16px; }
+.worldCard.hasArt span { font-size: 11.5px; opacity: .95; }
+.worldCard.hasArt.selected { box-shadow: 0 0 0 2px rgba(255,191,53,.55), 0 8px 30px rgba(255,174,52,.22); border-color: #ffbf35; }
+.worldCard { animation: portraitIn .5s ease; }
+
+/* El héroe es el paso 1: sección con marco dorado protagonista. */
+.heroSpecial { border: 1px solid rgba(255,191,53,.4) !important; background: linear-gradient(160deg, rgba(46,30,9,.5), rgba(6,10,22,.92)) !important; box-shadow: inset 0 0 42px rgba(255,183,69,.07), 0 6px 26px rgba(0,0,0,.35); }
+.heroSpecial .heroSummaryRow { border-color: rgba(255,198,95,.35); }
+.heroSpecial .heroSummaryRow img { width: 76px; height: 76px; }
+.heroSummaryRow { grid-template-columns: 76px minmax(0, 1fr) auto; }
+
 /* Forja de héroe: columna de retrato con botón Reimaginar. */
 .heroPortraitColumn { display: grid; gap: 7px; justify-items: center; }
 .reimagineButton { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,191,53,.45); background: rgba(56,36,10,.5); color: #ffda8a; font-size: 11px; font-weight: 800; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
