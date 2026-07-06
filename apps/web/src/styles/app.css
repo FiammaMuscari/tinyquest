@@ -227,17 +227,11 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .themeTint3 { --theme-glow: rgba(63, 218, 191, .24); }
 .themeTint4 { --theme-glow: rgba(191, 99, 255, .25); }
 .lobbyHeroGrid .designer { min-width: 0; }
-.lobbyHeroGrid .designerFields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.lobbyHeroGrid .statsRow { grid-template-columns: repeat(2, minmax(132px, 1fr)); }
 .lobbyHeroGrid .statBarsPanel { min-height: 0; }
-.lobbyHeroGrid .designer { display: grid; grid-template-columns: minmax(360px, 1.35fr) minmax(300px, .9fr); column-gap: 14px; align-content: start; }
-.lobbyHeroGrid .designer .panelTitle,
-.lobbyHeroGrid .designer .pointsBar { grid-column: 1 / -1; }
-.lobbyHeroGrid .designer .designerFields,
-.lobbyHeroGrid .designer .avatarPicker,
-.lobbyHeroGrid .designer .characterLore,
-.lobbyHeroGrid .designer > label { grid-column: 1; }
-.lobbyHeroGrid .designer .statBarsPanel { grid-column: 2; grid-row: 3 / span 5; margin-top: 0; align-self: stretch; }
+.lobbyHeroGrid .designer { display: grid; grid-template-columns: minmax(360px, 1.2fr) minmax(300px, .9fr); column-gap: 14px; align-content: start; }
+.lobbyHeroGrid .designer .panelTitle { grid-column: 1 / -1; }
+.lobbyHeroGrid .designer .forgeLeft { grid-column: 1; }
+.lobbyHeroGrid .designer .forgeRight { grid-column: 2; grid-row: 2; align-self: stretch; }
 .lobbyPreview { padding-bottom: 14px; overflow: hidden; }
 .lobbySceneImage { min-height: 205px; display: grid; align-content: end; padding: 18px; border-radius: 8px; background-size: cover; background-position: center; border: 1px solid rgba(217,168,77,.28); box-shadow: inset 0 -130px 130px rgba(3,6,14,.82); }
 .lobbySceneImage h2 { margin: 0 0 7px; color: #ffda8a; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.02; text-shadow: 0 2px 16px rgba(0,0,0,.85); }
@@ -260,10 +254,218 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .themeGrid span { color: #d8c9f5; margin: 5px 0; font-size: 12px; line-height: 1.35; }
 .themeGrid em { color: #9ff7ec; font-style: normal; font-size: 11px; }
 .themeGrid small { color: #ffe4a5; margin-top: 5px; font-size: 11px; }
-.designerFields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }
-.designerFields label { min-width: 0; }
-.characterLore { display: grid; gap: 6px; margin: 8px 0 10px; }
-.characterLore span { display: block; padding: 8px 10px; border-radius: 8px; background: rgba(4, 12, 25, .58); border: 1px solid rgba(255,255,255,.08); color: #e8d9ff; font-size: 12px; line-height: 1.35; }
+/* ── Forja de héroe (creador de personaje del lobby) ── */
+.forgeLeft, .forgeRight { min-width: 0; display: grid; gap: 12px; align-content: start; }
+.heroIdentity { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 13px; align-items: start; padding: 13px; border-radius: 10px; border: 1px solid rgba(217,168,77,.24); background: linear-gradient(160deg, rgba(28,18,6,.6), rgba(4,12,25,.7)); }
+.heroPortraitFrame { width: 104px; height: 104px; border-radius: 12px; padding: 3px; background: linear-gradient(150deg, rgba(255,198,95,.85), rgba(120,70,20,.4) 55%, rgba(255,198,95,.3)); box-shadow: 0 4px 18px rgba(0,0,0,.5), 0 0 24px rgba(255,183,69,.16); }
+.heroPortrait { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
+.heroIdentityFields { display: grid; gap: 8px; min-width: 0; }
+.heroIdentityFields input { width: 100%; min-width: 0; box-sizing: border-box; }
+.heroAvatarPicker { margin: 0; }
+.heroAvatarPicker button { width: 38px; height: 38px; }
+.builderTabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.builderTabs button { display: grid; gap: 2px; text-align: left; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(217,168,77,.2); background: rgba(4,12,25,.6); transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.builderTabs button span { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #d9b66a; font-weight: 900; }
+.builderTabs button strong { color: #fff8df; font-size: 13px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.builderTabs button.active { border-color: #f1c970; background: linear-gradient(160deg, rgba(56,36,10,.72), rgba(9,16,28,.85)); box-shadow: 0 0 0 1px rgba(241,201,112,.18), 0 0 22px rgba(255,174,52,.16); }
+.builderCardGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 8px; }
+.builderCard { position: relative; display: grid; gap: 5px; align-content: start; text-align: left; padding: 10px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(4,12,25,.62); min-height: 98px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.builderCard:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(255,191,53,.5); }
+.builderCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.66), rgba(6,13,26,.88)); box-shadow: 0 0 0 1px rgba(255,191,53,.25), 0 0 20px rgba(255,174,52,.16); }
+.builderCard.selected::after { content: "✦"; position: absolute; top: 7px; right: 9px; color: #ffbf35; text-shadow: 0 0 10px rgba(255,191,53,.8); font-size: 13px; }
+.builderCard strong { color: #ffda8a; font-size: 13px; line-height: 1.15; padding-right: 14px; }
+.builderCard > span { color: #d8c9f5; font-size: 11px; line-height: 1.3; }
+.builderCard .cardChips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.builderDetail { display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(217,168,77,.18); background: rgba(4,12,25,.58); }
+.builderDetail p { margin: 0; display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; font-size: 12px; line-height: 1.35; color: #e8d9ff; }
+.builderDetail p strong { color: #75eadb; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+.affinityMark { font-style: normal; margin-left: 5px; color: #ffbf35; text-shadow: 0 0 8px rgba(255,191,53,.6); font-size: 10px; cursor: help; }
+.affinityMark.roleMark { color: #75eadb; text-shadow: 0 0 8px rgba(69,234,211,.55); }
+.affinityMark.secondary { opacity: .72; }
+.talentPicker button.talentOption { width: auto; height: auto; padding: 0; border: 0; border-radius: 10px; background: transparent; overflow: visible; display: grid; justify-items: center; gap: 4px; filter: none; }
+.talentPicker .talentOption img { width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(217,168,77,.22); object-fit: cover; transition: border-color .15s ease, box-shadow .15s ease; }
+.talentPicker .talentOption span { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #d9b66a; font-weight: 900; }
+.talentPicker .talentOption.selected img, .talentPicker button.talentOption:hover:not(:disabled) img { border-color: #f1c970; box-shadow: 0 0 0 2px rgba(241,201,112,.14), 0 0 22px rgba(255,174,52,.3); }
+.heroSheet { padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(69,234,211,.24); background: rgba(4,18,31,.62); display: grid; gap: 8px; }
+.heroSheet h3 { margin: 0; color: #75eadb; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.heroSheet p { margin: 0; font-size: 12px; line-height: 1.35; color: #e8d9ff; }
+.heroSheet p strong { display: block; color: #ffda8a; font-size: 12px; margin-bottom: 1px; }
+.designerForge .statBarsPanel { margin-top: 0; }
+.cardChips .statChip { font-style: normal; }
+
+/* ── El Recorrido: mapa de capítulos, leyes del mundo, momentos ── */
+.journeyPanel { margin-top: 12px; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(217,168,77,.22); background: rgba(5,8,14,.5); display: grid; gap: 10px; }
+.journeyPanel h3 { margin: 0; color: #ffda8a; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.journeyPath { list-style: none; margin: 0; padding: 0; display: grid; }
+.journeyPath li { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: start; padding: 0 0 12px; }
+.journeyPath li:last-child { padding-bottom: 0; }
+.journeyPath li::before { content: ""; position: absolute; left: 7px; top: 14px; bottom: -2px; width: 2px; background: rgba(217,168,77,.18); }
+.journeyPath li:last-child::before { display: none; }
+.journeyPath li i { width: 14px; height: 14px; margin-top: 1px; border-radius: 50%; border: 2px solid rgba(217,168,77,.35); background: rgba(8,11,16,.9); }
+.journeyPath li.done i { border-color: #75eadb; background: rgba(69,234,211,.28); }
+.journeyPath li.current i { border-color: #ffbf35; background: radial-gradient(circle, #ffc65f, rgba(182,108,40,.6)); box-shadow: 0 0 12px rgba(255,183,69,.55); animation: journeyPulse 2s ease-in-out infinite; }
+.journeyPath li span { font-size: 12px; line-height: 1.3; color: #d8c9f5; }
+.journeyPath li.current span { color: #ffda8a; font-weight: 700; }
+.journeyPath li.done span { color: #9ff7ec; }
+.journeyPath li.future span { color: #6c6284; letter-spacing: .2em; }
+@keyframes journeyPulse { 0%, 100% { box-shadow: 0 0 6px rgba(255,183,69,.35); } 50% { box-shadow: 0 0 16px rgba(255,183,69,.75); } }
+.journeyLaws { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(217,168,77,.16); }
+.journeyLaws h4 { margin: 0; color: #75eadb; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.journeyLaw { margin: 0; font-size: 11px; line-height: 1.4; color: #e8d9ff; padding: 6px 8px; border-radius: 7px; background: rgba(69,234,211,.07); border: 1px solid rgba(69,234,211,.18); }
+.journeyLocked { margin: 0; font-size: 10px; color: #6c6284; font-style: italic; }
+
+.chapterBanner { position: fixed; top: 16vh; left: 50%; transform: translateX(-50%); z-index: 60; display: grid; justify-items: center; gap: 6px; padding: 22px 42px; border-radius: 14px; border: 1px solid rgba(255,191,53,.5); background: linear-gradient(165deg, rgba(30,19,6,.96), rgba(8,10,18,.97)); box-shadow: 0 22px 80px rgba(0,0,0,.7), 0 0 60px rgba(255,174,52,.22); cursor: pointer; animation: chapterIn .5s ease-out; text-align: center; max-width: min(560px, 90vw); }
+.chapterBanner em { color: #75eadb; font-style: normal; font-size: 12px; text-transform: uppercase; letter-spacing: .35em; }
+.chapterBanner strong { color: #ffda8a; font-size: clamp(22px, 2.6vw, 32px); line-height: 1.1; text-shadow: 0 2px 18px rgba(0,0,0,.8); }
+.chapterBanner p { margin: 6px 0 0; color: #e8d9ff; font-size: 13px; line-height: 1.4; padding: 8px 12px; border-radius: 8px; background: rgba(69,234,211,.08); border: 1px solid rgba(69,234,211,.24); }
+@keyframes chapterIn { from { opacity: 0; transform: translateX(-50%) translateY(-14px) scale(.96); } to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); } }
+
+.clueToast { position: fixed; top: 76px; right: 18px; z-index: 55; display: grid; gap: 3px; max-width: 340px; padding: 12px 15px; border-radius: 10px; border: 1px solid rgba(255,191,53,.55); background: linear-gradient(165deg, rgba(40,26,8,.97), rgba(10,12,18,.97)); box-shadow: 0 12px 40px rgba(0,0,0,.6), 0 0 30px rgba(255,174,52,.25); cursor: pointer; animation: clueIn .35s ease-out; }
+.clueToast strong { color: #ffbf35; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.clueToast span { color: #fff3d8; font-size: 12px; line-height: 1.4; }
+@keyframes clueIn { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+
+/* Críticos y pifias con drama. */
+.diceOutcomeCard.critical { animation: critFlash 1.1s ease-out; box-shadow: 0 0 0 1px rgba(255,215,90,.6), 0 0 36px rgba(255,191,53,.45) !important; }
+.diceOutcomeCard.fumble { animation: fumbleShake .5s ease-in-out; box-shadow: 0 0 0 1px rgba(220,90,90,.6), 0 0 30px rgba(220,60,60,.35) !important; }
+@keyframes critFlash { 0% { filter: brightness(2.1); } 45% { filter: brightness(1.25); } 100% { filter: brightness(1); } }
+@keyframes fumbleShake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+
+/* ── Mundos sellados y perspectiva de entrada ── */
+.worldGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.worldCard { display: grid; gap: 5px; align-content: start; text-align: left; padding: 13px 14px; min-height: 118px; border-radius: 11px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(165deg, rgba(14,10,24,.85), rgba(4,12,25,.8)); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.worldCard:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(255,191,53,.5); }
+.worldCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.7), rgba(6,13,26,.9)); box-shadow: 0 0 0 1px rgba(255,191,53,.28), 0 0 26px rgba(255,174,52,.18); }
+.worldCard em { color: #75eadb; font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
+.worldCard strong { color: #ffda8a; font-size: 15px; line-height: 1.15; }
+.worldCard span { color: #e8d9ff; font-size: 12px; line-height: 1.35; }
+.worldCard small { color: #9b8db5; font-size: 10px; margin-top: 2px; }
+.worldCard:disabled { opacity: .55; }
+.perspectivePicker { display: grid; gap: 8px; margin-bottom: 12px; }
+.perspectivePicker > strong { color: #d9b66a; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.perspectiveRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.perspectiveRow button { display: grid; gap: 4px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(4,12,25,.6); transition: border-color .15s ease, box-shadow .15s ease; }
+.perspectiveRow button.selected { border-color: #75eadb; box-shadow: 0 0 0 1px rgba(117,234,219,.25), 0 0 18px rgba(69,234,211,.16); }
+.perspectiveRow button span { color: #fff8df; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.perspectiveRow button small { color: #d8c9f5; font-size: 11px; line-height: 1.35; }
+.storyForgeStatus.forged { color: #ffda8a; animation: none; }
+.retryForge { margin-left: 8px; padding: 2px 10px; font-size: 11px; }
+.forgedTeaser { display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(255,191,53,.34); background: linear-gradient(165deg, rgba(56,36,10,.5), rgba(6,13,26,.85)); }
+.forgedTeaser strong { color: #ffda8a; font-size: 14px; }
+.forgedTeaser p { margin: 0; color: #e8d9ff; font-size: 12px; line-height: 1.4; }
+.forgedTeaserMeta { display: grid; gap: 3px; }
+.forgedTeaserMeta span { color: #9ff7ec; font-size: 11px; line-height: 1.35; }
+.forgedTeaser em { color: #9b8db5; font-style: normal; font-size: 10px; }
+@media (max-width: 620px) { .perspectiveRow { grid-template-columns: 1fr; } }
+
+/* ── Lobby rework: armá tu historia arriba, rápido y con texto corto ── */
+.storyBuilder { display: grid; gap: 10px; }
+.storyBuilder .worldGrid { margin-bottom: 0; }
+.storyBuilder .worldCard { min-height: 92px; padding: 11px 12px; }
+.quickChoices { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+.quickChoiceGroup { display: flex; align-items: center; gap: 8px; }
+.quickChoiceGroup > span { color: #d9b66a; font-size: 10px; text-transform: uppercase; font-weight: 900; letter-spacing: .06em; }
+.pillRow { display: inline-flex; border: 1px solid rgba(217,168,77,.28); border-radius: 999px; overflow: hidden; background: rgba(4,12,25,.6); }
+.pillRow button { padding: 6px 15px; border: 0; border-radius: 0; background: transparent; color: #d8c9f5; font-size: 12px; font-weight: 800; transition: background .15s ease, color .15s ease; }
+.pillRow button.selected { background: linear-gradient(160deg, rgba(66,42,12,.95), rgba(20,16,30,.95)); color: #ffda8a; box-shadow: inset 0 0 0 1px rgba(255,191,53,.45); }
+.pillRow button:disabled { opacity: .5; }
+.entryHint { margin: -2px 0 0; color: #9b8db5; font-size: 12px; font-style: italic; line-height: 1.35; }
+.startCta { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-top: 4px; padding: 15px 20px; border: 1px solid rgba(255,215,120,.55); border-radius: 12px; background: linear-gradient(160deg, #b66c28, #7c3f14); color: #fff3d8; font-size: 17px; font-weight: 900; letter-spacing: .02em; box-shadow: 0 8px 30px rgba(182,108,40,.35), inset 0 1px rgba(255,255,255,.25); transition: transform .15s ease, box-shadow .15s ease, filter .15s ease; }
+.startCta:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.12); box-shadow: 0 12px 38px rgba(255,174,52,.4), inset 0 1px rgba(255,255,255,.3); }
+.startCta:disabled { opacity: .7; animation: forgePulse 1.6s ease-in-out infinite; }
+.heroSummary { display: grid; gap: 8px; }
+.heroSummaryRow { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(217,168,77,.22); background: rgba(4,12,25,.55); }
+.heroSummaryRow img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 2px solid rgba(255,198,95,.5); }
+.heroSummaryInfo { display: grid; gap: 2px; min-width: 0; }
+.heroSummaryInfo strong { color: #ffda8a; font-size: 15px; }
+.heroSummaryInfo span { color: #d8c9f5; font-size: 12px; }
+.heroSummaryInfo .heroSummaryPet { color: #9ff7ec; }
+.heroEditWrap { display: grid; gap: 10px; }
+.heroDone { justify-self: end; padding: 8px 16px; }
+.lobbyHeroGrid.soloHero { grid-template-columns: 1fr !important; }
+
+/* ── Retratos de personajes (procedurales hoy, IA mañana vía portraitUrl) ── */
+.npcPortrait { border-radius: 50%; flex: 0 0 auto; display: block; object-fit: cover; box-shadow: 0 2px 10px rgba(0,0,0,.5); }
+.castCard .castHead { display: flex !important; align-items: center; gap: 10px; }
+.castHeadText { display: grid; gap: 2px; min-width: 0; }
+.forgedTeaserCast { display: flex; flex-wrap: wrap; gap: 8px; }
+.castChip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid rgba(217,168,77,.3); background: rgba(4,12,25,.62); color: #fff3d8; font-size: 12px; font-weight: 700; }
+.castChip.threat { border-color: rgba(232,100,80,.45); color: #ffb4a0; }
+
+/* ── Forja de historias (modo improvisado) ── */
+.storyForge { display: grid; gap: 8px; margin-bottom: 12px; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(69,234,211,.28); background: linear-gradient(160deg, rgba(4,26,32,.72), rgba(4,12,25,.66)); }
+.storyForgeIntro { display: grid; gap: 2px; }
+.storyForgeIntro strong { color: #75eadb; font-size: 13px; letter-spacing: .02em; }
+.storyForgeIntro span { color: #d8c9f5; font-size: 12px; }
+.storyForgeRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: stretch; }
+.storyForgeRow input { width: 100%; min-width: 0; box-sizing: border-box; }
+.forgeButton { white-space: nowrap; }
+.storyForgeStatus { margin: 0; color: #75eadb; font-size: 12px; animation: forgePulse 1.6s ease-in-out infinite; }
+.storyForgeError { margin: 0; color: #ff9d7a; font-size: 12px; }
+@keyframes forgePulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.lobbyThemeCard.improvisedCard { border-color: rgba(69,234,211,.5); background-image: linear-gradient(165deg, rgba(6,40,44,.85), rgba(6,13,26,.92)); }
+.lobbyThemeCard.improvisedCard.selected { border-color: #75eadb; box-shadow: 0 0 0 1px rgba(117,234,219,.3), 0 0 22px rgba(69,234,211,.22); }
+
+/* Columna de acción (derecha en juego): elección y dados en carril angosto. */
+.actionColumn { grid-template-rows: none; align-content: start; }
+.actionColumn .choiceGrid { grid-template-columns: 1fr; gap: 8px; }
+.actionColumn .scenePanel h2 { font-size: clamp(21px, 1.8vw, 27px); }
+.actionColumn .sceneImage { min-height: 150px; }
+/* La grilla compacta de tirada (texto|stat|mascota|botón en fila) no entra en el carril:
+   la acción elegida ocupa la fila completa y los controles pasan a una segunda fila. */
+.actionColumn .actionCompactGrid { grid-template-columns: minmax(0, 1fr) max-content minmax(120px, auto) !important; }
+.actionColumn .actionCompactText { grid-column: 1 / -1; }
+/* Carril derecho legible en pantallas reales (pedido: tamaños, fonts, grid bonito).
+   Cabecera de escena angosta sin pisar el botón Personajes; acciones en grid de 2. */
+.actionColumn .sceneImage { min-height: 60px !important; padding: 10px 116px 10px 12px !important; display: flex !important; align-items: flex-end !important; }
+.actionColumn .scenePanel h2 { font-size: 17px !important; line-height: 1.15 !important; margin: 0 0 2px !important; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.actionColumn .sceneImage p { font-size: 11px !important; line-height: 1.3 !important; margin: 0 !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.actionColumn .sceneClueInline { font-size: 11px !important; line-height: 1.3 !important; display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.actionColumn .castTrigger { top: 8px !important; right: 8px !important; padding: 4px 9px !important; font-size: 11px !important; }
+.actionColumn .choiceGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; margin-top: 10px !important; }
+.actionColumn .choiceCard { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; padding: 9px 10px !important; border-radius: 9px !important; min-height: 72px !important; }
+.actionColumn .choiceCard strong { font-size: 12.5px !important; line-height: 1.3 !important; -webkit-line-clamp: 3 !important; flex: 1 1 auto !important; }
+.actionColumn .choiceCard .choiceMeta { display: flex !important; justify-content: space-between !important; align-items: center !important; width: 100% !important; margin: 0 !important; }
+.actionColumn .choiceCard:hover:not(:disabled) { transform: translateY(-1px); }
+.actionColumn .choiceCard.selected { box-shadow: 0 0 0 1px rgba(255,191,53,.4), 0 6px 22px rgba(255,174,52,.18), inset 3px 0 0 #d9a84d !important; }
+
+/* Pantallas bajas (laptops ~700-800px de alto): Tirada/Resolución al mínimo vital
+   para que las OPCIONES — lo que se juega — tengan al menos dos filas a la vista. */
+@media (max-height: 820px) {
+  .actionColumn .panel { padding: 0 10px 8px !important; }
+  .actionColumn .panelTitle { font-size: 11px !important; margin-bottom: 5px !important; }
+  .actionColumn .actionCompactText { min-height: 0 !important; padding: 5px 9px !important; }
+  .actionColumn .actionCompactText strong { font-size: 13px !important; }
+  .actionColumn .actionCompactText span { display: none !important; }
+  .actionColumn .statSelectCompact select { height: 30px !important; padding: 4px 8px !important; }
+  .actionColumn .compactPet { height: 42px !important; }
+  .actionColumn .primaryButton { padding: 8px 14px !important; font-size: 13px !important; }
+  .actionColumn .diceTile { min-height: 0 !important; padding: 5px !important; }
+  .actionColumn .diceTile em { display: none !important; }
+  .actionColumn .diceBar .resolutionNote { -webkit-line-clamp: 1 !important; font-size: 10px !important; }
+  .actionColumn .choiceCard { min-height: 58px !important; padding: 7px 9px !important; }
+  .actionColumn .choiceCard strong { -webkit-line-clamp: 2 !important; font-size: 12px !important; }
+  .actionColumn .sceneImage { min-height: 48px !important; }
+}
+
+/* Tirada y Resolución SIEMPRE a la vista: la escena/opciones ceden espacio y
+   scrollean adentro; los controles de dados quedan anclados abajo del carril. */
+.actionColumn .scenePanel { flex: 1 1 0 !important; min-height: 120px !important; overflow-y: auto !important; overflow-x: hidden !important; }
+.actionColumn .actionComposer,
+.actionColumn .diceBar { flex: 0 0 auto !important; }
+.actionColumn .sceneImage { min-height: 96px !important; }
+/* Resolución compacta en el carril: que entre entera sin recortar texto a mitad de palabra. */
+.actionColumn .diceBar { padding-bottom: 10px !important; }
+.actionColumn .diceBar .resolutionNote {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  max-height: none !important;
+  font-size: 11px !important;
+  line-height: 1.35 !important;
+}
 .avatarPicker { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .avatarPicker button { width: 54px; height: 54px; padding: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,.16); background: transparent; overflow: hidden; }
 .avatarPicker button.selected { border-color: #ffbf35; box-shadow: 0 0 18px rgba(255,191,53,.34); }
@@ -373,16 +575,12 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 @media (max-width: 1160px) {
   .topStatus, .gameFrame, .buildGrid, .lobbyHeader, .lobbyLayout, .lobbyHeroGrid, .lobbyInfoGrid { grid-template-columns: 1fr; }
   .lobbyHeroGrid .designer { grid-template-columns: 1fr; }
-  .lobbyHeroGrid .designer .designerFields,
-  .lobbyHeroGrid .designer .avatarPicker,
-  .lobbyHeroGrid .designer .characterLore,
-  .lobbyHeroGrid .designer > label,
-  .lobbyHeroGrid .designer .statBarsPanel { grid-column: 1; grid-row: auto; }
-  .lobbyHeroGrid .designer .statBarsPanel { margin-top: 12px; }
+  .lobbyHeroGrid .designer .forgeLeft,
+  .lobbyHeroGrid .designer .forgeRight { grid-column: 1; grid-row: auto; }
   .lobbyHeaderActions { justify-items: stretch; }
   .lobbyHint { max-width: none; text-align: left; }
   .lobbyThemeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; overflow: visible; }
-  .choiceGrid, .controlRow, .designerFields, .statsRow, .diceGrid, .ambiencePanel, .sceneBriefGrid, .memoryGrid, .diceRuleHint { grid-template-columns: 1fr; }
+  .choiceGrid, .controlRow, .statsRow, .diceGrid, .ambiencePanel, .sceneBriefGrid, .memoryGrid, .diceRuleHint { grid-template-columns: 1fr; }
   .diceGrid p { grid-column: auto; }
 }
 
@@ -1880,54 +2078,15 @@ h1 {
   overflow: visible !important;
 }
 
-/* Character creator responsive layout: give stats real width, compact identity fields. */
+/* Character creator responsive layout (Forja): give cards and stats real width. */
 @media (min-width: 1161px) {
   .lobbyHeroGrid {
     grid-template-columns: minmax(0, 64%) minmax(320px, 36%) !important;
     gap: clamp(10px, 1vw, 16px) !important;
   }
   .lobbyHeroGrid .designer {
-    grid-template-columns: minmax(280px, 46%) minmax(360px, 54%) !important;
+    grid-template-columns: minmax(400px, 56%) minmax(320px, 44%) !important;
     column-gap: clamp(12px, 1.2vw, 20px) !important;
-  }
-  .lobbyHeroGrid .designer .statBarsPanel {
-    grid-column: 2 !important;
-    grid-row: 3 / span 6 !important;
-    width: 100%;
-  }
-  .lobbyHeroGrid .designerFields {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
-    margin-bottom: 8px !important;
-  }
-  .lobbyHeroGrid .designerFields label,
-  .lobbyHeroGrid .designer > label {
-    gap: 4px !important;
-    font-size: 10px !important;
-  }
-  .lobbyHeroGrid .designerFields input,
-  .lobbyHeroGrid .designerFields select,
-  .lobbyHeroGrid .designer > label input {
-    min-height: 30px !important;
-    padding: 6px 8px !important;
-    font-size: 11px !important;
-  }
-  .lobbyHeroGrid .avatarPicker {
-    margin: 8px 0 !important;
-    gap: 6px !important;
-  }
-  .lobbyHeroGrid .avatarPicker button {
-    width: clamp(42px, 3.4vw, 52px) !important;
-    height: clamp(42px, 3.4vw, 52px) !important;
-  }
-  .lobbyHeroGrid .characterLore {
-    gap: 5px !important;
-    margin: 6px 0 8px !important;
-  }
-  .lobbyHeroGrid .characterLore span {
-    padding: 7px 8px !important;
-    font-size: 11px !important;
-    line-height: 1.28 !important;
   }
   .statBarsPanel {
     padding: clamp(10px, 1vw, 14px) !important;
@@ -1947,7 +2106,7 @@ h1 {
     grid-template-columns: 1fr !important;
   }
   .lobbyHeroGrid .designer {
-    grid-template-columns: minmax(280px, 44%) minmax(360px, 56%) !important;
+    grid-template-columns: minmax(400px, 54%) minmax(320px, 46%) !important;
   }
 }
 
@@ -1955,18 +2114,26 @@ h1 {
   .lobbyHeroGrid .designer {
     grid-template-columns: 1fr !important;
   }
-  .lobbyHeroGrid .designer .statBarsPanel {
+  .lobbyHeroGrid .designer .forgeLeft,
+  .lobbyHeroGrid .designer .forgeRight {
     grid-column: 1 !important;
     grid-row: auto !important;
-  }
-  .designerFields {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }
 
 @media (max-width: 620px) {
-  .designerFields {
-    grid-template-columns: 1fr !important;
+  .heroIdentity {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+  .heroPortraitFrame {
+    width: 76px;
+    height: 76px;
+  }
+  .builderCardGrid {
+    grid-template-columns: 1fr;
+  }
+  .builderCard {
+    min-height: 0;
   }
   .statBarRow {
     grid-template-columns: 24px minmax(54px, .5fr) 22px 24px minmax(90px, 1fr) 24px !important;
@@ -2355,21 +2522,22 @@ h1 {
 .diceOutcomeCard.partial { border-color: rgba(255, 200, 80, .46) !important; }
 .diceOutcomeCard.failure { border-color: rgba(220, 90, 90, .5) !important; }
 
-/* Historial narration entries: make them denser and easier to scan. */
+/* Historial: texto legible de verdad (pedido: tamaños más visibles). */
 .historyTurnEntry {
-  padding: 8px 9px !important;
+  padding: 10px 11px !important;
   border-left-width: 2px !important;
 }
 .historyNarration {
-  font-size: 11px !important;
-  line-height: 1.38 !important;
-  color: #c8bfd4 !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: #ded5ea !important;
   display: block !important;
   overflow: visible !important;
   -webkit-line-clamp: unset !important;
 }
 .historyChoiceLine {
-  font-size: 11px !important;
+  font-size: 13px !important;
+  color: #ffe4a5 !important;
 }
 .narrativeHistory {
   padding: 9px 10px !important;
@@ -2669,7 +2837,7 @@ h1 {
 }
 .choiceCard strong {
   font-size: 12px !important;
-  -webkit-line-clamp: 1 !important;
+  -webkit-line-clamp: 2 !important;
   line-height: 1.3 !important;
 }
 .choiceGrid {
@@ -3206,3 +3374,84 @@ h1 {
 .lobbyThemeCard.selected { outline: 2px solid rgba(255,228,165,.55); outline-offset: 2px; }
 .lobbyStart { box-shadow: 0 0 18px rgba(255,228,165,.18); }
 .lobbyStart:hover { box-shadow: 0 0 26px rgba(255,228,165,.3); }
+
+/* ── Columnas redimensionables por el usuario (solo desktop) ──
+   Mayor especificidad + !important + última en el archivo: gana a todos los
+   grid-template-columns previos. Los fallbacks de var replican el layout default. */
+@media (min-width: 1161px) {
+  .gameFrame.gameFrameResizable {
+    grid-template-columns:
+      var(--col-left, minmax(220px, .68fr))
+      minmax(360px, 1.5fr)
+      var(--col-right, minmax(360px, 1fr)) !important;
+    position: relative;
+  }
+  /* Las manijas usan colocación explícita; sin esto, los paneles auto-colocados
+     pierden sus celdas y el layout entero se corre. */
+  .gameFrame.gameFrameResizable > .turnQueue { grid-area: 1 / 1; }
+  .gameFrame.gameFrameResizable > .dmPanel { grid-area: 1 / 2; }
+  .gameFrame.gameFrameResizable > .actionColumn { grid-area: 1 / 3; }
+  .colHandle { grid-row: 1; z-index: 40; width: 16px; align-self: stretch; display: flex; align-items: center; justify-content: center; cursor: col-resize; touch-action: none; }
+  .colHandleLeft { grid-column: 1; justify-self: end; margin-right: -14px; }
+  .colHandleRight { grid-column: 3; justify-self: start; margin-left: -14px; }
+  .colHandle::after { content: ""; width: 3px; height: 52px; border-radius: 999px; background: rgba(217,168,77,.28); transition: background .15s ease, height .15s ease, box-shadow .15s ease; }
+  .colHandle:hover::after, .colHandle.dragging::after { background: rgba(255,191,53,.85); height: 110px; box-shadow: 0 0 12px rgba(255,183,69,.5); }
+}
+@media (max-width: 1160px) {
+  .colHandle { display: none; }
+}
+
+/* ── Retratos generados con caché + forja viva (2026-07-06) ─────────────────── */
+/* Entrada suave de retratos ya pintados y pulso dorado mientras la IA imagina. */
+.portraitFade { animation: portraitIn .45s ease; }
+@keyframes portraitIn { from { opacity: 0; filter: saturate(.4) brightness(.65); } to { opacity: 1; } }
+.portraitForging { animation: portraitForging 1.5s ease-in-out infinite; }
+@keyframes portraitForging {
+  0%, 100% { box-shadow: 0 0 0 rgba(255,191,53,0); filter: saturate(.75) brightness(.92); }
+  50% { box-shadow: 0 0 14px rgba(255,191,53,.55); filter: saturate(1.1) brightness(1.14); }
+}
+
+/* Chips del teaser: ahora son botones — entran en cascada y piden el click. */
+.castChipButton { cursor: pointer; font-family: inherit; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; animation: chipIn .45s both; animation-delay: calc(var(--chip-i, 0) * 90ms); }
+.castChipButton:hover { transform: translateY(-2px) scale(1.03); border-color: rgba(255,191,53,.65); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.castChipButton.threat:hover { border-color: rgba(232,100,80,.8); }
+@keyframes chipIn { from { opacity: 0; transform: translateY(6px) scale(.9); } to { opacity: 1; transform: none; } }
+.forgedTeaser { animation: teaserReveal .5s ease; }
+@keyframes teaserReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.teaserHint { color: #9b8db5; font-size: 10.5px; font-style: normal; }
+
+/* Ritual de forja: frases rotativas, brasas y barra de calor mientras escribe el LLM. */
+.forgeRitual { position: relative; overflow: hidden; display: grid; gap: 8px; padding: 13px 14px; border-radius: 10px; border: 1px dashed rgba(255,191,53,.42); background: linear-gradient(165deg, rgba(56,36,10,.42), rgba(6,13,26,.82)); }
+.forgeRitual p { margin: 0; color: #ffda8a; font-size: 12.5px; font-weight: 700; animation: ritualLine .5s ease; }
+@keyframes ritualLine { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.forgeEmberBar { height: 4px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.forgeEmberBar span { display: block; height: 100%; width: 42%; border-radius: 999px; background: linear-gradient(90deg, transparent, #ffbf35, #ff7a3d, transparent); animation: emberSweep 1.35s linear infinite; }
+@keyframes emberSweep { from { transform: translateX(-130%); } to { transform: translateX(330%); } }
+.forgeSparks { position: absolute; inset: 0; pointer-events: none; }
+.forgeSparks i { position: absolute; bottom: -4px; width: 4px; height: 4px; border-radius: 50%; background: #ffbf35; opacity: 0; animation: sparkRise 2.6s ease-in infinite; }
+.forgeSparks i:nth-child(1) { left: 10%; animation-delay: 0s; }
+.forgeSparks i:nth-child(2) { left: 28%; animation-delay: .9s; width: 3px; height: 3px; background: #ff7a3d; }
+.forgeSparks i:nth-child(3) { left: 47%; animation-delay: .4s; }
+.forgeSparks i:nth-child(4) { left: 63%; animation-delay: 1.5s; width: 3px; height: 3px; }
+.forgeSparks i:nth-child(5) { left: 79%; animation-delay: .7s; background: #ffe08a; }
+.forgeSparks i:nth-child(6) { left: 91%; animation-delay: 1.9s; width: 3px; height: 3px; background: #ff7a3d; }
+@keyframes sparkRise { 0% { transform: translateY(0) scale(1); opacity: 0; } 12% { opacity: .95; } 100% { transform: translateY(-62px) scale(.35); opacity: 0; } }
+
+/* Popup de ficha pública de personaje (click en un chip del teaser). */
+.peekModal { width: min(94vw, 440px); }
+.peekBody { display: flex; gap: 14px; align-items: center; margin-bottom: 10px; }
+.peekIdentity { display: grid; gap: 4px; min-width: 0; }
+.peekIdentity strong { font-size: 18px; color: #fff3d8; line-height: 1.2; }
+.peekDanger { color: #ff9d7a; font-size: 12px; font-weight: 800; }
+.peekDesc { color: #e8d9ff; font-size: 13px; line-height: 1.5; margin: 0 0 8px; }
+.peekTrait { margin: 0 0 4px; font-size: 12.5px; color: #d8c9f5; }
+.peekTrait em { color: #75eadb; font-style: normal; font-weight: 800; margin-right: 6px; }
+.peekSealed { margin: 10px 0 0; font-size: 11px; color: #9b8db5; border-top: 1px dashed rgba(155,141,181,.3); padding-top: 8px; }
+
+.heroSummaryActions { display: grid; gap: 6px; justify-items: stretch; }
+
+/* Forja de héroe: columna de retrato con botón Reimaginar. */
+.heroPortraitColumn { display: grid; gap: 7px; justify-items: center; }
+.reimagineButton { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,191,53,.45); background: rgba(56,36,10,.5); color: #ffda8a; font-size: 11px; font-weight: 800; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.reimagineButton:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 14px rgba(255,183,69,.35); }
+.reimagineButton:disabled { opacity: .5; cursor: default; }

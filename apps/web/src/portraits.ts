@@ -1,0 +1,193 @@
+import { useCallback, useEffect, useState } from "react";
+
+// ─── Retratos generados por IA, con caché persistente ────────────────────────
+// Pollinations (gratis, sin key) genera la imagen a partir de un prompt en la URL.
+// Problema histórico: el servicio es lento/intermitente y un <img> que falla una
+// vez perdía el retrato para siempre. Acá el flujo es:
+//   URL determinística → IndexedDB (blob guardado) → si no está, fetch con cola
+//   de concurrencia + reintentos → se guarda el blob → object URL para el <img>.
+// Resultado: cada personaje se genera UNA sola vez y queda guardado en el navegador.
+
+const DB_NAME = "tiny-quest-portraits";
+const STORE = "portraits";
+// Medido 2026-07-06: una generación fresca tarda 20-90s bajo carga, y Pollinations
+// encola por IP — dos descargas en paralelo hacen que AMBAS superen el timeout.
+// Por eso: de a UNA, timeout generoso, y el hook reintenta en segundo plano.
+const FETCH_TIMEOUT_MS = 120_000;
+const RETRY_DELAYS_MS = [0, 5_000, 15_000];
+const MAX_CONCURRENT_FETCHES = 1;
+const BACKGROUND_RETRY_MS = 30_000; // tras agotar la serie, el hook vuelve a intentar
+const BACKGROUND_RETRY_ROUNDS = 8;
+
+export function nameHash(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return hash;
+}
+
+// El LLM imagina el aspecto (appearance) y este prompt lo pinta. Seed determinística
+// por nombre → mismo personaje, mismo retrato durante toda la partida. `seedNonce`
+// permite "reimaginar": nueva cara para la misma identidad.
+export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
+  const prompt = `Fantasy RPG book character portrait, dark moody lighting, half body, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  const seed = (nameHash(name) + seedNonce * 7919) % 100000;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&model=flux&seed=${seed}`;
+}
+
+export function isGeneratedPortraitUrl(url: string | undefined): url is string {
+  return typeof url === "string" && url.startsWith("http");
+}
+
+// ─── IndexedDB mínima (sin dependencias) ──────────────────────────────────────
+let dbPromise: Promise<IDBDatabase> | null = null;
+function openDb(): Promise<IDBDatabase> {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = () => request.result.createObjectStore(STORE);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+  return dbPromise;
+}
+
+async function idbGet(key: string): Promise<Blob | undefined> {
+  if (typeof indexedDB === "undefined") return undefined;
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE, "readonly").objectStore(STORE).get(key);
+    request.onsuccess = () => resolve(request.result instanceof Blob ? request.result : undefined);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function idbPut(key: string, blob: Blob): Promise<void> {
+  if (typeof indexedDB === "undefined") return;
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(STORE, "readwrite").objectStore(STORE).put(blob, key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// ─── Cola de descargas con reintentos ─────────────────────────────────────────
+let activeFetches = 0;
+const waitingForSlot: Array<() => void> = [];
+
+async function acquireSlot(): Promise<void> {
+  if (activeFetches < MAX_CONCURRENT_FETCHES) {
+    activeFetches += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => waitingForSlot.push(resolve));
+  activeFetches += 1;
+}
+
+function releaseSlot(): void {
+  activeFetches -= 1;
+  waitingForSlot.shift()?.();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchPortraitBlob(url: string): Promise<Blob> {
+  let lastError: unknown = new Error("portrait fetch failed");
+  for (const delay of RETRY_DELAYS_MS) {
+    if (delay > 0) await sleep(delay);
+    await acquireSlot();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`portrait HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.type.startsWith("image/")) throw new Error(`portrait content-type ${blob.type}`);
+        return blob;
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (error) {
+      lastError = error;
+    } finally {
+      releaseSlot();
+    }
+  }
+  throw lastError;
+}
+
+// ─── API pública ──────────────────────────────────────────────────────────────
+const readyObjectUrls = new Map<string, string>();
+const inFlight = new Map<string, Promise<string>>();
+
+export function loadPortrait(url: string): Promise<string> {
+  const ready = readyObjectUrls.get(url);
+  if (ready) return Promise.resolve(ready);
+  const pending = inFlight.get(url);
+  if (pending) return pending;
+  const promise = (async () => {
+    let blob = await idbGet(url).catch(() => undefined);
+    if (!blob) {
+      blob = await fetchPortraitBlob(url);
+      await idbPut(url, blob).catch(() => undefined); // sin persistencia sigue funcionando en memoria
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    readyObjectUrls.set(url, objectUrl);
+    return objectUrl;
+  })();
+  // Si falla del todo, se borra el registro: el próximo mount lo vuelve a intentar solo.
+  promise.catch(() => inFlight.delete(url));
+  inFlight.set(url, promise);
+  return promise;
+}
+
+export type PortraitStatus = "idle" | "loading" | "ready" | "failed";
+
+// Hook para <img>: mantiene la imagen anterior mientras llega la nueva (sin parpadeo),
+// reporta estado para animar "forjando retrato" y expone retry manual. Si la serie
+// de descargas falla (servicio saturado), sigue reintentando solo cada 30s mientras
+// el componente esté montado: el retrato "llega tarde" en vez de no llegar nunca.
+export function useGeneratedPortrait(url: string | undefined): { src: string | null; status: PortraitStatus; retry: () => void } {
+  const [attempt, setAttempt] = useState(0);
+  const [state, setState] = useState<{ src: string | null; status: PortraitStatus }>({ src: null, status: url ? "loading" : "idle" });
+  useEffect(() => {
+    if (!url) {
+      setState({ src: null, status: "idle" });
+      return;
+    }
+    let alive = true;
+    let timer: number | undefined;
+    const run = (roundsLeft: number) => {
+      setState((prev) => ({ src: prev.src, status: "loading" }));
+      loadPortrait(url)
+        .then((src) => alive && setState({ src, status: "ready" }))
+        .catch(() => {
+          if (!alive) return;
+          setState((prev) => ({ src: prev.src, status: "failed" }));
+          if (roundsLeft > 0) timer = window.setTimeout(() => alive && run(roundsLeft - 1), BACKGROUND_RETRY_MS);
+        });
+    };
+    run(BACKGROUND_RETRY_ROUNDS);
+    return () => {
+      alive = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [url, attempt]);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  return { ...state, retry };
+}
+
+// Medallón procedural como data-URI: sirve de placeholder/fallback en cualquier
+// <img> existente (hereda el CSS del selector img) mientras la IA pinta el real.
+export function medallionDataUri(name: string): string {
+  const hash = nameHash(name || "?");
+  const hue = hash % 360;
+  const hue2 = (hue + 40 + (hash % 60)) % 360;
+  const initial = (name.replace(/^(el|la|los|las|un|una)\s+/i, "").trim()[0] ?? "?").toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><radialGradient id="g" cx="35%" cy="30%" r="85%"><stop offset="0%" stop-color="hsl(${hue}, 55%, 38%)"/><stop offset="100%" stop-color="hsl(${hue2}, 60%, 14%)"/></radialGradient></defs><rect width="128" height="128" fill="url(#g)"/><circle cx="64" cy="50" r="19" fill="rgba(8,10,16,.55)"/><path d="M24 106 Q64 72 104 106 L104 128 L24 128 Z" fill="rgba(8,10,16,.55)"/><text x="64" y="78" text-anchor="middle" font-size="42" font-weight="900" font-family="Georgia, serif" fill="#fff3d8">${initial}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}

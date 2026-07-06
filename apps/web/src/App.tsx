@@ -1,14 +1,20 @@
-import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Brain, Cat, Dices, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
 import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
+import { characterPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, useGeneratedPortrait } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
+  buildImprovisedCampaign,
   campaignById,
   campaigns,
+  defaultWorldId,
+  perspectiveEntryLine,
+  worldById,
+  worldEras,
   chooseVisibleBotAction,
   chooseBotStat,
   createCharacter,
@@ -41,8 +47,11 @@ import {
   type GameEvent,
   type GameRoom,
   type NarrationResponse,
+  type Scene,
   type SceneActionChoice,
-  type StatKey
+  type StatKey,
+  type StoryPerspective,
+  type WorldEra
 } from "@tiny-quest/game-engine";
 
 const statLabels: Record<StatKey, string> = {
@@ -74,6 +83,9 @@ function wait(ms: number) {
 const draftStorageKey = "tiny-quest:draft-character";
 const campaignStorageKey = "tiny-quest:selected-campaign";
 const statStorageKey = "tiny-quest:selected-stat";
+const worldStorageKey = "tiny-quest:selected-world";
+const perspectiveStorageKey = "tiny-quest:perspective";
+const partyStorageKey = "tiny-quest:party-mode";
 const storageResetKey = "tiny-quest:storage-reset-version";
 const storageResetVersion = "causal-resolution-plan-2026-06-19-v5";
 
@@ -182,7 +194,7 @@ function actionMood(action: string) {
   if (clean.includes("bestia") || clean.includes("combate") || clean.includes("enfrentar")) return "combat";
   if (clean.includes("magia") || clean.includes("hechizo") || clean.includes("runa")) return "occult";
   if (clean.includes("huella") || clean.includes("rastro") || clean.includes("estudiar") || clean.includes("examinar") || clean.includes("objeto")) return "investigation";
-  if (clean.includes("calmar") || clean.includes("misericordia") || clean.includes("hablar") || clean.includes("interrogar") || clean.includes("presionar") || clean.includes("confrontar") || clean.includes("declarar") || clean.includes("negociar")) return "social";
+  if (clean.includes("calmar") || clean.includes("misericordia") || clean.includes("hablar") || clean.includes("interrogar") || clean.includes("presionar") || clean.includes("confrontar") || clean.includes("declarar") || clean.includes("negociar") || clean.includes("postura") || clean.includes("convencer") || clean.includes("testigo") || clean.includes("ayuda") || clean.includes("duda") || clean.includes("voto") || clean.includes("votar")) return "social";
   if (clean.includes("defender") || clean.includes("proteger")) return "defense";
   if (clean.includes("ruta") || clean.includes("forzar") || clean.includes("sendero")) return "route";
   return "mystery";
@@ -361,13 +373,37 @@ function sceneTexture(sceneTitle = "", action = "") {
       damage: "la cera negra se mezcla"
     };
   }
+  // Variantes seeded por la acción: el mismo detalle genérico no puede repetirse
+  // palabra por palabra turno tras turno.
+  const genericSeed = action.length + sceneTitle.length;
+  const pickGeneric = (variants: string[]) => variants[genericSeed % variants.length];
   return {
-    object: "un objeto que alguien intento apartar de la vista",
-    sign: "una marca fisica que contradice la version publica",
-    witness: "un testigo cambia de postura antes de mentir",
-    path: "una ruta estrecha abierta con coste",
-    placeDetail: "el lugar conserva una senal que puede tocarse",
-    damage: "el polvo se corre"
+    object: pickGeneric([
+      "un objeto que alguien intento apartar de la vista",
+      "una pertenencia dejada atras con demasiado apuro",
+      "un bulto tapado a medias, como si sobrara tiempo para esconderlo mejor"
+    ]),
+    sign: pickGeneric([
+      "una marca fisica que contradice la version publica",
+      "un corte reciente donde nadie deberia haber tocado",
+      "una mancha que alguien intento limpiar y solo corrio"
+    ]),
+    witness: pickGeneric([
+      "un testigo cambia de postura antes de mentir",
+      "alguien evita mirar el mismo punto dos veces",
+      "una voz baja se corta apenas el grupo se acerca"
+    ]),
+    path: pickGeneric([
+      "una ruta estrecha abierta con coste",
+      "un paso lateral que nadie vigila del todo",
+      "una salida usada hace poco, todavia tibia de pisadas"
+    ]),
+    placeDetail: pickGeneric([
+      "el lugar conserva una senal que puede tocarse",
+      "el aire guarda un olor que no pertenece a la escena",
+      "algo quedo movido de su sitio y nadie lo admite"
+    ]),
+    damage: pickGeneric(["el polvo se corre", "la marca se borronea", "el rastro pierde nitidez"])
   };
 }
 
@@ -486,7 +522,7 @@ function buildOpeningBeat(campaign: Campaign, sceneTitle: string, objective: str
   const stakes = (campaign.stakes?.[0] ?? `si nadie actua, ${enemy} decide por todos`).replace(/\.$/, "").toLowerCase();
   return {
     sections: {
-      narration: `${sceneTitle} abre la campaña con una injusticia preparada de antemano. ${premise} La primera tarea no es ganar: es impedir que el miedo escriba la version oficial antes que el grupo encuentre una prueba firme.`,
+      narration: `La noche todavía no termina de caer cuando el grupo cruza la entrada de ${sceneTitle}. ${premise}\n\nAdentro, ${npc} mide a los recién llegados sin acercarse, con algo guardado detrás de los dientes. El nombre de ${enemy} se dice en voz baja, como si nombrarlo pudiera apurar lo que viene. Cada minuto que pasa endurece la versión que alguien ya escribió.`,
       dialogue: `${npc}: "No necesito que me crean. Necesito que miren antes de obedecer."`,
       consequence: `Peligro bajo: todavia hay margen, pero ${stakes}.`,
       options: ["Examinar la pista que no encaja", `Presionar a ${npc}`, `Prepararse contra ${enemy}`]
@@ -541,8 +577,45 @@ export function App() {
   const soundProvider = useMemo(() => createSoundProvider(import.meta.env.VITE_SOUND_PROVIDER ?? "mock"), []);
 
   const [draft, setDraft] = useState<Character>(() => readStoredDraft());
+  const draftRef = useRef(draft);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  // Retrato del héroe generado automáticamente: mientras no fijes un retrato clásico
+  // del picker, la cara se imagina (y re-imagina, con debounce) según nombre +
+  // linaje + oficio + concepto. Elegir un retrato clásico corta la auto-generación;
+  // "Reimaginar" en la forja la vuelve a encender.
+  const manualAvatarRef = useRef(false);
+  useEffect(() => {
+    const current = draftRef.current.avatarUrl;
+    if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
+    if (manualAvatarRef.current) return;
+    const timer = setTimeout(() => {
+      const spec = heroPortraitSpec(draftRef.current);
+      const nextUrl = characterPortraitUrl(spec.name, spec.appearance, spec.styleHint);
+      const currentUrl = draftRef.current.avatarUrl;
+      // Misma identidad con otra seed = retrato reimaginado a propósito: se respeta.
+      const sameIdentity = isGeneratedPortraitUrl(currentUrl) && currentUrl.replace(/seed=\d+$/, "") === nextUrl.replace(/seed=\d+$/, "");
+      if (!sameIdentity && currentUrl !== nextUrl) setDraft(createCharacter({ ...draftRef.current, avatarUrl: nextUrl }));
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [draft.name, draft.species, draft.role, draft.concept]);
+  function reimagineHeroPortrait(seedNonce: number) {
+    manualAvatarRef.current = false;
+    const spec = heroPortraitSpec(draftRef.current);
+    setDraft(createCharacter({ ...draftRef.current, avatarUrl: characterPortraitUrl(spec.name, spec.appearance, spec.styleHint, seedNonce) }));
+  }
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => readStoredCampaignId());
-  const selectedCampaign = campaignById(selectedCampaignId);
+  // Historia improvisada: campaña generada por el LLM en runtime; no vive en el registro estático.
+  const [improvisedCampaign, setImprovisedCampaign] = useState<Campaign | null>(null);
+  const [forgingStory, setForgingStory] = useState(false);
+  const [forgeError, setForgeError] = useState<string | null>(null);
+  // Mundo sellado + perspectiva: el jugador elige ambiente y punto de entrada; el resto se descubre jugando.
+  const [selectedWorldId, setSelectedWorldId] = useState(() => localStorage.getItem(worldStorageKey) ?? defaultWorldId);
+  const [perspective, setPerspective] = useState<StoryPerspective>(() => (localStorage.getItem(perspectiveStorageKey) === "interior" ? "interior" : "exterior"));
+  const [improvisedWorldId, setImprovisedWorldId] = useState<string | null>(null);
+  // "alone" = recorrido en solitario (sin bots): cada turno es del jugador.
+  const [partyMode, setPartyMode] = useState<"alone" | "companions">(() => (localStorage.getItem(partyStorageKey) === "companions" ? "companions" : "alone"));
+  const selectedWorld = worldById(selectedWorldId);
+  const selectedCampaign = improvisedCampaign && improvisedCampaign.id === selectedCampaignId ? improvisedCampaign : campaignById(selectedCampaignId);
   const [room, setRoom] = useState<GameRoom | null>(null);
   const sceneList = useMemo(() => room ? getRoomScenes(room) : createScenesForCampaign(selectedCampaign), [room?.selectedCampaignId, selectedCampaign.id]);
   const [selectedActionDraftId, setSelectedActionDraftId] = useState(sceneList[0].actionChoices[0].id);
@@ -561,6 +634,21 @@ export function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const turnInFlightRef = useRef(false);
+  // Invalidates a pending LLM opening if a turn resolves before it arrives.
+  const openingTokenRef = useRef(0);
+  // Columnas del juego redimensionables por el usuario (px persistidos; null = default responsive).
+  const [gameCols, setGameCols] = useState<{ left: number | null; right: number | null }>(() => ({
+    left: Number(localStorage.getItem("tiny-quest:col-left")) || null,
+    right: Number(localStorage.getItem("tiny-quest:col-right")) || null
+  }));
+  const gameColsRef = useRef(gameCols);
+  useEffect(() => { gameColsRef.current = gameCols; }, [gameCols]);
+  const gameFrameRef = useRef<HTMLElement | null>(null);
+  // Recorrido: banner de capítulo al cambiar de escena + toast al descubrir pista.
+  const [chapterBanner, setChapterBanner] = useState<{ number: number; title: string; law?: string } | null>(null);
+  const lastSceneIndexRef = useRef(0);
+  const [clueToast, setClueToast] = useState<string | null>(null);
+  const prevClueCountRef = useRef(0);
   const previousActivePlayerIdRef = useRef<string | null>(null);
   const narrativeIndexRef = useRef<NarrativeMemoryIndex | null>(null);
 
@@ -616,6 +704,17 @@ export function App() {
     localStorage.setItem(draftStorageKey, JSON.stringify(draft));
   }, [draft]);
 
+  // Precalienta los retratos del elenco apenas arranca la partida: cuando el modal
+  // "Personajes" se abra, ya están pintados o en camino. El styleHint debe ser
+  // idéntico al que usa CastPanel (misma URL = misma entrada de caché).
+  useEffect(() => {
+    if (!room) return;
+    const styleHint = `${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`;
+    for (const npc of room.campaign.npcs) {
+      loadPortrait(npc.portraitUrl ?? characterPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)).catch(() => undefined);
+    }
+  }, [room?.selectedCampaignId]);
+
   useEffect(() => {
     localStorage.setItem(campaignStorageKey, selectedCampaignId);
   }, [selectedCampaignId]);
@@ -670,6 +769,33 @@ export function App() {
     setSoundMood(scene.atmosphere.ambientSoundPrompt);
   }, [scene.id, scene.atmosphere]);
 
+  // Capítulo nuevo: banner dramático + una ley del mundo grabada al cruzar de escena.
+  useEffect(() => {
+    if (!room) { lastSceneIndexRef.current = 0; setChapterBanner(null); return; }
+    if (room.currentSceneIndex > lastSceneIndexRef.current) {
+      const index = room.currentSceneIndex;
+      lastSceneIndexRef.current = index;
+      setChapterBanner({ number: index + 1, title: sceneList[index]?.title ?? "", law: selectedWorld.worldRules[index - 1] });
+      const timer = window.setTimeout(() => setChapterBanner(null), 8000);
+      return () => window.clearTimeout(timer);
+    }
+    if (room.currentSceneIndex < lastSceneIndexRef.current) lastSceneIndexRef.current = room.currentSceneIndex;
+  }, [room?.currentSceneIndex, room?.id]);
+
+  // Pista nueva descubierta: aviso brillante, sin spoilear nada más.
+  useEffect(() => { prevClueCountRef.current = room?.mysteryClues.length ?? 0; }, [room?.id]);
+  useEffect(() => {
+    if (!room) return;
+    const count = room.mysteryClues.length;
+    if (count > prevClueCountRef.current && room.sessionLog.length > 0) {
+      setClueToast(room.mysteryClues[count - 1]);
+      prevClueCountRef.current = count;
+      const timer = window.setTimeout(() => setClueToast(null), 7000);
+      return () => window.clearTimeout(timer);
+    }
+    prevClueCountRef.current = count;
+  }, [room?.mysteryClues.length, room?.id]);
+
   useEffect(() => {
     let cancelled = false;
     async function loadAtmosphere() {
@@ -723,27 +849,178 @@ export function App() {
     }
   }, [isAudioPlaying, sceneAudioUrl, volume]);
 
-  function startSolo() {
+  // Un solo click: si el mundo elegido todavía no tiene historia (o la forja previa
+  // falló), forja y ARRANCA apenas termina — sin pedir un segundo click.
+  async function startSolo() {
+    if (forgingStory) return;
+    let campaignToPlay = selectedCampaign;
+    if (!selectedWorld.authoredCampaignId && (improvisedWorldId !== selectedWorld.id || !improvisedCampaign)) {
+      const forged = await forgeStory("", selectedWorld);
+      if (!forged) return; // el error + Reintentar quedan visibles en la Forja
+      campaignToPlay = forged;
+    }
+    launchSolo(campaignToPlay);
+  }
+
+  function launchSolo(campaignToPlay: Campaign) {
     narrativeIndexRef.current = new NarrativeMemoryIndex({
       embeddingProvider: new MockEmbeddingProvider(),
       store: new InMemoryVectorStore()
     });
-    const nextRoom = createSoloRoom(draft, selectedCampaign);
+    const nextRoom = createSoloRoom(draft, campaignToPlay, partyMode === "companions" ? 2 : 0);
     setRoom(nextRoom);
     const firstScene = getRoomScenes(nextRoom).find((candidate) => candidate.id === nextRoom.initialSceneId) ?? getRoomScenes(nextRoom)[0];
     setSelectedActionDraftId(firstScene.actionChoices[0].id);
     setSelectedStat(firstScene.actionChoices[0].recommendedStats[0]);
-    setCurrentNarration(`Narración: ${firstScene.title} empieza con una promesa rota y una pista peligrosa. Consecuencia: el peligro empieza en cero, pero cada decisión acerca la verdad. Opciones: investiga, negocia o arriesga una jugada audaz.`);
-    setNpcDialogue([`${selectedCampaign.npcs[0].name}: Si quieres la verdad, tendrás que pagar con algo más que dados.`]);
+    setNpcDialogue([`${campaignToPlay.npcs[0].name}: Si quieres la verdad, tendrás que pagar con algo más que dados.`]);
     setDmSections(undefined);
     setPlotBeat(undefined);
     setLatestTurnNarration(undefined);
-    const opening = buildOpeningBeat(selectedCampaign, firstScene.title, firstScene.objective);
+    const opening = buildOpeningBeat(campaignToPlay, firstScene.title, firstScene.objective);
     setCurrentNarration(opening.sections.narration);
     setNpcDialogue([opening.sections.dialogue]);
     setNextOptions(opening.sections.options);
     setDmSections(opening.sections);
     setPlotBeat(opening.plotBeat);
+    requestLlmOpening(nextRoom, firstScene, campaignToPlay);
+  }
+
+  // La apertura estática se muestra al instante; el LLM la reemplaza con la escena
+  // narrada de verdad apenas responde (si un turno se resuelve antes, se descarta).
+  // La campaña llega por parámetro: tras forjar, el estado todavía no está actualizado.
+  function requestLlmOpening(nextRoom: GameRoom, firstScene: Scene, campaignToPlay: Campaign) {
+    if (!masterProvider.generateOpeningScene) return;
+    const openingToken = ++openingTokenRef.current;
+    const sceneNpcs = (firstScene.npcIds?.length
+      ? campaignToPlay.npcs.filter((npc) => firstScene.npcIds?.includes(npc.id))
+      : campaignToPlay.npcs
+    ).slice(0, 4).map((npc) => ({ name: npc.name, role: npc.role, description: npc.description, desire: npc.desire, fear: npc.fear }));
+    masterProvider.generateOpeningScene({
+      campaignTitle: campaignToPlay.title,
+      narratorVoice: campaignToPlay.narratorVoice,
+      premise: campaignToPlay.premise ?? campaignToPlay.storyHook,
+      storyHook: campaignToPlay.storyHook,
+      stakes: campaignToPlay.stakes,
+      scene: { title: firstScene.title, objective: firstScene.objective },
+      npcs: sceneNpcs,
+      optionLabels: firstScene.actionChoices.map((choice) => choice.label).slice(0, 4),
+      playerNames: nextRoom.players.map((player) => player.name),
+      perspectiveEntry: perspectiveEntryLine(selectedWorld, perspective)
+    }).then((llmOpening) => {
+      if (openingTokenRef.current !== openingToken) return;
+      setCurrentNarration(llmOpening.narration);
+      if (llmOpening.dialogue) setNpcDialogue([llmOpening.dialogue]);
+      setDmSections((prev) => prev ? { ...prev, narration: llmOpening.narration, dialogue: llmOpening.dialogue ?? prev.dialogue } : prev);
+    }).catch(() => {
+      // La apertura estática ya está visible; no hay nada que romper.
+    });
+  }
+
+  // La forja genera la historia del mundo sellado: el LLM escribe la ficción dentro
+  // de las reglas del mundo y del punto de entrada; buildImprovisedCampaign la monta
+  // sobre la mecánica probada.
+  async function forgeStory(extraWish: string, worldOverride?: WorldEra, perspectiveOverride?: StoryPerspective): Promise<Campaign | null> {
+    const world = worldOverride ?? selectedWorld;
+    const chosenPerspective = perspectiveOverride ?? perspective;
+    if (!masterProvider.generateImprovisedStory || forgingStory) return null;
+    setForgingStory(true);
+    setForgeError(null);
+    try {
+      const content = await masterProvider.generateImprovisedStory({
+        userPrompt: extraWish.trim(),
+        playerNames: [draft.name],
+        worldContext: {
+          worldName: world.name,
+          era: world.era,
+          ambience: world.ambience,
+          rules: world.worldRules,
+          seasoning: world.forgeSeasoning,
+          perspective: chosenPerspective,
+          entryLine: perspectiveEntryLine(world, chosenPerspective)
+        }
+      });
+      const built = buildImprovisedCampaign(content);
+      // El LLM imaginó el aspecto de cada personaje: acá nace su retrato generado.
+      const campaign: Campaign = {
+        ...built,
+        npcs: built.npcs.map((npc) => ({ ...npc, portraitUrl: characterPortraitUrl(npc.name, npc.appearance ?? npc.description, `${world.era}, ${world.name}`) }))
+      };
+      setImprovisedCampaign(campaign);
+      setImprovisedWorldId(world.id);
+      setSelectedCampaignId(campaign.id);
+      return campaign;
+    } catch (error) {
+      setForgeError(error instanceof Error ? error.message : "La forja falló. Probá de nuevo en unos segundos.");
+      return null;
+    } finally {
+      setForgingStory(false);
+    }
+  }
+
+  function selectWorld(worldId: string) {
+    const world = worldById(worldId);
+    setSelectedWorldId(worldId);
+    localStorage.setItem(worldStorageKey, worldId);
+    if (world.authoredCampaignId) {
+      setSelectedCampaignId(world.authoredCampaignId);
+    } else if (improvisedWorldId === world.id && improvisedCampaign) {
+      setSelectedCampaignId(improvisedCampaign.id);
+    } else {
+      // Mundo sin historia madre: se forja apenas lo elegís, mientras armás tu héroe.
+      void forgeStory("", world);
+    }
+  }
+
+  function startColumnDrag(side: "left" | "right", event: React.PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const frame = gameFrameRef.current;
+    if (!frame) return;
+    const startX = event.clientX;
+    const tracks = getComputedStyle(frame).gridTemplateColumns.split(" ").map((value) => parseFloat(value));
+    const startLeft = tracks[0] ?? 250;
+    const startRight = tracks[2] ?? 420;
+    const frameWidth = frame.clientWidth;
+    const handleEl = event.currentTarget;
+    handleEl.classList.add("dragging");
+    document.body.style.userSelect = "none";
+    const onMove = (e: PointerEvent) => {
+      const dx = e.clientX - startX;
+      if (side === "left") {
+        const next = Math.round(Math.min(Math.min(560, frameWidth - startRight - 380), Math.max(170, startLeft + dx)));
+        setGameCols((cols) => ({ ...cols, left: next }));
+      } else {
+        const next = Math.round(Math.min(Math.min(780, frameWidth - startLeft - 380), Math.max(320, startRight - dx)));
+        setGameCols((cols) => ({ ...cols, right: next }));
+      }
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      handleEl.classList.remove("dragging");
+      document.body.style.userSelect = "";
+      const cols = gameColsRef.current;
+      if (cols.left) localStorage.setItem("tiny-quest:col-left", String(cols.left)); else localStorage.removeItem("tiny-quest:col-left");
+      if (cols.right) localStorage.setItem("tiny-quest:col-right", String(cols.right)); else localStorage.removeItem("tiny-quest:col-right");
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  function resetColumn(side: "left" | "right") {
+    localStorage.removeItem(side === "left" ? "tiny-quest:col-left" : "tiny-quest:col-right");
+    setGameCols((cols) => ({ ...cols, [side]: null }));
+  }
+
+  function choosePartyMode(next: "alone" | "companions") {
+    setPartyMode(next);
+    localStorage.setItem(partyStorageKey, next);
+  }
+
+  function choosePerspective(next: StoryPerspective) {
+    setPerspective(next);
+    localStorage.setItem(perspectiveStorageKey, next);
+    // La historia improvisada nace del punto de entrada: cambiarlo re-forja el mundo.
+    if (!selectedWorld.authoredCampaignId) void forgeStory("", selectedWorld, next);
   }
 
   function startMultiplayerHost() {
@@ -777,6 +1054,7 @@ export function App() {
   async function runTurn(botAction?: string, botStat?: StatKey) {
     if (!room || room.sessionComplete || busy || turnInFlightRef.current) return;
     turnInFlightRef.current = true;
+    openingTokenRef.current += 1;
     setBusy(true);
     setTurnError(null);
     let resolution: ReturnType<typeof resolvePlayerAction> | null = null;
@@ -958,14 +1236,22 @@ export function App() {
     return (
       <LobbyScreen
         selectedCampaign={selectedCampaign}
-        setSelectedCampaignId={setSelectedCampaignId}
         draft={draft}
         setDraft={setDraft}
-        scene={scene}
-        sceneImageUrl={sceneImageUrl}
         startSolo={startSolo}
         onMultiplayerHost={startMultiplayerHost}
         onMultiplayerJoin={openMultiplayerJoin}
+        improvisedCampaign={improvisedCampaign}
+        forgingStory={forgingStory}
+        forgeError={forgeError}
+        onForgeStory={(wish) => { void forgeStory(wish); }}
+        selectedWorld={selectedWorld}
+        onSelectWorld={selectWorld}
+        perspective={perspective}
+        onChoosePerspective={choosePerspective}
+        partyMode={partyMode}
+        onChoosePartyMode={choosePartyMode}
+        onReimagineHero={reimagineHeroPortrait}
       />
     );
   }
@@ -980,28 +1266,58 @@ export function App() {
       <HelpButton open={showHelp} setOpen={setShowHelp} />
       {isMultiplayer && <MultiplayerStatusBar mpState={mpState} onLeave={cancelMultiplayer} />}
       {room.sessionComplete && <FinalBanner room={room} onBackToCampaigns={() => { cancelMultiplayer(); setRoom(null); }} onReplayRoute={startSolo} />}
+      {chapterBanner && !room.sessionComplete && (
+        <div className="chapterBanner" role="status" onClick={() => setChapterBanner(null)}>
+          <em>Capítulo {["I", "II", "III", "IV", "V"][chapterBanner.number - 1] ?? chapterBanner.number}</em>
+          <strong>{chapterBanner.title}</strong>
+          {chapterBanner.law && <p>⚖ Ley del mundo grabada: {chapterBanner.law}</p>}
+        </div>
+      )}
+      {clueToast && !room.sessionComplete && (
+        <div className="clueToast" role="status" onClick={() => setClueToast(null)}>
+          <strong>🔍 Pista descubierta</strong>
+          <span>{clueToast}</span>
+        </div>
+      )}
       {isMultiplayer && mpState.phase === "opponent_gone" && (
         <div className="mpDisconnectOverlay">
           <p>Tu oponente se desconectó. La partida continúa si regresa en 5 minutos.</p>
           <button className="ghostButton" onClick={cancelMultiplayer}>Volver al menú</button>
         </div>
       )}
-      <section className="gameFrame">
-        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} />
-        <section className="centerColumn">
+      <section
+        className="gameFrame gameFrameResizable"
+        ref={gameFrameRef}
+        style={{
+          ["--col-left" as string]: gameCols.left ? `${gameCols.left}px` : undefined,
+          ["--col-right" as string]: gameCols.right ? `${gameCols.right}px` : undefined
+        } as React.CSSProperties}
+      >
+        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
+        {/* La narración vive en la pista central ancha; elección y dados en la columna derecha. */}
+        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
+        <section className="centerColumn actionColumn">
           {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
-          {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} />}
+          {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} styleHint={`${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
         </section>
-        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
+        <div className="colHandle colHandleLeft" role="separator" aria-orientation="vertical" title="Arrastrá para redimensionar · doble click restablece" onPointerDown={(event) => startColumnDrag("left", event)} onDoubleClick={() => resetColumn("left")} />
+        <div className="colHandle colHandleRight" role="separator" aria-orientation="vertical" title="Arrastrá para redimensionar · doble click restablece" onPointerDown={(event) => startColumnDrag("right", event)} onDoubleClick={() => resetColumn("right")} />
       </section>
     </main>
   );
 }
 
-function LobbyScreen({ selectedCampaign, setSelectedCampaignId, draft, setDraft, scene, sceneImageUrl, startSolo, onMultiplayerHost, onMultiplayerJoin }: { selectedCampaign: Campaign; setSelectedCampaignId: (id: string) => void; draft: Character; setDraft: (character: Character) => void; scene: ReturnType<typeof createScenesForCampaign>[number]; sceneImageUrl: string; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void }) {
+function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, partyMode, onChoosePartyMode, onReimagineHero }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; partyMode: "alone" | "companions"; onChoosePartyMode: (mode: "alone" | "companions") => void; onReimagineHero: (seedNonce: number) => void }) {
   const [showHelp, setShowHelp] = useState(false);
+  const [forgePrompt, setForgePrompt] = useState("");
+  const [editingHero, setEditingHero] = useState(false);
+  // Ficha rápida de un personaje forjado (click en un chip del teaser).
+  const [castPeek, setCastPeek] = useState<CastPeek | null>(null);
+  const improvisedSelected = improvisedCampaign !== null && selectedCampaign.id === improvisedCampaign.id;
+  const canForge = forgePrompt.trim().length >= 12 && !forgingStory;
+  const mpBlocked = improvisedSelected || !selectedWorld.authoredCampaignId;
   return (
     <main className="appShell lobbyShell">
       <HelpButton open={showHelp} setOpen={setShowHelp} />
@@ -1010,50 +1326,117 @@ function LobbyScreen({ selectedCampaign, setSelectedCampaignId, draft, setDraft,
           <img className="brandLogo" src="/assets/brand/tiny-quest-logo.png" alt="Tiny Quest" />
         </div>
         <div className="lobbyHeaderActions">
-          <button className="soloButton lobbyStart" onClick={startSolo}><Play size={18} /> Iniciar solo con bots</button>
-          <button className="ghostButton" type="button" onClick={onMultiplayerHost}><Users size={16} /> Crear sala 2 jugadores</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerHost} disabled={mpBlocked} title={mpBlocked ? "Las historias forjadas online llegan pronto — por ahora jugalas en solitario." : undefined}><Users size={16} /> Crear sala</button>
           <button className="ghostButton" type="button" onClick={onMultiplayerJoin}><Users size={16} /> Unirse con código</button>
         </div>
       </header>
 
       <section className="lobbyLayout">
-        <section className="lobbyHeroGrid">
-          <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} />
-
-          <section className="panel lobbyPreview">
-            <PanelTitle title="Escena inicial" icon={<Sparkles size={17} />} />
-            <div className="sceneImage lobbySceneImage" style={{ backgroundImage: `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.2)), url(${sceneImageUrl})` }}>
-              <div><h2>{normalizeUiText(selectedCampaign.title)}</h2><p>{normalizeUiText(scene.title)} · {normalizeUiText(scene.objective)}</p></div>
-            </div>
-            <div className="tagRow">{selectedCampaign.recommendedStats.map((tag) => <span key={tag}>{statLabels[tag]}</span>)}</div>
-            <div className="lobbyInfoGrid">
-              <div className="lobbyPromptBox">
-                <strong>Campaña</strong>
-                <p>{normalizeUiText(selectedCampaign.storyHook)}</p>
-                <p>{normalizeUiText(selectedCampaign.genre)} · {selectedCampaign.durationMinutes} min · {normalizeUiText(selectedCampaign.difficulty)}</p>
-              </div>
-              <div className="lobbyPromptBox">
-                <strong>Narrador</strong>
-                <p>{normalizeUiText(selectedCampaign.narratorGuidance)}</p>
-                <p>Mascotas: {selectedCampaign.legendaryPets.map(normalizeUiText).join(", ")}</p>
-              </div>
-            </div>
-          </section>
-        </section>
-
-        <section className="panel lobbyThemesPanel">
-          <PanelTitle title="Campañas disponibles" icon={<Sparkles size={17} />} />
-          <div className="lobbyThemeGrid">
-            {campaigns.map((campaign, index) => (
-              <button className={`lobbyThemeCard themeTint${index % 5} ${campaign.id === selectedCampaign.id ? "selected" : ""}`} key={campaign.id} onClick={() => setSelectedCampaignId(campaign.id)} style={{ "--campaign-bg": `url(${campaignCardImage(campaign.id)})` } as React.CSSProperties}>
-                <strong>{normalizeUiText(campaign.title)}</strong>
-                <span>{normalizeUiText(campaign.description)}</span>
-                <em>{normalizeUiText(campaign.genre)} · {campaign.recommendedSkills.slice(0, 3).map(normalizeUiText).join(" · ")}</em>
-                <small>{campaign.durationMinutes} min · {normalizeUiText(campaign.difficulty)} · {campaign.scenes.length} escenas · {campaign.scenes.some((item) => item.hasCombat) ? "combate opcional" : "misterio/social"}</small>
+        <section className="panel lobbyThemesPanel storyBuilder">
+          <PanelTitle title="1 · Armá tu historia" icon={<Sparkles size={17} />} />
+          <div className="worldGrid">
+            {worldEras.map((world) => (
+              <button key={world.id} type="button" className={`worldCard ${world.id === selectedWorld.id ? "selected" : ""}`} onClick={() => onSelectWorld(world.id)} disabled={forgingStory && world.id !== selectedWorld.id} title={world.authoredCampaignId ? "Historia madre lista · online disponible" : "La historia se forja al elegirlo"}>
+                <em>{world.era}</em>
+                <strong>{world.name}</strong>
+                <span>{world.tagline}</span>
               </button>
             ))}
           </div>
+          <div className="quickChoices">
+            <div className="quickChoiceGroup">
+              <span>Entrás</span>
+              <div className="pillRow">
+                <button type="button" className={perspective === "exterior" ? "selected" : ""} onClick={() => onChoosePerspective("exterior")} disabled={forgingStory}>Desde afuera</button>
+                <button type="button" className={perspective === "interior" ? "selected" : ""} onClick={() => onChoosePerspective("interior")} disabled={forgingStory}>Desde adentro</button>
+              </div>
+            </div>
+            <div className="quickChoiceGroup">
+              <span>Recorrido</span>
+              <div className="pillRow">
+                <button type="button" className={partyMode === "alone" ? "selected" : ""} onClick={() => onChoosePartyMode("alone")}>En solitario</button>
+                <button type="button" className={partyMode === "companions" ? "selected" : ""} onClick={() => onChoosePartyMode("companions")} title="Belo y Miri juegan sus propios turnos">Con compañeros</button>
+              </div>
+            </div>
+          </div>
+          <p className="entryHint">{perspectiveEntryLine(selectedWorld, perspective)}</p>
+          <div className="storyForgeRow">
+            <input
+              value={forgePrompt}
+              onChange={(event) => setForgePrompt(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter" && canForge) onForgeStory(forgePrompt.trim()); }}
+              placeholder="⚡ Pedido especial al narrador (opcional): elfos oscuros, un circo maldito, un traidor…"
+              disabled={forgingStory}
+              aria-label="Pedido especial para la historia del mundo"
+            />
+            <button type="button" className="soloButton forgeButton" disabled={!canForge} onClick={() => onForgeStory(forgePrompt.trim())}>
+              {forgingStory ? "Forjando…" : "Reforjar"}
+            </button>
+          </div>
+          {forgingStory && <ForgeRitual />}
+          {forgeError && !forgingStory && <p className="storyForgeError">{forgeError} <button type="button" className="ghostButton retryForge" onClick={() => onForgeStory(forgePrompt.trim())}>Reintentar</button></p>}
+          {improvisedSelected && !forgingStory && improvisedCampaign && (
+            <div className="forgedTeaser">
+              <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
+              <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
+              <div className="forgedTeaserCast">
+                {improvisedCampaign.npcs.map((npc, index) => (
+                  <button
+                    key={npc.id}
+                    type="button"
+                    className="castChip castChipButton"
+                    style={{ "--chip-i": index } as CSSProperties}
+                    onClick={() => setCastPeek({ name: npc.name, role: npc.role, description: npc.description, desire: npc.desire, fear: npc.fear, portraitUrl: npc.portraitUrl })}
+                  >
+                    <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl} size={28} />
+                    {npc.name}
+                  </button>
+                ))}
+                {improvisedCampaign.enemies[0] && (
+                  <button
+                    type="button"
+                    className="castChip threat castChipButton"
+                    style={{ "--chip-i": improvisedCampaign.npcs.length } as CSSProperties}
+                    onClick={() => setCastPeek({ name: improvisedCampaign.enemies[0].name, description: improvisedCampaign.enemies[0].description, portraitUrl: characterPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`), threat: true, dangerLevel: improvisedCampaign.enemies[0].dangerLevel })}
+                  >
+                    <NpcPortrait name={improvisedCampaign.enemies[0].name} role="amenaza" size={28} portraitUrl={characterPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`)} />
+                    {improvisedCampaign.enemies[0].name}
+                  </button>
+                )}
+              </div>
+              <em className="teaserHint">Tocá un personaje para conocerlo — lo que esconde queda sellado hasta que lo descubras.</em>
+            </div>
+          )}
+          {castPeek && <CharacterPeekModal peek={castPeek} onClose={() => setCastPeek(null)} />}
+          <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory}>
+            <Play size={20} /> {forgingStory ? "Forjando tu historia…" : "Empezar la historia"}
+          </button>
         </section>
+
+        {editingHero ? (
+          <section className="heroEditWrap lobbyHeroGrid soloHero">
+            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} />
+            <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Listo, guardar héroe</button>
+          </section>
+        ) : (
+          <section className="panel heroSummary">
+            <PanelTitle title="2 · Tu héroe" icon={<Wand2 size={17} />} />
+            <div className="heroSummaryRow">
+              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} />
+              <div className="heroSummaryInfo">
+                <strong>{draft.name}</strong>
+                <span>{draft.species} · {draft.role}</span>
+                <span className="heroSummaryPet">Compañero: {draft.pet.name}</span>
+              </div>
+              <div className="heroSummaryActions">
+                <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
+                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} title="La IA imagina tu retrato según nombre, linaje y oficio">
+                  <Sparkles size={13} /> Retrato IA
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
       </section>
     </main>
   );
@@ -1084,7 +1467,9 @@ function StatusPill({ label, value, accent = false }: { label: string; value: st
   return <div className={`statusPill ${accent ? "accent" : ""}`}><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume }: { room: GameRoom | null; draft: Character; audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (v: boolean) => void; volume: number; setVolume: (v: number) => void }) {
+type JourneyInfo = { worldName: string; scenes: string[]; currentIndex: number; laws: string[]; totalLaws: number };
+
+function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume, journey }: { room: GameRoom | null; draft: Character; audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (v: boolean) => void; volume: number; setVolume: (v: number) => void; journey?: JourneyInfo }) {
   const players = room?.players ?? [{ id: "preview", name: draft.name, type: "human" as const, character: draft, temporaryItems: [] }];
   return (
     <aside className="panel turnQueue">
@@ -1094,7 +1479,7 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
         const next = room && (room.activePlayerIndex + 1) % players.length === index;
         return (
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
-            <div className="avatar"><img src={player.character.avatarUrl} alt={player.name} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
+            <div className="avatar"><HeroAvatarImg url={player.type === "bot" ? characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía") : player.character.avatarUrl} name={player.name} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
             <div><strong>{player.name}</strong><span>{player.character.species} · {player.character.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
             <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span><span><Cat size={13} /> {player.character.pet.name}</span></div>
           </article>
@@ -1111,11 +1496,139 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
         </div>
         <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="queueAudioVol" />
       </div>
+      {journey && (
+        <div className="journeyPanel">
+          <h3>El recorrido</h3>
+          <ol className="journeyPath">
+            {journey.scenes.map((title, index) => (
+              <li key={`${title}-${index}`} className={index < journey.currentIndex ? "done" : index === journey.currentIndex ? "current" : "future"}>
+                <i aria-hidden="true" />
+                {/* Las escenas futuras son incógnitas: el recorrido se revela al caminarlo. */}
+                <span>{index <= journey.currentIndex ? title : "· · ·"}</span>
+              </li>
+            ))}
+          </ol>
+          <div className="journeyLaws">
+            <h4>Leyes de {journey.worldName}</h4>
+            {journey.laws.length === 0 && <p className="journeyLocked">Todavía no conocés ninguna. Se graban al avanzar de capítulo.</p>}
+            {journey.laws.map((law) => <p key={law} className="journeyLaw">⚖ {law}</p>)}
+            {journey.laws.length < journey.totalLaws && journey.laws.length > 0 && (
+              <p className="journeyLocked">{journey.totalLaws - journey.laws.length} {journey.totalLaws - journey.laws.length === 1 ? "ley sellada" : "leyes selladas"} por descubrir…</p>
+            )}
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
 
-function CastPanel({ sceneId, npcIds, npcs }: { sceneId: string; npcIds: string[]; npcs: CampaignNPC[] }) {
+// Retrato de NPC: pasa por la caché persistente (portraits.ts) — genera una vez,
+// guarda el blob y reintenta solo si falla. Mientras se pinta muestra el medallón
+// procedural con pulso de forja; si el servicio muere, el medallón queda.
+function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; role?: string; portraitUrl?: string; size?: number }) {
+  const { src, status } = useGeneratedPortrait(isGeneratedPortraitUrl(portraitUrl) ? portraitUrl : undefined);
+  if (src) {
+    return <img className={`npcPortrait npcPortraitImg ${status === "loading" ? "portraitForging" : ""}`} src={src} alt="" width={size} height={size} style={{ width: size, height: size }} />;
+  }
+  const hash = nameHash(name);
+  const hue = hash % 360;
+  const hue2 = (hue + 40 + (hash % 60)) % 360;
+  const roleKind = /amenaza|antagonista|villan/i.test(role ?? "") ? "threat" : /principal|líder|lider|jefe/i.test(role ?? "") ? "primary" : "secondary";
+  const ring = roleKind === "threat" ? "#e86450" : roleKind === "primary" ? "#ffbf35" : "#75eadb";
+  const initial = (name.replace(/^(el|la|los|las|un|una)\s+/i, "").trim()[0] ?? "?").toUpperCase();
+  const gradientId = `npcGrad-${hash}`;
+  return (
+    <svg className={`npcPortrait ${status === "loading" ? "portraitForging" : ""}`} width={size} height={size} viewBox="0 0 46 46" role="img" aria-label={name}>
+      <defs>
+        <radialGradient id={gradientId} cx="35%" cy="30%" r="80%">
+          <stop offset="0%" stopColor={`hsl(${hue}, 55%, 38%)`} />
+          <stop offset="100%" stopColor={`hsl(${hue2}, 60%, 14%)`} />
+        </radialGradient>
+      </defs>
+      <circle cx="23" cy="23" r="21.5" fill={`url(#${gradientId})`} stroke={ring} strokeWidth="2" />
+      {/* Silueta genérica: hombros + cabeza, apenas sugerida */}
+      <circle cx="23" cy="17.5" r="6.5" fill="rgba(8,10,16,.55)" />
+      <path d="M9 38 Q23 26 37 38 L37 41 Q23 45 9 41 Z" fill="rgba(8,10,16,.55)" />
+      <text x="23" y="27.5" textAnchor="middle" fontSize="15" fontWeight="900" fill="#fff3d8" style={{ textShadow: "0 1px 4px rgba(0,0,0,.8)" }}>{initial}</text>
+    </svg>
+  );
+}
+
+// Ficha pública de un personaje forjado: lo que el jugador puede leer antes de
+// jugar. Nunca incluye secret/whatTheyHide/alibi — eso se descubre en la partida.
+type CastPeek = { name: string; role?: string; description: string; desire?: string; fear?: string; portraitUrl?: string; threat?: boolean; dangerLevel?: number };
+
+function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => void }) {
+  return (
+    <div className="castModalBackdrop" onClick={onClose} role="presentation">
+      <div className="castModal peekModal" role="dialog" aria-label={peek.name} onClick={(event) => event.stopPropagation()}>
+        <div className="castModalHead">
+          <strong>{peek.threat ? "⚔ La amenaza" : "Personaje"}</strong>
+          <button type="button" className="castClose" onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
+        </div>
+        <div className="peekBody">
+          <NpcPortrait name={peek.name} role={peek.threat ? "amenaza" : peek.role} portraitUrl={peek.portraitUrl} size={92} />
+          <div className="peekIdentity">
+            <strong>{normalizeUiText(peek.name)}</strong>
+            {peek.role && <span className="castRole">{normalizeUiText(peek.role)}</span>}
+            {peek.threat && typeof peek.dangerLevel === "number" && <span className="peekDanger">Peligro {peek.dangerLevel}/10</span>}
+          </div>
+        </div>
+        <p className="peekDesc">{normalizeUiText(peek.description)}</p>
+        {peek.desire && <p className="peekTrait"><em>Quiere</em>{normalizeUiText(peek.desire)}</p>}
+        {peek.fear && <p className="peekTrait"><em>Teme</em>{normalizeUiText(peek.fear)}</p>}
+        <p className="peekSealed">Lo que esconde queda sellado hasta que lo descubras jugando.</p>
+      </div>
+    </div>
+  );
+}
+
+// Ritual de forja: mientras el LLM escribe la historia, la fragua respira —
+// frases que rotan, brasas que suben y una barra de calor. Pura UI, cero datos.
+const forgeRitualLines = [
+  "El narrador enciende la fragua…",
+  "Nacen los testigos y sus nombres…",
+  "Alguien ya está mintiendo…",
+  "Se templan los capítulos…",
+  "La amenaza abre los ojos…",
+  "Se sella el destino…"
+];
+
+function ForgeRitual() {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setStep((value) => value + 1), 2100);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <div className="forgeRitual" role="status">
+      <div className="forgeSparks" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
+      <p key={step}>{forgeRitualLines[step % forgeRitualLines.length]}</p>
+      <div className="forgeEmberBar"><span /></div>
+    </div>
+  );
+}
+
+// Identidad visual del héroe: nombre + linaje + oficio + concepto arman el prompt.
+// Misma identidad → misma cara (seed por nombre, caché por URL).
+function heroPortraitSpec(draft: Character): { name: string; appearance: string; styleHint: string } {
+  const selectedSpecies = species.find((item) => item.name === draft.species);
+  const appearance = [`${draft.species} ${draft.role}, heroic protagonist`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
+  return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
+}
+
+// Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
+// medallón data-URI de placeholder (sigue siendo un <img>, así hereda el CSS
+// de .avatar img / .heroPortrait / .heroSummaryRow img sin tocar selectores).
+function HeroAvatarImg({ url, name, className }: { url: string; name: string; className?: string }) {
+  const generated = isGeneratedPortraitUrl(url);
+  const { src, status } = useGeneratedPortrait(generated ? url : undefined);
+  if (!generated) return <img className={className} src={url} alt={name} />;
+  if (src) return <img className={`${className ?? ""} ${status === "loading" ? "portraitForging" : "portraitFade"}`} src={src} alt={name} />;
+  return <img className={`${className ?? ""} ${status === "failed" ? "" : "portraitForging"}`} src={medallionDataUri(name)} alt={name} />;
+}
+
+function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcIds: string[]; npcs: CampaignNPC[]; styleHint: string }) {
   const [open, setOpen] = useState(false);
   // Unión: NPCs activos de la escena (npcIds) + los que declaran presencia vía appearsInScenes.
   const primary = npcIds.map((id) => npcs.find((npc) => npc.id === id)).filter((npc): npc is CampaignNPC => Boolean(npc));
@@ -1140,8 +1653,11 @@ function CastPanel({ sceneId, npcIds, npcs }: { sceneId: string; npcIds: string[
               {present.map((npc) => (
                 <div key={npc.id} className="castCard open">
                   <span className="castHead">
-                    <strong>{npc.name}</strong>
-                    {npc.role && <span className="castRole">{npc.role}</span>}
+                    <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl ?? characterPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)} />
+                    <span className="castHeadText">
+                      <strong>{npc.name}</strong>
+                      {npc.role && <span className="castRole">{npc.role}</span>}
+                    </span>
                   </span>
                   <span className="castBody">
                     <span className="castDesc">{npc.description}</span>
@@ -1158,7 +1674,6 @@ function CastPanel({ sceneId, npcIds, npcs }: { sceneId: string; npcIds: string[
   );
 }
 
-const riskLabels: Record<string, string> = { low: "riesgo bajo", medium: "riesgo medio", high: "riesgo alto" };
 
 function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraftId, onChoice, imageUrl, energy, enrichedLabels, roundInScene = 0 }: { sceneTitle: string; objective: string; clues: string[]; choices: SceneActionChoice[]; selectedActionDraftId: string; onChoice: (id: string) => void; imageUrl: string; energy: number; enrichedLabels?: Record<string, string>; roundInScene?: number }) {
   const sceneBg = `linear-gradient(90deg, rgba(5,8,18,.82), rgba(5,8,18,.22)), url(${imageUrl})`;
@@ -1180,16 +1695,15 @@ function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraft
           return (
             <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""} ${isCrisis ? "crisisChoice" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button">
               <strong>{enrichedLabels?.[choice.id] ?? choice.label}</strong>
+              {/* Un solo tag por opción: el stat principal. Excepciones puntuales:
+                  expiración inminente y costo solo cuando bloquea por falta de energía. */}
               <div className="choiceMeta">
                 <div className="choiceStats">
-                  {choice.recommendedStats.map((stat) => (
-                    <span key={stat} className={`statChip stat-${stat}`}>{statLabels[stat]}</span>
-                  ))}
-                  {choice.riskLevel && <span className={`riskChip risk-${choice.riskLevel}`}>{riskLabels[choice.riskLevel] ?? choice.riskLevel}</span>}
-                  {roundsLeft !== null && roundsLeft <= 2 && <span className="expiryChip">⏳ {roundsLeft <= 1 ? "última ronda" : `${roundsLeft} rondas`}</span>}
-                  {choice.energyRestoreOnSuccess ? <span className="saveChip">+{choice.energyRestoreOnSuccess}⚡ al lograrlo</span> : null}
+                  {roundsLeft !== null && roundsLeft <= 2
+                    ? <span className="expiryChip">⏳ {roundsLeft <= 1 ? "última ronda" : `${roundsLeft} rondas`}</span>
+                    : <span className={`statChip stat-${choice.recommendedStats[0]}`}>{statLabels[choice.recommendedStats[0]]}</span>}
                 </div>
-                <span className="choiceCost"><Zap size={10} />{energyCost}{disabled ? <em>−{energyCost - energy}</em> : null}</span>
+                {energyCost > 0 && <span className="choiceCost"><Zap size={10} />{energyCost}{disabled ? <em>−{energyCost - energy}</em> : null}</span>}
               </div>
             </button>
           );
@@ -1795,58 +2309,161 @@ function DiceBadge({ kind, value, muted = false }: { kind: "d20" | "d4" | "d6"; 
   );
 }
 
-function CharacterDesigner({ draft, setDraft, disabled }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean }) {
+const builderTabList = [
+  { id: "species", label: "Linaje" },
+  { id: "role", label: "Oficio" },
+  { id: "pet", label: "Compañero" }
+] as const;
+type BuilderTab = typeof builderTabList[number]["id"];
+
+function CharacterDesigner({ draft, setDraft, disabled, onReimagine }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; onReimagine?: (seedNonce: number) => void }) {
   const spentPoints = totalExtraPoints(draft.stats);
   const remainingPoints = 8 - spentPoints;
   const selectedSpecies = species.find((item) => item.name === draft.species) ?? species[0];
   const selectedRole = roles.find((item) => item.name === draft.role) ?? roles[0];
   const selectedPet = legendaryPets.find((pet) => pet.id === draft.pet.id) ?? legendaryPets[0];
   const [selectedTalent, setSelectedTalent] = useState<string>(characterTalentAssets[0].id);
+  const [builderTab, setBuilderTab] = useState<BuilderTab>("species");
+  const speciesAffinity = Object.keys(selectedSpecies.statBonus ?? {})[0] as StatKey | undefined;
+  const tabValue: Record<BuilderTab, string> = { species: selectedSpecies.name, role: selectedRole.name, pet: selectedPet.name };
   function updateStats(stat: StatKey, delta: number) {
     if (delta > 0 && (remainingPoints <= 0 || draft.stats[stat] >= 4)) return;
     if (delta < 0 && draft.stats[stat] <= 1) return;
     setDraft(createCharacter({ ...draft, stats: { ...draft.stats, [stat]: draft.stats[stat] + delta } }));
   }
   return (
-    <section className="panel designer">
-      <PanelTitle title="Personaje" icon={<Wand2 size={17} />} />
-      <div className="pointsBar"><strong>{remainingPoints}</strong><span>puntos disponibles</span><em>{spentPoints}/8 usados · max. 4</em></div>
-      <div className="designerFields">
-        <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
-        <label>Linaje<select value={draft.species} onChange={(event) => setDraft(createCharacter({ ...draft, species: event.target.value }))} disabled={disabled}>{species.map((item) => <option key={item.id}>{item.name}</option>)}</select></label>
-        <label>Oficio<select value={draft.role} onChange={(event) => setDraft(createCharacter({ ...draft, role: event.target.value }))} disabled={disabled}>{roles.map((item) => <option key={item.id}>{item.name}</option>)}</select></label>
-        <label>Mascota<select value={draft.pet.id} onChange={(event) => setDraft(createCharacter({ ...draft, pet: legendaryPets.find((pet) => pet.id === event.target.value) }))} disabled={disabled}>{legendaryPets.map((pet) => <option key={pet.id} value={pet.id}>{pet.name}</option>)}</select></label>
-      </div>
-      <div className="avatarPicker">{avatarOptions.map((avatar) => <button className={draft.avatarUrl === avatar ? "selected" : ""} key={avatar} type="button" onClick={() => setDraft(createCharacter({ ...draft, avatarUrl: avatar }))} disabled={disabled}><img src={avatar} alt="Avatar" /></button>)}</div>
-      <div className="characterLore">
-        <span>{selectedSpecies.description}</span>
-        <span>{selectedRole.description}</span>
-        <span>{selectedPet.description}</span>
-      </div>
-      <label>Concepto<input value={draft.concept} onChange={(event) => setDraft(createCharacter({ ...draft, concept: event.target.value }))} disabled={disabled} /></label>
-      <div className="statBarsPanel">
-        {(Object.keys(statLabels) as StatKey[]).map((stat) => (
-          <div className="statBarRow" key={stat}>
-            <img src={characterStatAssets[stat]} alt="" aria-hidden="true" />
-            <span>{statLabels[stat]}</span>
-            <strong>{draft.stats[stat]}</strong>
-            <button className="statArrow" onClick={() => updateStats(stat, -1)} disabled={disabled || draft.stats[stat] <= 1} aria-label={`Bajar ${statLabels[stat]}`}>‹</button>
-            <div className="statSegments" aria-label={`${statLabels[stat]} ${draft.stats[stat]}`}>
-              {Array.from({ length: 4 }).map((_, index) => <i className={index < draft.stats[stat] ? "filled" : ""} key={index} />)}
+    <section className="panel designer designerForge">
+      <PanelTitle title="Forjá tu héroe" icon={<Wand2 size={17} />} />
+
+      <div className="forgeLeft">
+        <div className="heroIdentity">
+          <div className="heroPortraitColumn">
+            <div className="heroPortraitFrame">
+              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" />
             </div>
-            <button className="statArrow" onClick={() => updateStats(stat, 1)} disabled={disabled || remainingPoints <= 0 || draft.stats[stat] >= 4} aria-label={`Subir ${statLabels[stat]}`}>›</button>
-          </div>
-        ))}
-        <div className="talentPicker">
-          <h3>Talentos</h3>
-          <div>
-            {characterTalentAssets.map((talent) => (
-              <button className={selectedTalent === talent.id ? "selected" : ""} type="button" key={talent.id} onClick={() => setSelectedTalent(talent.id)} disabled={disabled} title={talent.name}>
-                <img src={talent.url} alt={talent.name} />
+            {/* Nonce al azar: cada click es una cara nueva; la elegida persiste en avatarUrl. */}
+            {onReimagine && (
+              <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled} title="La IA imagina otra cara para la misma identidad">
+                <Sparkles size={13} /> Reimaginar
               </button>
-            ))}
-            <button className="lockedTalent" type="button" disabled aria-label="Talento bloqueado">⌕</button>
+            )}
           </div>
+          <div className="heroIdentityFields">
+            <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
+            <label>Concepto<input value={draft.concept} onChange={(event) => setDraft(createCharacter({ ...draft, concept: event.target.value }))} disabled={disabled} /></label>
+            <div className="avatarPicker heroAvatarPicker">{avatarOptions.map((avatar) => <button className={draft.avatarUrl === avatar ? "selected" : ""} key={avatar} type="button" onClick={() => setDraft(createCharacter({ ...draft, avatarUrl: avatar }))} disabled={disabled} aria-label="Elegir retrato"><img src={avatar} alt="" /></button>)}</div>
+          </div>
+        </div>
+
+        <div className="builderTabs" role="tablist" aria-label="Construcción del personaje">
+          {builderTabList.map((tab) => (
+            <button key={tab.id} type="button" role="tab" aria-selected={builderTab === tab.id} className={builderTab === tab.id ? "active" : ""} onClick={() => setBuilderTab(tab.id)}>
+              <span>{tab.label}</span>
+              <strong>{tabValue[tab.id]}</strong>
+            </button>
+          ))}
+        </div>
+
+        {builderTab === "species" && (
+          <>
+            <div className="builderCardGrid">
+              {species.map((item) => {
+                const affinity = Object.keys(item.statBonus ?? {})[0] as StatKey | undefined;
+                return (
+                  <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.species === item.name ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, species: item.name }))}>
+                    <strong>{item.name}</strong>
+                    <span>{item.description}</span>
+                    {affinity && <span className="cardChips"><em className={`statChip stat-${affinity}`}>{statLabels[affinity]}</em></span>}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="builderDetail">
+              <p><strong>Don</strong>{selectedSpecies.passiveTrait}</p>
+              <p><strong>Sombra</strong>{selectedSpecies.quirk}</p>
+              <p><strong>Aspecto</strong>{selectedSpecies.visualFlavor}</p>
+            </div>
+          </>
+        )}
+        {builderTab === "role" && (
+          <>
+            <div className="builderCardGrid">
+              {roles.map((item) => (
+                <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.role === item.name ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, role: item.name }))}>
+                  <strong>{item.name}</strong>
+                  <span>{item.description}</span>
+                  <span className="cardChips">
+                    <em className={`statChip stat-${item.mainStat}`}>{statLabels[item.mainStat]}</em>
+                    <em className={`statChip stat-${item.secondaryStat}`}>{statLabels[item.secondaryStat]}</em>
+                  </span>
+                </button>
+              ))}
+            </div>
+            <div className="builderDetail">
+              <p><strong>Habilidad</strong>{selectedRole.specialAbility}</p>
+              <p><strong>Límite</strong>{selectedRole.limitation}</p>
+              <p><strong>Estilo</strong>{selectedRole.playstyle}</p>
+            </div>
+          </>
+        )}
+        {builderTab === "pet" && (
+          <>
+            <div className="builderCardGrid">
+              {legendaryPets.map((pet) => (
+                <button key={pet.id} type="button" disabled={disabled} className={`builderCard ${draft.pet.id === pet.id ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, pet }))}>
+                  <strong>{pet.name}</strong>
+                  <span>{pet.description}</span>
+                  <span className="cardChips"><em className={`statChip stat-${pet.preferredStat}`}>{statLabels[pet.preferredStat]}</em></span>
+                </button>
+              ))}
+            </div>
+            <div className="builderDetail">
+              <p><strong>Pasiva</strong>{selectedPet.passiveAbility}</p>
+              <p><strong>Activa</strong>{selectedPet.activeAbility}</p>
+              <p><strong>Recarga</strong>{selectedPet.cooldownTurns} turnos entre usos del +1d4.</p>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="forgeRight">
+        <div className="pointsBar"><strong>{remainingPoints}</strong><span>puntos de forja</span><em>{spentPoints}/8 usados · máx. 4</em></div>
+        <div className="statBarsPanel">
+          {(Object.keys(statLabels) as StatKey[]).map((stat) => (
+            <div className="statBarRow" key={stat}>
+              <img src={characterStatAssets[stat]} alt="" aria-hidden="true" />
+              <span>
+                {statLabels[stat]}
+                {speciesAffinity === stat && <i className="affinityMark" title={`Afinidad de ${selectedSpecies.name}`}>◆</i>}
+                {selectedRole.mainStat === stat && <i className="affinityMark roleMark" title={`Stat principal de ${selectedRole.name}`}>★</i>}
+                {selectedRole.secondaryStat === stat && <i className="affinityMark roleMark secondary" title={`Stat secundario de ${selectedRole.name}`}>☆</i>}
+              </span>
+              <strong>{draft.stats[stat]}</strong>
+              <button className="statArrow" onClick={() => updateStats(stat, -1)} disabled={disabled || draft.stats[stat] <= 1} aria-label={`Bajar ${statLabels[stat]}`}>‹</button>
+              <div className="statSegments" aria-label={`${statLabels[stat]} ${draft.stats[stat]}`}>
+                {Array.from({ length: 4 }).map((_, index) => <i className={index < draft.stats[stat] ? "filled" : ""} key={index} />)}
+              </div>
+              <button className="statArrow" onClick={() => updateStats(stat, 1)} disabled={disabled || remainingPoints <= 0 || draft.stats[stat] >= 4} aria-label={`Subir ${statLabels[stat]}`}>›</button>
+            </div>
+          ))}
+          <div className="talentPicker">
+            <h3>Talentos</h3>
+            <div>
+              {characterTalentAssets.map((talent) => (
+                <button className={`talentOption ${selectedTalent === talent.id ? "selected" : ""}`} type="button" key={talent.id} onClick={() => setSelectedTalent(talent.id)} disabled={disabled}>
+                  <img src={talent.url} alt="" />
+                  <span>{talent.name}</span>
+                </button>
+              ))}
+              <button className="lockedTalent" type="button" disabled aria-label="Talento bloqueado">⌕</button>
+            </div>
+          </div>
+        </div>
+        <div className="heroSheet">
+          <h3>Ficha viva</h3>
+          <p><strong>{selectedSpecies.name}</strong>{selectedSpecies.passiveTrait}</p>
+          <p><strong>{selectedRole.name}</strong>{selectedRole.specialAbility}</p>
+          <p><strong>{selectedPet.name}</strong>{selectedPet.activeAbility}</p>
         </div>
       </div>
     </section>
