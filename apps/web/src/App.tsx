@@ -2537,6 +2537,20 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { ...draft.look, ...patch } }));
   }
+  // Precalienta el retrato de las OTRAS razas con tu apariencia actual: cambiar de
+  // linaje actualiza la cara al instante (o casi) en vez de esperar una generación.
+  useEffect(() => {
+    if (!lookComplete(draft)) return;
+    const timer = setTimeout(() => {
+      for (const item of species) {
+        if (item.name === draft.species) continue;
+        const variant = heroImageUrls(createCharacter({ ...draft, species: item.name }));
+        void loadPortrait(variant.face).catch(() => undefined);
+      }
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [draft.name, draft.role, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor]);
+
   // Alterna entre retrato de frente y cuerpo entero SIN regenerar: conserva la seed
   // actual (mismo rostro en ambas tomas) reescribiéndola en la URL de la otra toma.
   function chooseShot(shot: "face" | "fullbody") {
@@ -2638,7 +2652,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
               {species.map((item) => {
                 const affinity = Object.keys(item.statBonus ?? {})[0] as StatKey | undefined;
                 return (
-                  <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.species === item.name ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, species: item.name }))}>
+                  <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.species === item.name ? "selected" : ""}`} onClick={() => { onUnlockAutoPortrait?.(); setDraft(createCharacter({ ...draft, species: item.name })); }}>
                     <span className="builderCardHead">
                       <NpcPortrait name={item.name} portraitUrl={archetypeImageUrl("lineage", item.name, item.description)} size={42} />
                       <strong>{item.name}</strong>
@@ -2660,7 +2674,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           <>
             <div className="builderCardGrid">
               {roles.map((item) => (
-                <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.role === item.name ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, role: item.name }))}>
+                <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.role === item.name ? "selected" : ""}`} onClick={() => { onUnlockAutoPortrait?.(); setDraft(createCharacter({ ...draft, role: item.name })); }}>
                   <span className="builderCardHead">
                     <NpcPortrait name={item.name} portraitUrl={archetypeImageUrl("role", item.name, item.description)} size={42} />
                     <strong>{item.name}</strong>
