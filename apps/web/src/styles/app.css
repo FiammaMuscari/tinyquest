@@ -3517,6 +3517,24 @@ h1 {
 .heroSpecial .heroSummaryRow img { width: 76px; height: 76px; }
 .heroSummaryRow { grid-template-columns: 76px minmax(0, 1fr) auto; }
 
+/* Designer: cards con imagen de arquetipo, picker de mascota y ficha viva rica. */
+.builderCardHead { display: flex; align-items: center; gap: 9px; }
+.builderCardHead .npcPortrait { flex: 0 0 auto; }
+.petPicker { display: grid; gap: 6px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(117,234,219,.22); background: rgba(4,20,25,.4); }
+.petPicker > span { color: #75eadb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.petPickerRow { display: flex; gap: 10px; }
+.petPickerRow button { display: grid; gap: 3px; justify-items: center; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); cursor: pointer; transition: transform .13s ease, border-color .13s ease; }
+.petPickerRow button:hover:not(:disabled) { transform: translateY(-2px); }
+.petPickerRow button.selected { border-color: #75eadb; box-shadow: 0 0 14px rgba(117,234,219,.3); }
+.petPickerRow small { color: #d8c9f5; font-size: 9.5px; font-weight: 700; max-width: 76px; text-align: center; line-height: 1.15; }
+.statsLegend { margin: 6px 0 8px; color: #9b8db5; font-size: 11px; line-height: 1.45; }
+.statBarRow { cursor: help; }
+.sheetBlock { border-left: 3px solid rgba(255,255,255,.15); padding-left: 9px; }
+.sheetBlock.who { border-left-color: rgba(255,191,53,.6); }
+.sheetBlock.helps { border-left-color: rgba(117,234,219,.6); }
+.sheetBlock.trouble { border-left-color: rgba(232,100,80,.55); }
+.sheetBlock.story { border-left-color: rgba(154,120,220,.6); }
+
 /* Forja de héroe: columna de retrato con botón Reimaginar. */
 .heroPortraitColumn { display: grid; gap: 7px; justify-items: center; }
 .reimagineButton { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,191,53,.45); background: rgba(56,36,10,.5); color: #ffda8a; font-size: 11px; font-weight: 800; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }

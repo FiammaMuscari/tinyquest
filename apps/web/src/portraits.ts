@@ -42,6 +42,16 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=384&nologo=true&model=flux&seed=${seed}`;
 }
 
+// Imagen de arquetipo para las cards de linaje/oficio del designer: un vistazo
+// de "de qué va" cada opción. Seed por kind+nombre → cacheada para siempre.
+export function archetypeImageUrl(kind: "lineage" | "role", name: string, description: string): string {
+  const style = kind === "lineage"
+    ? "Fantasy race archetype character portrait, atmospheric bust illustration"
+    : "Fantasy adventurer profession illustration, iconic pose with tools of the trade";
+  const prompt = `${style}: ${name}. ${description}. Dark moody painted background, rich detail, no text`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=192&height=192&nologo=true&model=flux&seed=${nameHash(kind + name) % 100000}`;
+}
+
 // Arte de mundo para las cards del lobby: paisaje/mapa pintado que caracteriza al
 // mundo. Seed por id → misma imagen siempre, cacheada como cualquier retrato.
 export function worldCardImageUrl(worldId: string, name: string, era: string, tagline: string): string {

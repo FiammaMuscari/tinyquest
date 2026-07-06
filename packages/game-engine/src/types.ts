@@ -64,6 +64,7 @@ export type CharacterLook = {
   gender?: string;
   skinTone?: string;
   eyeColor?: string;
+  hairColor?: string;
   /** Qué imagen usa de avatar: retrato de frente o cuerpo entero. */
   avatarShot?: "face" | "fullbody";
 };
@@ -1125,7 +1126,7 @@ export type ImprovisedStoryRequest = {
   playerNames?: string[];
   worldContext?: ImprovisedWorldContext;
   /** El héroe ya forjado: la historia debe atarse a su identidad (nunca copiar su nombre en NPCs sin explicar el vínculo). */
-  hero?: { name: string; species: string; role: string; petName: string; concept: string };
+  hero?: { name: string; species: string; role: string; petName: string; concept: string; strengths?: string[]; weakness?: string };
 };
 
 export interface DungeonMasterProvider {

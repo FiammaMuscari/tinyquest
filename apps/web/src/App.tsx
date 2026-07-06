@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait, worldCardImageUrl } from "./portraits";
+import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, loadPortrait, medallionDataUri, nameHash, petPortraitUrl, useGeneratedPortrait, worldCardImageUrl } from "./portraits";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -608,7 +608,7 @@ export function App() {
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [draft.name, draft.species, draft.role, draft.concept, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor]);
+  }, [draft.name, draft.species, draft.role, draft.concept, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor, topStat(draft.stats)]);
   function reimagineHeroPortrait(seedNonce: number) {
     if (!lookComplete(draftRef.current)) return;
     manualAvatarRef.current = false;
@@ -951,7 +951,16 @@ export function App() {
         userPrompt: extraWish.trim(),
         playerNames: [draft.name],
         // La historia debe atarse a la identidad del héroe (y no robarle el nombre a un NPC).
-        hero: { name: draft.name, species: draft.species, role: draft.role, petName: draft.pet.name, concept: draft.concept },
+        // strengths/weakness: los stats del jugador tiñen escenas y complicaciones.
+        hero: {
+          name: draft.name,
+          species: draft.species,
+          role: draft.role,
+          petName: draft.pet.name,
+          concept: draft.concept,
+          strengths: topTwoStats(draft.stats).map((stat) => statLabels[stat]),
+          weakness: statLabels[lowStat(draft.stats)]
+        },
         worldContext: {
           worldName: world.name,
           era: world.era,
@@ -1379,12 +1388,12 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               </div>
               <div className="heroSummaryActions">
                 <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
-                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel y ojos en Editar héroe"}>
+                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel, ojos y pelo en Editar héroe"}>
                   <Sparkles size={13} /> Reimaginar héroe
                 </button>
               </div>
             </div>
-            {!heroLookDone && <p className="startHint">Tu héroe todavía no tiene cara: entrá a <strong>Editar héroe</strong> y elegí género, piel y ojos para forjar su retrato.</p>}
+            {!heroLookDone && <p className="startHint">Tu héroe todavía no tiene cara: entrá a <strong>Editar héroe</strong> y elegí género, piel, ojos y pelo para forjar su retrato.</p>}
             {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
           </section>
         )}
@@ -1505,7 +1514,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory || editingHero || !heroLookDone}>
             <Play size={20} /> {forgingStory ? "Forjando tu historia…" : !heroLookDone ? "Forjá tu héroe para empezar" : editingHero ? "Guardá tu héroe para empezar" : "Empezar la historia"}
           </button>
-          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel y ojos para que el narrador lo vea.</p>}
+          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel, ojos y pelo para que el narrador lo vea.</p>}
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
         </section>
       </section>
@@ -1651,7 +1660,7 @@ type CastPeek = { name: string; role?: string; description: string; desire?: str
 
 // La personalización física del héroe es obligatoria antes de forjar su retrato.
 function lookComplete(draft: Character): boolean {
-  return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor);
+  return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
 }
 
 // Las dos imágenes del héroe con el mismo seed: retrato de frente y cuerpo entero.
@@ -1716,14 +1725,65 @@ function ForgeRitual() {
   );
 }
 
-// Identidad visual del héroe: rasgos elegidos (género/piel/ojos) + nombre + linaje
-// + oficio + concepto arman el prompt. Misma identidad → misma cara (seed por
-// nombre, caché por URL). Los rasgos van PRIMERO para que la imagen los respete.
+// Rasgos raciales explícitos para la imagen: el nombre del linaje solo no alcanza
+// (el modelo no sabe que "Elfo del Velo" implica orejas puntiagudas).
+const raceLook: Record<string, string> = {
+  "human-oath": "humano",
+  "duskelder": "elfo de orejas puntiagudas y rasgos finos",
+  "rune-dwarf": "enano fornido de baja estatura y barba trenzada",
+  "road-halfling": "mediano pequeño de rostro pícaro",
+  "dragon-marked": "humano con escamas dracónicas sutiles e iris dorado",
+  "grave-touched": "humano pálido espectral de mirada fría"
+};
+
+// La stat dominante también se ve: el cuerpo cuenta la build del personaje.
+const statPhysique: Record<StatKey, string> = {
+  body: "complexión fuerte y presencia física imponente",
+  mind: "mirada analítica e inteligente",
+  charm: "sonrisa magnética y porte carismático",
+  creativity: "aire excéntrico e ingenioso",
+  courage: "porte desafiante y mandíbula firme",
+  focus: "expresión serena, precisa y vigilante",
+  luck: "chispa pícara en los ojos"
+};
+
+const statOrderForTop: StatKey[] = ["body", "mind", "charm", "creativity", "courage", "focus", "luck"];
+function topStat(stats: Character["stats"]): StatKey {
+  return statOrderForTop.reduce((best, stat) => (stats[stat] > stats[best] ? stat : best), statOrderForTop[0]);
+}
+function lowStat(stats: Character["stats"]): StatKey {
+  return statOrderForTop.reduce((worst, stat) => (stats[stat] < stats[worst] ? stat : worst), statOrderForTop[0]);
+}
+function topTwoStats(stats: Character["stats"]): [StatKey, StatKey] {
+  const sorted = [...statOrderForTop].sort((a, b) => stats[b] - stats[a]);
+  return [sorted[0], sorted[1]];
+}
+
+// Qué toca cada stat en la historia — tooltips del reparto de puntos.
+const statHints: Record<StatKey, string> = {
+  body: "Fuerza y aguante: trepar, forzar, resistir daño.",
+  mind: "Deducción y saber: pistas, archivos, contradicciones.",
+  charm: "Palabra y encanto: convencer, calmar, leer intenciones.",
+  creativity: "Ingenio: improvisar herramientas y salidas raras.",
+  courage: "Avanzar con miedo: enfrentar, proteger, no ceder.",
+  focus: "Precisión y paciencia: apuntar, vigilar, descifrar rituales.",
+  luck: "Fortuna: críticos más probables y azares a favor."
+};
+
+// Identidad visual del héroe: rasgos elegidos (género/piel/ojos/pelo) + raza +
+// stat dominante + oficio + concepto arman el prompt. Misma identidad → misma
+// cara (seed por nombre, caché por URL). Los rasgos van PRIMERO para que manden.
 function heroPortraitSpec(draft: Character): { name: string; appearance: string; styleHint: string } {
   const selectedSpecies = species.find((item) => item.name === draft.species);
   const look = draft.look ?? {};
-  const traits = [look.gender, look.skinTone && `piel ${look.skinTone}`, look.eyeColor && `ojos ${look.eyeColor}`].filter(Boolean).join(", ");
-  const appearance = [traits, `${draft.species} ${draft.role}, heroic protagonist`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
+  const traits = [
+    look.gender,
+    selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : undefined,
+    look.skinTone && `piel ${look.skinTone}`,
+    look.eyeColor && `ojos ${look.eyeColor}`,
+    look.hairColor && `pelo ${look.hairColor}`
+  ].filter(Boolean).join(", ");
+  const appearance = [traits, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
   return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
 }
 
@@ -1745,6 +1805,14 @@ const lookEyeOptions = [
   { label: "azules", color: "#4a7fc1" },
   { label: "grises", color: "#9aa4ad" },
   { label: "violetas", color: "#8a5fc1" }
+] as const;
+const lookHairOptions = [
+  { label: "negro", color: "#181820" },
+  { label: "castaño", color: "#5d3a22" },
+  { label: "rubio", color: "#d9b264" },
+  { label: "rojo fuego", color: "#a83a20" },
+  { label: "blanco", color: "#e8e4da" },
+  { label: "plateado", color: "#aab4c2" }
 ] as const;
 
 // Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
@@ -2496,12 +2564,12 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
-              <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled || !heroLookDone} title={heroLookDone ? "La IA imagina otra cara para la misma identidad" : "Elegí género, piel y ojos primero"}>
+              <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled || !heroLookDone} title={heroLookDone ? "La IA imagina otra cara para la misma identidad" : "Elegí género, piel, ojos y pelo primero"}>
                 <Sparkles size={13} /> Reimaginar héroe
               </button>
             )}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
-            {!heroLookDone && <span className="portraitStatus lookNeeded">Elegí género, piel y ojos →</span>}
+            {!heroLookDone && <span className="portraitStatus lookNeeded">Elegí género, piel, ojos y pelo →</span>}
           </div>
           <div className="heroIdentityFields">
             <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
@@ -2531,8 +2599,27 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                   ))}
                 </div>
               </div>
+              <div className="lookGroup">
+                <span>Pelo</span>
+                <div className="lookSwatches">
+                  {lookHairOptions.map((option) => (
+                    <button key={option.label} type="button" title={`Pelo ${option.label}`} aria-label={`Pelo ${option.label}`} className={draft.look?.hairColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ hairColor: draft.look?.hairColor === option.label ? undefined : option.label })} disabled={disabled} />
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="avatarPicker heroAvatarPicker">{avatarOptions.map((avatar) => <button className={draft.avatarUrl === avatar ? "selected" : ""} key={avatar} type="button" onClick={() => setDraft(createCharacter({ ...draft, avatarUrl: avatar }))} disabled={disabled} aria-label="Elegir retrato"><img src={avatar} alt="" /></button>)}</div>
+            {/* La compañera se elige acá mismo, con su propia imagen (reemplaza a los avatares fijos). */}
+            <div className="petPicker">
+              <span>Tu compañera de aventuras</span>
+              <div className="petPickerRow">
+                {legendaryPets.map((pet) => (
+                  <button key={pet.id} type="button" className={draft.pet.id === pet.id ? "selected" : ""} onClick={() => setDraft(createCharacter({ ...draft, pet }))} disabled={disabled} title={`${pet.name} — ${pet.description}`}>
+                    <NpcPortrait name={pet.name} portraitUrl={petPortraitUrl(pet.name, pet.description)} size={44} />
+                    <small>{pet.name}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -2552,7 +2639,10 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 const affinity = Object.keys(item.statBonus ?? {})[0] as StatKey | undefined;
                 return (
                   <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.species === item.name ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, species: item.name }))}>
-                    <strong>{item.name}</strong>
+                    <span className="builderCardHead">
+                      <NpcPortrait name={item.name} portraitUrl={archetypeImageUrl("lineage", item.name, item.description)} size={42} />
+                      <strong>{item.name}</strong>
+                    </span>
                     <span>{item.description}</span>
                     {affinity && <span className="cardChips"><em className={`statChip stat-${affinity}`}>{statLabels[affinity]}</em></span>}
                   </button>
@@ -2571,7 +2661,10 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             <div className="builderCardGrid">
               {roles.map((item) => (
                 <button key={item.id} type="button" disabled={disabled} className={`builderCard ${draft.role === item.name ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, role: item.name }))}>
-                  <strong>{item.name}</strong>
+                  <span className="builderCardHead">
+                    <NpcPortrait name={item.name} portraitUrl={archetypeImageUrl("role", item.name, item.description)} size={42} />
+                    <strong>{item.name}</strong>
+                  </span>
                   <span>{item.description}</span>
                   <span className="cardChips">
                     <em className={`statChip stat-${item.mainStat}`}>{statLabels[item.mainStat]}</em>
@@ -2592,7 +2685,10 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             <div className="builderCardGrid">
               {legendaryPets.map((pet) => (
                 <button key={pet.id} type="button" disabled={disabled} className={`builderCard ${draft.pet.id === pet.id ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, pet }))}>
-                  <strong>{pet.name}</strong>
+                  <span className="builderCardHead">
+                    <NpcPortrait name={pet.name} portraitUrl={petPortraitUrl(pet.name, pet.description)} size={42} />
+                    <strong>{pet.name}</strong>
+                  </span>
                   <span>{pet.description}</span>
                   <span className="cardChips"><em className={`statChip stat-${pet.preferredStat}`}>{statLabels[pet.preferredStat]}</em></span>
                 </button>
@@ -2613,9 +2709,10 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
 
       <div className="forgeRight">
         <div className="pointsBar"><strong>{remainingPoints}</strong><span>puntos de forja</span><em>{spentPoints}/8 asignados sobre los valores base · máx. 4 por stat</em></div>
+        <p className="statsLegend">Cada stat abre acciones distintas en la historia. Tus dos más altas brillan en la trama; la más baja te va a complicar. La stat dominante también moldea tu retrato.</p>
         <div className="statBarsPanel">
           {(Object.keys(statLabels) as StatKey[]).map((stat) => (
-            <div className="statBarRow" key={stat}>
+            <div className="statBarRow" key={stat} title={statHints[stat]}>
               <img src={characterStatAssets[stat]} alt="" aria-hidden="true" />
               <span>
                 {statLabels[stat]}
@@ -2646,9 +2743,10 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
         </div>
         <div className="heroSheet">
           <h3>Ficha viva</h3>
-          <p className="sheetBlock"><strong>Quién sos</strong>{selectedSpecies.name} · {selectedRole.name} · {selectedPet.name}</p>
-          <p className="sheetBlock"><strong>Qué te ayuda</strong>{selectedSpecies.passiveTrait} {selectedRole.specialAbility} {selectedPet.activeAbility}</p>
-          <p className="sheetBlock"><strong>Qué te complica</strong>{selectedSpecies.quirk} {selectedRole.limitation}</p>
+          <p className="sheetBlock who"><strong>Quién sos</strong>{draft.name || "Tu héroe"}, {selectedSpecies.name.toLowerCase()} y {selectedRole.name.toLowerCase()}, junto a {selectedPet.name}.{draft.look?.gender ? ` ${draft.look.gender}, piel ${draft.look.skinTone ?? "?"}, ojos ${draft.look.eyeColor ?? "?"}, pelo ${draft.look.hairColor ?? "?"}.` : ""}</p>
+          <p className="sheetBlock helps"><strong>Qué te ayuda</strong>{selectedSpecies.passiveTrait} {selectedRole.specialAbility} {selectedPet.activeAbility}</p>
+          <p className="sheetBlock trouble"><strong>Qué te complica</strong>{selectedSpecies.quirk} {selectedRole.limitation}</p>
+          <p className="sheetBlock story"><strong>En la historia</strong>Tus fuertes: {topTwoStats(draft.stats).map((stat) => statLabels[stat]).join(" y ")}. Tu flanco débil: {statLabels[lowStat(draft.stats)]}. El narrador los va a usar.</p>
         </div>
       </div>
     </section>
