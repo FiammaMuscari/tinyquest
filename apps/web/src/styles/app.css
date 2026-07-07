@@ -497,7 +497,6 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .talentPicker button { width: 50px; height: 50px; padding: 0; border-radius: 50%; border: 2px solid rgba(217,168,77,.22); background: radial-gradient(circle, rgba(217,168,77,.08), rgba(7,9,14,.86)); overflow: hidden; filter: saturate(.9); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease, filter .15s ease; }
 .talentPicker button:hover:not(:disabled), .talentPicker button.selected { border-color: #f1c970; box-shadow: 0 0 0 2px rgba(241,201,112,.14), 0 0 24px rgba(255,174,52,.28); filter: saturate(1.12); transform: translateY(-1px); }
 .talentPicker img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.lockedTalent { color: rgba(217,168,77,.42); font-size: 30px; }
 .progression p, .setupPanel p { margin: 8px 0; line-height: 1.4; color: #e8d9ff; }
 .progression h3 { margin: 0 0 8px; color: #ffda8a; }
 .dangerMeter { height: 12px; border-radius: 999px; background: #150d24; overflow: hidden; border: 1px solid #4b3b69; }
@@ -3637,6 +3636,19 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .worldCard.hasArt strong { font-size: 16px; }
 .worldCard.hasArt span { font-size: 11.5px; opacity: .95; }
 .worldCard.hasArt.selected { box-shadow: 0 0 0 2px rgba(255,191,53,.55), 0 8px 30px rgba(255,174,52,.22); border-color: #ffbf35; }
+/* ── Dimensiones fieles de imágenes (2026-07-07) ────────────────────────────── */
+/* Mundos: el arte es 1024×576 — la card mantiene 16:9 para que el encuadre del
+   cuadro sea el mismo a cualquier ancho/zoom (antes quedaba una franja de ~3:1). */
+.worldCard.hasArt { aspect-ratio: 16 / 9; min-height: 0; height: auto; }
+/* Talentos: un solo aro (el del medallón) — el botón contenedor no dibuja
+   borde/glow propio ni se levanta; eso duplicaba los bordes. */
+.talentPicker button.talentOption, .talentPicker button.talentOption:hover:not(:disabled), .talentPicker button.talentOption.selected { border-color: transparent !important; box-shadow: none !important; transform: none !important; filter: none !important; background: transparent !important; }
+/* Retrato del designer: la toma de cuerpo entero es 256×384 → marco 2:3 exacto. */
+.heroPortraitFrame.fullbodyFrame { height: auto; aspect-ratio: 2 / 3; }
+/* Retrato del lobby: mismo aspecto que la fuente — cara 1:1, cuerpo entero 2:3
+   (la caja fija 112×140 recortaba las dos tomas). */
+.heroSpecial .heroSummaryRow img.summaryShot { width: 112px; height: 112px; }
+.heroSpecial .heroSummaryRow img.summaryShot.fullShot { height: 168px; }
 .worldCard { animation: portraitIn .5s ease; }
 
 /* El héroe es el paso 1: sección con marco dorado protagonista. */

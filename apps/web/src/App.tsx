@@ -1393,7 +1393,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <section className="panel heroSummary heroSpecial">
             <LobbyStepTitle number={1} title="Forjá tu héroe" />
             <div className="heroSummaryRow">
-              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} priority />
+              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className={draft.look?.avatarShot === "fullbody" ? "summaryShot fullShot" : "summaryShot"} priority />
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
@@ -2847,7 +2847,6 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                   <span>{talent.name}</span>
                 </button>
               ))}
-              <button className="lockedTalent" type="button" disabled aria-label="Talento bloqueado">⌕</button>
             </div>
           </div>
         </div>
