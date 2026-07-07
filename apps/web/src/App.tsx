@@ -1380,6 +1380,10 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   // El temple de la quest: la historia elegida sube una stat y baja otra en la partida.
   const questTemper = getQuestTemper(selectedCampaign);
   const improvisedSelected = improvisedCampaign !== null && selectedCampaign.id === improvisedCampaign.id;
+  // Hasta que TODOS los assets estén pintados (retrato del héroe + portada con el
+  // héroe en escena), no se puede empezar el mundo.
+  const [bannerReady, setBannerReady] = useState(false);
+  const assetsForging = (heroLookDone && heroPortrait.status === "loading") || (improvisedSelected && !bannerReady);
   // La forja es SIEMPRE un click explícito, con las ideas como aporte opcional:
   // primero se elige mundo/entrada/recorrido, después se forja.
   const canForge = !forgingStory;
@@ -1468,7 +1472,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {forgeError && !forgingStory && <p className="storyForgeError">{forgeError} <button type="button" className="ghostButton retryForge" onClick={() => onForgeStory(forgePrompt.trim())}>Reintentar</button></p>}
           {improvisedSelected && !forgingStory && improvisedCampaign && (
             <div className="forgedTeaser">
-              <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} hero={draft} />
+              <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} hero={draft} onReady={setBannerReady} />
               <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
               <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
               {improvisedCampaign.forgeNotes?.summary?.objective && (
@@ -1556,8 +1560,8 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <div className="questTemper">
             Esta historia templa tu <em className={`statChip stat-${questTemper.blessed}`}>{statLabels[questTemper.blessed]} +1</em> y descuida tu <em className={`statChip stat-${questTemper.strained} strained`}>{statLabels[questTemper.strained]} −1</em> durante la partida.
           </div>
-          <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory || editingHero || !heroLookDone}>
-            <Play size={20} /> {forgingStory ? "Forjando tu historia…" : !heroLookDone ? "Forjá tu héroe para empezar" : editingHero ? "Guardá tu héroe para empezar" : "Empezar la historia"}
+          <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory || editingHero || !heroLookDone || assetsForging}>
+            <Play size={20} /> {forgingStory ? "Forjando tu historia…" : !heroLookDone ? "Forjá tu héroe para empezar" : editingHero ? "Guardá tu héroe para empezar" : assetsForging ? "Forjando las imágenes de tu leyenda…" : "Empezar la historia"}
           </button>
           {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel, ojos y pelo para que el narrador lo vea.</p>}
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
@@ -1693,16 +1697,43 @@ function loadImg(src: string): Promise<HTMLImageElement> {
   return image.decode().then(() => image);
 }
 
+// Cartel de forja de assets: spinner + frases que laten, rotando, mientras la IA
+// pinta la portada (escena del mundo + tu héroe compositado).
+const assetForgingLines = [
+  "Pintando la escena de tu mundo…",
+  "Colocando a tu héroe en situación…",
+  "Mezclando los óleos del narrador…",
+  "Fundiendo la figura con la luz de la escena…",
+  "Los últimos trazos de la portada…"
+];
+function AssetForging() {
+  const [line, setLine] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setLine((v) => (v + 1) % assetForgingLines.length), 2100);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <div className="assetForging" role="status" aria-label="Generando la portada de tu historia">
+      <span className="spin" />
+      <em>{assetForgingLines[line]}</em>
+    </div>
+  );
+}
+
 // Portada de la historia: la escena generada + TU AVATAR compositado encima con
 // bordes fundidos — la promesa es dura: sea cual sea tu imagen (IA o clásica),
 // aparece en la portada. El prompt además describe al héroe por si flux lo pinta.
-function ForgedStoryBanner({ campaign, world, hero }: { campaign: Campaign; world: WorldEra; hero: Character }) {
+function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
   const castLine = campaign.npcs.slice(0, 3).map((npc) => npc.appearance ?? npc.name).join("; ");
   const heroLine = heroPortraitSpec(hero).appearance;
   const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine, heroLine));
   const avatarUrl: string = hero.avatarUrl;
   const heroShotUrl = hero.look?.fullBodyUrl ?? (avatarUrl.startsWith("/") || isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : null);
   const [composed, setComposed] = useState<string | null>(null);
+  // La portada está lista cuando la composición terminó (o cuando hay escena y
+  // no hay héroe que montar): recién ahí se habilita Empezar.
+  const ready = composed !== null || (!!src && !heroShotUrl);
+  useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
   useEffect(() => {
     if (!src || !heroShotUrl) { setComposed(null); return; }
     let alive = true;
@@ -1741,7 +1772,8 @@ function ForgedStoryBanner({ campaign, world, hero }: { campaign: Campaign; worl
     })();
     return () => { alive = false; };
   }, [src, heroShotUrl]);
-  if (!src && status === "loading") return <div className="forgedBanner bannerLoading" role="status" aria-label="Generando escena"><span className="spin" /></div>;
+  // Generando (escena o composición): spinner + frases que laten.
+  if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
   if (!src) return null;
   return <img className="forgedBanner portraitFade" src={composed ?? src} alt={`Escena de ${campaign.title} con tu héroe`} />;
 }
