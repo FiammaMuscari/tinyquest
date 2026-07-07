@@ -181,3 +181,14 @@ test("8e) las pistas plantadas viajan en clue.plantadas con su regla, solo si ex
   assert.equal(clean.turn.clue.plantadas, undefined);
   assert.ok(!clean.rules.some((r) => r.includes("plantadas")));
 });
+
+test("8f) actorSkill: el arma/oficio del héroe viaja al narrador solo en turnos de jugador", () => {
+  const input = { recentSessionLog: [], character: { specialAbility: "Dagas Gemelas: si el primer golpe falla, el segundo convierte la falla en éxito parcial. Ganzúas de hueso." } };
+  const parsed = JSON.parse(budget.buildCompactGroqPrompt(plan(), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input));
+  assert.ok(parsed.turn.actorSkill.includes("Dagas Gemelas"));
+  assert.ok(parsed.rules.some((r) => r.includes("actorSkill")));
+  // turno de bot: sin actorSkill ni regla
+  const botTurn = JSON.parse(budget.buildCompactGroqPrompt(plan({ actorKind: "bot", actorId: "bot-1" }), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input));
+  assert.equal(botTurn.turn.actorSkill, undefined);
+  assert.ok(!botTurn.rules.some((r) => r.includes("actorSkill")));
+});

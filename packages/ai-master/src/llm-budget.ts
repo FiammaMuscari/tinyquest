@@ -170,11 +170,16 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
   const clueIds = plan.cluePolicy.canRevealNewClue ? plan.cluePolicy.allowedClueIds.slice(0, 3) : [];
   const plantadas = clueIds.filter((id) => input?.selectedCampaign?.clues?.find((c) => c.id === id)?.isFalse);
 
+  // El arma/oficio del héroe (dagas gemelas, arco encantado, ganzúas…): el
+  // narrador debe saber CON QUÉ actúa el personaje, no narrar manos genéricas.
+  const actorSkill = plan.actorKind === "player" ? short(input?.character?.specialAbility, 150) : undefined;
+
   const payload = {
     story: storyLast,
     turn: {
       actor: plan.actorName,
       kind: plan.actorKind,
+      ...(actorSkill ? { actorSkill } : {}),
       action: plan.actionText,
       roll: { total: plan.roll.total, dc: plan.roll.dc, result: plan.roll.result, ...(plan.roll.critical ? { critical: true } : {}), ...(plan.roll.fumble ? { fumble: true } : {}) },
       facts,
@@ -204,6 +209,9 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
         : []),
       ...(plantadas.length
         ? ["clue.plantadas = pistas FALSAS sembradas en la historia: si revelás una, narrala tan creíble como cualquier otra PERO dejá un detalle concreto que no cierra del todo (una hora, una mano, un olor). JAMÁS digas ni insinúes que es falsa."]
+        : []),
+      ...(actorSkill
+        ? ["turn.actorSkill = las armas y herramientas propias del héroe: cuando la acción encaje (combate, cerraduras, puntería, sigilo), que la narración las nombre — pelea con SUS dagas, dispara SU arco, fuerza la cerradura con SUS ganzúas; nunca manos genéricas."]
         : []),
       "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",
       "VARIÁ LA APERTURA: está PROHIBIDO empezar con las mismas palabras, el mismo sujeto o la misma imagen que cualquier entrada de noRepeat. Abrí cada turno distinto: a veces con una acción, a veces con un diálogo, a veces con un detalle sensorial NUEVO.",
