@@ -3756,13 +3756,19 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
    diálogos e historial — la UI sigue en Nunito, los títulos en Cinzel. */
 .dmPanel p, .historyNarration { font-family: 'Alegreya', Georgia, serif; font-size: 15.5px; line-height: 1.6; }
 .dmPanel details p, .dmPanel .warning { font-family: 'Nunito', system-ui, sans-serif; font-size: 12.5px; }
-/* ── Destello dorado inferior con blur ascendente (2026-07-07) ──────────────
-   Selecciones activas y botones al tocar: brasas doradas que suben desde el
-   borde inferior. builderCard usa ::before (su ::after es la estrella ✦). */
-@keyframes tqEmberRise {
-  0% { opacity: 0; transform: translateY(5px) scaleX(.85); filter: blur(6px); }
-  35% { opacity: .85; }
-  100% { opacity: 0; transform: translateY(-15px) scaleX(1.1); filter: blur(11px); }
+/* ── Luciérnagas doradas (2026-07-07) ───────────────────────────────────────
+   Selecciones activas y botones al tocar: puntitos de luz MINÚSCULOS que
+   flotan desde el borde inferior hacia arriba y desaparecen, con un vaivén
+   lateral suave. builderCard usa ::before (su ::after es la estrella ✦). */
+@keyframes tqFireflyRise {
+  0% { transform: translateY(10px); opacity: 0; }
+  18% { opacity: .95; }
+  70% { opacity: .55; }
+  100% { transform: translateY(-30px); opacity: 0; }
+}
+@keyframes tqFireflySway {
+  from { margin-left: -4px; }
+  to { margin-left: 4px; }
 }
 .quickChoiceGroup .pillRow button.selected, .lobbyShell .lookPills button.selected,
 .lobbyShell .shotToggle button.selected, .lobbyShell .builderTabs button.active,
@@ -3779,18 +3785,28 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .ghostButton:hover:not(:disabled)::after, .lobbyShell .reimagineButton:hover:not(:disabled)::after,
 .soloButton:hover:not(:disabled)::after, .primaryButton:hover:not(:disabled)::after,
 .lobbyShell .builderCard.selected::before {
-  content: ""; position: absolute; left: 10%; right: 10%; bottom: -3px; height: 15px;
-  border-radius: 50%; pointer-events: none;
-  background: radial-gradient(ellipse at center bottom, rgba(242,210,124,.8), rgba(212,175,55,.3) 55%, transparent 78%);
-  animation: tqEmberRise 2.2s ease-out infinite;
+  content: ""; position: absolute; left: 4%; right: 4%; bottom: 0; height: 34px;
+  pointer-events: none;
+  background:
+    radial-gradient(2px 2px at 9% 84%, rgba(255,238,180,.95), transparent 65%),
+    radial-gradient(1.4px 1.4px at 23% 58%, rgba(242,210,124,.8), transparent 65%),
+    radial-gradient(1.8px 1.8px at 38% 90%, rgba(255,244,200,.9), transparent 65%),
+    radial-gradient(1.3px 1.3px at 52% 66%, rgba(242,210,124,.7), transparent 65%),
+    radial-gradient(2px 2px at 67% 82%, rgba(255,238,180,.9), transparent 65%),
+    radial-gradient(1.4px 1.4px at 79% 55%, rgba(242,210,124,.75), transparent 65%),
+    radial-gradient(1.8px 1.8px at 92% 74%, rgba(255,244,200,.85), transparent 65%);
+  background-repeat: no-repeat;
+  animation: tqFireflyRise 3s linear infinite, tqFireflySway 1.7s ease-in-out infinite alternate;
 }
+/* En cards grandes las luciérnagas tienen más aire para subir. */
+.worldCard.hasArt.selected::after, .lobbyShell .builderCard.selected::before { height: 64px; }
 /* Base fija del destello: brillo dorado apoyado en el borde inferior. */
 .quickChoiceGroup .pillRow button.selected, .lobbyShell .lookPills button.selected,
 .lobbyShell .shotToggle button.selected, .lobbyShell .builderTabs button.active,
 .lobbyShell .builderCard.selected {
-  box-shadow: inset 0 -10px 16px -12px rgba(242,210,124,.65) !important;
+  box-shadow: inset 0 -8px 14px -12px rgba(242,210,124,.4) !important;
 }
-.worldCard.hasArt.selected { box-shadow: inset 0 -22px 30px -20px rgba(242,210,124,.7), 0 0 0 1px rgba(242,210,124,.35), 0 0 34px rgba(212,175,55,.4) !important; }
+.worldCard.hasArt.selected { box-shadow: inset 0 -14px 22px -18px rgba(242,210,124,.45), 0 0 0 1px rgba(242,210,124,.35), 0 0 34px rgba(212,175,55,.4) !important; }
 /* Cards de mundo: leve zoom extra (los assets ya vienen recortados sin su marco
    pintado; esto remata cualquier resto de borde en los extremos). */
 .worldCard.hasArt { background-size: 106% auto !important; background-position: center 40% !important; }
