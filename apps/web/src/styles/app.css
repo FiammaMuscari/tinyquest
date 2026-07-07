@@ -3636,6 +3636,35 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .worldCard.hasArt strong { font-size: 16px; }
 .worldCard.hasArt span { font-size: 11.5px; opacity: .95; }
 .worldCard.hasArt.selected { box-shadow: 0 0 0 2px rgba(255,191,53,.55), 0 8px 30px rgba(255,174,52,.22); border-color: #ffbf35; }
+/* ── Sistema de botones + paleta del pack (2026-07-07) ──────────────────────
+   Paleta: gold #D4AF37 · gold claro #F2D27C · navy #0D1B2A · panel #050A12 ·
+   pergamino #EADFC6 · teal #2EC4B6. Radios: paneles 14 / cards y botones 12 /
+   pills y chips 999. Todo scoped al lobby (el juego conserva su tema). */
+:root { --tq-gold: #D4AF37; --tq-gold-hi: #F2D27C; --tq-navy: #0D1B2A; --tq-panel: #050A12; --tq-cream: #EADFC6; --tq-teal: #2EC4B6; }
+.lobbyShell .ghostButton, .lobbyShell .reimagineButton, .lobbyShell .heroDone, .lobbyShell .retryForge, .lobbyShell .shotToggle button, .lobbyShell .builderTabs button {
+  font-family: Georgia, serif; font-weight: 700; color: var(--tq-cream);
+  border: 1px solid rgba(212,175,55,.42); border-radius: 12px;
+  background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95));
+  box-shadow: none; transition: border-color .15s ease, color .15s ease, box-shadow .15s ease;
+}
+.lobbyShell .ghostButton:hover:not(:disabled), .lobbyShell .reimagineButton:hover:not(:disabled), .lobbyShell .heroDone:hover:not(:disabled), .lobbyShell .shotToggle button:hover:not(:disabled), .lobbyShell .shotToggle button.selected, .lobbyShell .builderTabs button.active {
+  border-color: var(--tq-gold); color: var(--tq-gold-hi); box-shadow: 0 0 12px rgba(212,175,55,.3);
+}
+.lobbyShell .builderTabs button span { color: rgba(212,175,55,.85); }
+.lobbyShell .builderTabs button strong { color: var(--tq-cream); }
+.lobbyShell .lookPills button { border: 1px solid rgba(212,175,55,.35); border-radius: 999px; background: rgba(5,10,18,.7); color: var(--tq-cream); }
+.lobbyShell .lookPills button.selected { border-color: var(--tq-gold); color: var(--tq-gold-hi); background: rgba(212,175,55,.14); box-shadow: 0 0 10px rgba(212,175,55,.3); }
+/* Texto lila heredado del tema viejo → pergamino/teal de la paleta. */
+.lobbyShell .worldCard span { color: var(--tq-cream); }
+.lobbyShell .worldCard em { color: var(--tq-teal); }
+.lobbyShell .worldCard small { color: rgba(234,223,198,.6); }
+/* Forjá tu historia: input y botón con el mismo radio y la misma altura. */
+.storyForgeRow input, .storyForgeRow .forgeButton { border-radius: 12px !important; min-height: 48px; }
+.storyForgeRow input { color: var(--tq-cream); }
+.storyForgeRow input::placeholder { color: rgba(234,223,198,.55); }
+.forgeButton:disabled { opacity: .55; }
+.lobbyShell .startCta { border-radius: 14px; }
+.lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
 /* ── Dimensiones fieles de imágenes (2026-07-07) ────────────────────────────── */
 /* Mundos: el arte es 1024×576 — la card mantiene 16:9 para que el encuadre del
    cuadro sea el mismo a cualquier ancho/zoom (antes quedaba una franja de ~3:1). */
