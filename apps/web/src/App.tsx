@@ -1793,16 +1793,11 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
 }
 
 // Título de paso del lobby: rombo numerado + serif dorada + filete CORTO.
-// El flujo entre pasos lo marca una flecha en el gutter (ver .stepFlowArrow en CSS),
-// no una línea recta eterna.
+// El flujo entre pasos lo marca el conector ornamental del gutter (ver
+// .lobbyLayout::before en CSS), no una línea recta eterna.
 function LobbyStepTitle({ number, title }: { number: number; title: string }) {
   return (
     <div className="lobbyStepTitle">
-      {number > 1 && (
-        <svg className="stepFlowArrow" viewBox="0 0 16 20" aria-hidden="true">
-          <path d="M8 2v13M3 10l5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )}
       <i className="stepDiamond" aria-hidden="true"><span>{number}</span></i>
       <h2>{title}</h2>
       <span className="stepRule" aria-hidden="true" />
