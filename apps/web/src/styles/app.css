@@ -3577,7 +3577,12 @@ h1 {
 .heroSpecial { position: relative; background: linear-gradient(180deg, rgba(30,24,14,.55), rgba(11,9,5,.85)); border: 1px solid rgba(212,175,55,.28); overflow: hidden; }
 /* Detalle central del mockup: círculo arcano + espada de filigrana AL FONDO,
    centrados; todo el contenido del panel queda por encima (z-index). */
-.heroSpecial::before { content: ""; position: absolute; inset: 0; background: url("/assets/ui/ornamento-espada.webp") no-repeat center / auto 86%, url("/assets/ui/ornamento-circulo.webp") no-repeat center / auto 96%; opacity: .3; pointer-events: none; z-index: 0; }
+/* Ornamento de fondo en dos capas: la espada FIJA (::before) y el círculo arcano
+   que GIRA lento como una brújula mágica (::after). */
+.heroSpecial::before { content: ""; position: absolute; inset: 0; background: url("/assets/ui/ornamento-espada.webp") no-repeat center / auto 86%; opacity: .3; pointer-events: none; z-index: 0; }
+.heroSpecial::after { content: ""; position: absolute; inset: 0; background: url("/assets/ui/ornamento-circulo.webp") no-repeat center / auto 96%; opacity: .3; pointer-events: none; z-index: 0; animation: arcaneSpin 60s linear infinite; will-change: transform; }
+@keyframes arcaneSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .heroSpecial::after { animation: none; } }
 .heroSpecial > * { position: relative; z-index: 1; }
 /* Card interna del héroe con marco fino y esquinas ornamentadas (como el mockup). */
 .heroSpecial .heroSummaryRow { position: relative; border: 1px solid rgba(212,175,55,.32); border-radius: 12px; padding: 16px 18px; }
@@ -3766,7 +3771,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .lookGroup > span { color: rgba(212,175,55,.9); }
 /* Editor del héroe SIN el ornamento de fondo (pentagrama + espada): solo va en
    la card resumen del paso 1, no mientras editás. */
-.heroEditWrap.heroSpecial::before { display: none; }
+.heroEditWrap.heroSpecial::before, .heroEditWrap.heroSpecial::after { display: none; }
 /* Botones del JUEGO al mismo sistema: primarios dorados Cinzel, flechas de
    stats en carbón/oro — un solo lenguaje en todo el juego. */
 .soloButton, .primaryButton { background: linear-gradient(180deg, #F2D27C 0%, #D4AF37 55%, #b98e22 100%); color: #241703; border: 1px solid rgba(255,230,160,.8); font-family: 'Cinzel', Georgia, serif; font-weight: 700; box-shadow: 0 0 18px rgba(212,175,55,.3); }
