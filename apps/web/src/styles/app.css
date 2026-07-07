@@ -3609,7 +3609,10 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .heroSummaryInfo .heroSummaryPet { padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid rgba(117,234,219,.35); background: rgba(8, 20, 18,.55); justify-self: start; }
 /* Paso 3: labels en caps, input alto, botón de yunque. */
 .quickChoiceGroup > span { text-transform: uppercase; letter-spacing: .07em; }
-.quickChoiceGroup .pillRow button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(212,175,55,.3); background: linear-gradient(180deg, rgba(30,24,14,.85), rgba(11,9,5,.92)); color: #EADFC6; font-family: 'Cinzel', Georgia, serif; }
+/* Cada pill es su propia píldora completa (borde y radio propios); el contenedor
+   ya no dibuja marco — antes los botones rectos rompían el radio del row. */
+.quickChoiceGroup .pillRow { border: 0; background: none; overflow: visible; gap: 7px; }
+.quickChoiceGroup .pillRow button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(212,175,55,.3); border-radius: 999px !important; padding: 7px 16px; background: linear-gradient(180deg, rgba(30,24,14,.85), rgba(11,9,5,.92)); color: #EADFC6; font-family: 'Cinzel', Georgia, serif; }
 .quickChoiceGroup .pillRow button.selected { border-color: #D4AF37 !important; color: #F2D27C !important; background: linear-gradient(180deg, rgba(52,41,22,.95), rgba(16,13,7,.95)) !important; box-shadow: 0 0 10px rgba(212,175,55,.35); }
 .quickChoiceGroup .pillRow button .uiIcon { width: 16px; height: 16px; }
 .storyForgeRow input { padding: 12px 14px; border-radius: 12px; font-size: 13.5px; border: 1px solid rgba(212,175,55,.35); background: rgba(11,9,5,.75); }

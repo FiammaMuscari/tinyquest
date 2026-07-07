@@ -5,10 +5,12 @@
 //   Fiamy puede pisar con otro audio sin tocar código; mientras sea el mismo
 //   archivo, se distingue con un tono apenas más grave (playbackRate).
 const STORAGE_KEY = "tiny-quest:ui-sound";
-type ClickKind = "menu" | "soft";
+type ClickKind = "menu" | "soft" | "action";
 const SOURCES: Record<ClickKind, { src: string; gain: number; rate: number }> = {
   menu: { src: "/media/audio/ui-click.wav", gain: 0.5, rate: 1 },
-  soft: { src: "/media/audio/ui-click-soft.wav", gain: 0.42, rate: 0.86 }
+  soft: { src: "/media/audio/ui-click-soft.wav", gain: 0.42, rate: 0.86 },
+  // Acciones grandes: elegir mundo, crear/forjar héroe, forjar historia.
+  action: { src: "/media/audio/ui-action.mp3", gain: 0.55, rate: 1 }
 };
 
 let ctx: AudioContext | null = null;
@@ -62,12 +64,15 @@ export function playUiClick(kind: ClickKind = "soft") {
 
 /** Botones del menú principal: header (crear sala / unirse), ayuda y ajustes. */
 const MENU_SCOPE = ".lobbyHeaderActions, .helpButton, .settingsButton, .settingsPop, .helpPanel";
+/** Acciones grandes: elegir mundo, crear/editar/guardar héroe, forjar historia y empezar. */
+const ACTION_SCOPE = ".worldCard, .forgeButton, .startCta, .heroSummaryActions, .heroDone, .reimagineButton";
 
 /** Listener global delegado: cualquier click en un botón habilitado suena. */
 export function installUiClickSound(): () => void {
   const onClick = (event: MouseEvent) => {
     const button = (event.target as HTMLElement | null)?.closest?.("button");
-    if (button && !button.disabled) playUiClick(button.closest(MENU_SCOPE) ? "menu" : "soft");
+    if (!button || button.disabled) return;
+    playUiClick(button.closest(ACTION_SCOPE) ? "action" : button.closest(MENU_SCOPE) ? "menu" : "soft");
   };
   document.addEventListener("click", onClick, true);
   return () => document.removeEventListener("click", onClick, true);
