@@ -5,6 +5,7 @@ import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
 import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { installUiClickSound, setUiSoundEnabled, uiSoundEnabled } from "./ui-sound";
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -582,6 +583,8 @@ export function App() {
   const [draft, setDraft] = useState<Character>(() => readStoredDraft());
   const draftRef = useRef(draft);
   useEffect(() => { draftRef.current = draft; }, [draft]);
+  // Sonido de interfaz: un toc cálido en cada botón (toggle en Ajustes).
+  useEffect(() => installUiClickSound(), []);
   // RETRATOS CONGELADOS: el par frente/cuerpo se genera UNA vez (al completar el
   // look) y después solo cambia con "Reimaginar héroe". Editar identidad, stats o
   // rasgos NO regenera nada — el par fijado en look.faceUrl/fullBodyUrl es la
@@ -1960,6 +1963,7 @@ function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcI
 // hoy viven en localStorage (encuadre de la imagen de escena en partida).
 function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode: SceneImageMode) => void }) {
   const [open, setOpen] = useState(false);
+  const [sound, setSound] = useState(() => uiSoundEnabled());
   return (
     <>
       <button className="helpButton settingsButton" type="button" onClick={() => setOpen((v) => !v)} aria-label="Ajustes" title="Ajustes" aria-expanded={open}>
@@ -1974,6 +1978,10 @@ function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode:
               <span aria-hidden="true">{option.icon}</span> {option.label}
             </button>
           ))}
+          <strong>Sonido de interfaz</strong>
+          <button type="button" className={sound ? "selected" : ""} onClick={() => { setUiSoundEnabled(!sound); setSound(!sound); }}>
+            <span aria-hidden="true">{sound ? "🔔" : "🔕"}</span> {sound ? "Clicks con sonido" : "Silencio"}
+          </button>
         </div>
       )}
     </>

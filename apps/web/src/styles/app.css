@@ -3756,6 +3756,41 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
    diálogos e historial — la UI sigue en Nunito, los títulos en Cinzel. */
 .dmPanel p, .historyNarration { font-family: 'Alegreya', Georgia, serif; font-size: 15.5px; line-height: 1.6; }
 .dmPanel details p, .dmPanel .warning { font-family: 'Nunito', system-ui, sans-serif; font-size: 12.5px; }
+/* ── Destello dorado inferior con blur ascendente (2026-07-07) ──────────────
+   Selecciones activas y botones al tocar: brasas doradas que suben desde el
+   borde inferior. builderCard usa ::before (su ::after es la estrella ✦). */
+@keyframes tqEmberRise {
+  0% { opacity: 0; transform: translateY(5px) scaleX(.85); filter: blur(6px); }
+  35% { opacity: .85; }
+  100% { opacity: 0; transform: translateY(-15px) scaleX(1.1); filter: blur(11px); }
+}
+.quickChoiceGroup .pillRow button.selected, .lobbyShell .lookPills button.selected,
+.lobbyShell .shotToggle button.selected, .lobbyShell .builderTabs button.active,
+.worldCard.hasArt.selected, .lobbyShell .builderCard.selected,
+.forgeButton:hover:not(:disabled), .lobbyShell .startCta:hover:not(:disabled),
+.lobbyShell .ghostButton:hover:not(:disabled), .lobbyShell .reimagineButton:hover:not(:disabled),
+.soloButton:hover:not(:disabled), .primaryButton:hover:not(:disabled) {
+  position: relative; overflow: hidden;
+}
+.quickChoiceGroup .pillRow button.selected::after, .lobbyShell .lookPills button.selected::after,
+.lobbyShell .shotToggle button.selected::after, .lobbyShell .builderTabs button.active::after,
+.worldCard.hasArt.selected::after,
+.forgeButton:hover:not(:disabled)::after, .lobbyShell .startCta:hover:not(:disabled)::after,
+.lobbyShell .ghostButton:hover:not(:disabled)::after, .lobbyShell .reimagineButton:hover:not(:disabled)::after,
+.soloButton:hover:not(:disabled)::after, .primaryButton:hover:not(:disabled)::after,
+.lobbyShell .builderCard.selected::before {
+  content: ""; position: absolute; left: 10%; right: 10%; bottom: -3px; height: 15px;
+  border-radius: 50%; pointer-events: none;
+  background: radial-gradient(ellipse at center bottom, rgba(242,210,124,.8), rgba(212,175,55,.3) 55%, transparent 78%);
+  animation: tqEmberRise 2.2s ease-out infinite;
+}
+/* Base fija del destello: brillo dorado apoyado en el borde inferior. */
+.quickChoiceGroup .pillRow button.selected, .lobbyShell .lookPills button.selected,
+.lobbyShell .shotToggle button.selected, .lobbyShell .builderTabs button.active,
+.lobbyShell .builderCard.selected {
+  box-shadow: inset 0 -10px 16px -12px rgba(242,210,124,.65) !important;
+}
+.worldCard.hasArt.selected { box-shadow: inset 0 -22px 30px -20px rgba(242,210,124,.7), 0 0 0 1px rgba(242,210,124,.35), 0 0 34px rgba(212,175,55,.4) !important; }
 /* Cards de mundo: leve zoom extra (los assets ya vienen recortados sin su marco
    pintado; esto remata cualquier resto de borde en los extremos). */
 .worldCard.hasArt { background-size: 106% auto !important; background-position: center 40% !important; }
