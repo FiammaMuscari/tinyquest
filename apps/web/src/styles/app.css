@@ -3744,6 +3744,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .summaryCard p { color: var(--tq-cream); }
 .lobbyShell .summaryCard.mission { border-color: rgba(212,175,55,.4); background: rgba(30,22,6,.45); }
 .lobbyShell .questTemper { color: rgba(234,223,198,.85); }
+.lobbyShell .lookGroup > span { color: rgba(212,175,55,.9); }
 /* Cards de mundo: leve zoom extra (los assets ya vienen recortados sin su marco
    pintado; esto remata cualquier resto de borde en los extremos). */
 .worldCard.hasArt { background-size: 106% auto !important; background-position: center 40% !important; }
@@ -3757,10 +3758,13 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* Retrato del héroe: UN solo marco para las dos tomas (cambiar Frente/Cuerpo no
    salta de tamaño). El recorte lo absorbe cover: la cara (1:1) pierde un poco
    de los lados, el cuerpo (2:3) casi nada y queda anclado a la cabeza. */
-.heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: clamp(104px, 9vw, 150px); height: auto; aspect-ratio: 3 / 4; }
+/* La columna del grid acompaña al marco: si divergen, el retrato pisa los campos. */
+.heroIdentity { grid-template-columns: clamp(104px, 9vw, 150px) minmax(0, 1fr); }
+.heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 100%; height: auto; aspect-ratio: 3 / 4; }
 .heroPortraitFrame.fullbodyFrame .heroPortrait { object-position: top; }
 @media (max-width: 620px) {
   .heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 76px; height: 102px; }
+  .heroIdentity { grid-template-columns: 76px minmax(0, 1fr); }
 }
 .worldCard { animation: portraitIn .5s ease; }
 
