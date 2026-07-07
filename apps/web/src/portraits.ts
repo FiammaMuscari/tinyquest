@@ -62,14 +62,44 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
 
+// Arquetipos de linaje/oficio PRE-GENERADOS y guardados como assets fijos
+// (apps/web/public/assets/archetypes): no se regeneran en cada partida y son la
+// base visual del linaje/oficio elegido. Clave = "kind:nombre exacto". Un
+// arquetipo nuevo sin asset cae al generador por URL (abajo).
+const ARCHETYPE_ASSETS: Record<string, string> = {
+  "lineage:Humano de Juramento": "/assets/archetypes/lineage-human-oath.webp",
+  "lineage:Elfo del Velo": "/assets/archetypes/lineage-duskelder.webp",
+  "lineage:Enano de Runafosa": "/assets/archetypes/lineage-rune-dwarf.webp",
+  "lineage:Mediano del Camino": "/assets/archetypes/lineage-road-halfling.webp",
+  "lineage:Marcado por Dragón": "/assets/archetypes/lineage-dragon-marked.webp",
+  "lineage:Tocado por la Tumba": "/assets/archetypes/lineage-grave-touched.webp",
+  "role:Guardia del Umbral": "/assets/archetypes/role-umbral-guard.webp",
+  "role:Oráculo de Almas": "/assets/archetypes/role-soul-oracle.webp",
+  "role:Cerrajera de Ruinas": "/assets/archetypes/role-ruin-locksmith.webp",
+  "role:Juramentado de Ceniza": "/assets/archetypes/role-ash-oath.webp",
+  "role:Diplomática de Sangre": "/assets/archetypes/role-blood-diplomat.webp",
+  "role:Vinculador de Reliquias": "/assets/archetypes/role-relic-binder.webp",
+  "role:Sombra del Gremio": "/assets/archetypes/role-guild-shadow.webp",
+  "role:Arquera del Alba": "/assets/archetypes/role-dawn-archer.webp"
+};
+
 // Imagen de arquetipo para las cards de linaje/oficio del designer: un vistazo
-// de "de qué va" cada opción. Seed por kind+nombre → cacheada para siempre.
+// de "de qué va" cada opción. Usa el asset fijo si existe; si no, lo genera
+// (misma URL/seed con la que se pre-generó, para que coincida al guardarlo).
 export function archetypeImageUrl(kind: "lineage" | "role", name: string, description: string): string {
+  const asset = ARCHETYPE_ASSETS[`${kind}:${name}`];
+  if (asset) return asset;
   const style = kind === "lineage"
     ? "Fantasy race archetype character portrait, atmospheric bust illustration"
     : "Fantasy adventurer profession illustration, iconic pose with tools of the trade";
   const prompt = `${style}: ${name}. ${description}. Dark moody painted background, rich detail, no text`;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=384&nologo=true&model=flux&seed=${nameHash(kind + name) % 100000}`;
+}
+
+/** El arquetipo de linaje elegido, como imagen de referencia estable (base visual
+ * del héroe). Vacío si el linaje aún no tiene asset pre-generado. */
+export function lineageArchetypeAsset(speciesName: string): string | undefined {
+  return ARCHETYPE_ASSETS[`lineage:${speciesName}`];
 }
 
 // Arte de mundo para las cards del lobby: paisaje/mapa pintado que caracteriza al
