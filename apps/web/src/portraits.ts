@@ -80,8 +80,12 @@ export function worldCardImageUrl(worldId: string, name: string, era: string, ta
 // creados interactuando. No es edición de la imagen del mundo (img2img no existe en
 // el tier gratis): es una generación nueva que hereda mundo + elenco, cacheada por
 // título. Cero uso de Gemini — las imágenes van siempre por Pollinations.
-export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, castLine: string): string {
-  const prompt = `Epic fantasy story illustration, cinematic wide shot in the world of ${worldName} (${era}): the tale "${storyTitle}". Characters together in a tense scene: ${castLine}. Painted, dramatic light, rich detail, no text`;
+export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, castLine: string, heroLine?: string): string {
+  // heroLine = el MISMO descriptor con el que se pintó el retrato del héroe
+  // (género/raza/piel/ojos/pelo): tu personaje aparece EN la escena, coherente
+  // con su avatar, en el centro de la acción.
+  const hero = heroLine?.trim() ? ` The protagonist stands at the center of the action: ${heroLine}.` : "";
+  const prompt = `Epic fantasy story illustration, cinematic wide shot in the world of ${worldName} (${era}): the tale "${storyTitle}".${hero} Characters together in a tense scene: ${castLine}. Painted, dramatic light, rich detail, no text`;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
 }
 

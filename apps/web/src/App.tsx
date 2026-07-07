@@ -1468,7 +1468,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {forgeError && !forgingStory && <p className="storyForgeError">{forgeError} <button type="button" className="ghostButton retryForge" onClick={() => onForgeStory(forgePrompt.trim())}>Reintentar</button></p>}
           {improvisedSelected && !forgingStory && improvisedCampaign && (
             <div className="forgedTeaser">
-              <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} />
+              <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} hero={draft} />
               <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
               <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
               {improvisedCampaign.forgeNotes?.summary?.objective && (
@@ -1699,9 +1699,11 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
 
 // Banner de la historia forjada: el mundo elegido con el elenco creado en escena.
 // URL determinística desde el contenido de la campaña → cacheado, cero re-cómputo.
-function ForgedStoryBanner({ campaign, world }: { campaign: Campaign; world: WorldEra }) {
+function ForgedStoryBanner({ campaign, world, hero }: { campaign: Campaign; world: WorldEra; hero: Character }) {
   const castLine = campaign.npcs.slice(0, 3).map((npc) => npc.appearance ?? npc.name).join("; ");
-  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine));
+  // El héroe entra a la escena con el MISMO descriptor de su retrato: coherente.
+  const heroLine = heroPortraitSpec(hero).appearance;
+  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine, heroLine));
   if (!src && status === "loading") return <div className="forgedBanner bannerLoading" role="status" aria-label="Generando escena"><span className="spin" /></div>;
   if (!src) return null;
   return <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title}`} />;
