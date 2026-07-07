@@ -1092,6 +1092,8 @@ export type ImprovisedStoryContent = {
   evidence?: string[];
   /** Capa ENGINE: giros que REINTERPRETAN la evidencia inicial. Jamás se muestran al crear. */
   hiddenTwists?: string[];
+  /** Capa ENGINE: relaciones SECRETAS entre NPCs (no con el héroe) que reinterpretan sus bonds públicos. Jamás se muestran al crear. */
+  npcRelations?: Array<{ from: string; to: string; nature: string }>;
 };
 
 // Mundo sellado: ambiente central + reglas inmutables que el narrador respeta

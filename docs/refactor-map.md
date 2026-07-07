@@ -88,6 +88,12 @@ section** — an outdated map costs more than no map.
   heroBond, evidence[]; NPCs carry bond + whyMightLie (public, no spoilers).
   Forge input now includes `hero` and forbids NPCs reusing the hero's name
   unless bond explains it. maxTokens 3400.
+- Hidden NPC relations (SECRET layer, never rendered by any UI panel): forge asks
+  for `npcRelations[{from,to,nature}]` (names) → `buildImprovisedCampaign` resolves
+  them onto `CampaignNPC.relationshipToOtherNPCs` (ids); luna-roja has 3 authored
+  ones. `buildCompactGroqPrompt` sends them as `npcs[].hiddenTies` (subtext-only
+  rule, included only when ties exist). If a UI panel ever lists NPC fields, keep
+  relationshipToOtherNPCs out (same tier as secret/whatTheyHide/alibi).
 - Forge coherence gate: `storyCoherenceIssues` in
   `packages/ai-master/src/story-coherence.ts` (pure, tested in
   `tests/story-coherence.test.mjs`) runs after each forge attempt in

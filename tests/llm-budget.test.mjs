@@ -122,3 +122,41 @@ test("10) recordSkippedCall registra fallback esperado cuando Groq no está perm
   budget.recordSkippedCall(state, p, decision.reason);
   assert.deepEqual(state.skippedCalls[0], { reason: "bot-turns-disabled", actorId: "bot-1", sceneId: "chapel", turnId: "turn-1" });
 });
+
+test("8c) hiddenTies viaja como subtexto solo cuando el NPC tiene relaciones secretas", () => {
+  const input = {
+    recentSessionLog: [],
+    selectedCampaign: {
+      npcs: [
+        { id: "brisa", name: "Brisa Salobre", relationshipToOtherNPCs: { practico: "Le compró el silencio con el nombre de su hermano" } },
+        { id: "practico", name: "El Práctico Mudo" }
+      ],
+      enemies: [],
+      storyObjects: []
+    }
+  };
+  const bundle = {
+    hardFacts: ["Brisa duda antes de responder."],
+    forbiddenFacts: [],
+    presentNpcs: [
+      { id: "brisa", name: "Brisa Salobre", currentAttitude: "tensa", plausibleGestures: ["seca la misma jarra dos veces"] },
+      { id: "practico", name: "El Práctico Mudo", currentAttitude: "vigilante", plausibleGestures: [] }
+    ],
+    loadedObjects: [],
+    sensoryMotifs: [],
+    recentNarrationOpenings: []
+  };
+  const prompt = budget.buildCompactGroqPrompt(plan(), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input, bundle);
+  const parsed = JSON.parse(prompt);
+  const brisa = parsed.scene.npcs.find((n) => n.name === "Brisa Salobre");
+  assert.deepEqual(brisa.hiddenTies, ["El Práctico Mudo: Le compró el silencio con el nombre de su hermano"]);
+  const practico = parsed.scene.npcs.find((n) => n.name === "El Práctico Mudo");
+  assert.equal(practico.hiddenTies, undefined);
+  assert.ok(parsed.rules.some((r) => r.includes("hiddenTies")));
+});
+
+test("8d) sin relaciones secretas no se gasta la regla de hiddenTies", () => {
+  const prompt = budget.buildCompactGroqPrompt(plan(), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, { recentSessionLog: [] });
+  const parsed = JSON.parse(prompt);
+  assert.ok(!parsed.rules.some((r) => r.includes("hiddenTies")));
+});

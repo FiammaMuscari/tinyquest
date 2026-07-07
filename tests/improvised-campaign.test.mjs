@@ -99,3 +99,25 @@ test("buildImprovisedCampaign resiste contenido incompleto del LLM", () => {
   // sceneIndex fuera de rango queda clampeado a una escena real.
   assert.ok(campaign.clues.every((clue) => /scene-[1-4]$/.test(clue.sceneId)));
 });
+
+test("npcRelations se resuelven por nombre a relationshipToOtherNPCs", () => {
+  const campaign = buildImprovisedCampaign({
+    ...fullContent,
+    npcRelations: [
+      { from: "Brisa Salobre", to: "El Práctico Mudo", nature: "Le compró el silencio con el nombre de su hermano" },
+      { from: "el práctico", to: "Brisa", nature: "La vigila desde el muelle por orden de la farera" },
+      { from: "Brisa Salobre", to: "Brisa Salobre", nature: "auto-relación inválida" },
+      { from: "Nadie Conocido", to: "Brisa Salobre", nature: "nombre que no existe" }
+    ]
+  });
+  const [brisa, practico] = campaign.npcs;
+  assert.equal(brisa.relationshipToOtherNPCs?.[practico.id], "Le compró el silencio con el nombre de su hermano");
+  assert.equal(practico.relationshipToOtherNPCs?.[brisa.id], "La vigila desde el muelle por orden de la farera");
+  // Ni la auto-relación ni el nombre inexistente dejan rastro.
+  assert.equal(Object.keys(brisa.relationshipToOtherNPCs ?? {}).length, 1);
+});
+
+test("sin npcRelations no aparece relationshipToOtherNPCs", () => {
+  const campaign = buildImprovisedCampaign(fullContent);
+  for (const npc of campaign.npcs) assert.equal(npc.relationshipToOtherNPCs, undefined);
+});

@@ -95,9 +95,23 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
   const forbidden = bundle?.forbiddenFacts.slice(0, 4).map((f) => short(f, 110) ?? f)
     ?? plan.mustNotHappen.slice(0, 3).map((f) => short(f, 110) ?? f);
 
-  // Scene NPCs from bundle or plan
+  // Scene NPCs from bundle or plan. hiddenTies = relaciones secretas entre NPCs
+  // (relationshipToOtherNPCs, cargado por la forja): viajan como subtexto, cap 2.
+  const campaignNpcs = input?.selectedCampaign?.npcs;
+  const hiddenTiesFor = (npcId: string): string[] | undefined => {
+    const relations = campaignNpcs?.find((c) => c.id === npcId)?.relationshipToOtherNPCs;
+    if (!relations) return undefined;
+    const ties = Object.entries(relations).slice(0, 2).map(([otherId, nature]) => {
+      const otherName = campaignNpcs?.find((c) => c.id === otherId)?.name ?? otherId;
+      return `${otherName}: ${short(nature, 90) ?? nature}`;
+    });
+    return ties.length ? ties : undefined;
+  };
   const npcs = bundle
-    ? bundle.presentNpcs.slice(0, 3).map((n) => ({ name: n.name, attitude: n.currentAttitude, gestures: n.plausibleGestures.slice(0, 2) }))
+    ? bundle.presentNpcs.slice(0, 3).map((n) => {
+      const hiddenTies = hiddenTiesFor(n.id);
+      return { name: n.name, attitude: n.currentAttitude, gestures: n.plausibleGestures.slice(0, 2), ...(hiddenTies ? { hiddenTies } : {}) };
+    })
     : plan.npcDirectives.slice(0, 3).map((n) => ({ name: n.name, attitude: "desconocida", gestures: [] as string[] }));
 
   // Scene objects and motifs from bundle
@@ -180,6 +194,9 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       "narration: 1-2 párrafos CORTOS, máximo ~90 palabras en total. Cada frase se gana su lugar; sin relleno atmosférico.",
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
+      ...(npcs.some((n) => "hiddenTies" in n && n.hiddenTies)
+        ? ["npcs[].hiddenTies = relaciones SECRETAS entre personajes: usalas SOLO como subtexto (una mirada esquivada, una tensión, un nombre que incomoda). PROHIBIDO declararlas o revelarlas en la narración."]
+        : []),
       "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",
       "VARIÁ LA APERTURA: está PROHIBIDO empezar con las mismas palabras, el mismo sujeto o la misma imagen que cualquier entrada de noRepeat. Abrí cada turno distinto: a veces con una acción, a veces con un diálogo, a veces con un detalle sensorial NUEVO.",
       "story[] es continuidad de TRAMA y tensión, NO un molde de prosa: no copies su arranque ni sus frases. No repitas motivos ya usados en turnos previos (un objeto que cae, las voces que se cortan, el sudor frío, etc.); avanzá con material nuevo.",
