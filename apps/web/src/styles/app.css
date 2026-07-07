@@ -3717,6 +3717,30 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .builderCardHead { gap: 10px; }
 .lobbyShell .builderCardHead img:not([src^="/assets/companions/"]) { width: 48px !important; height: 48px !important; border-radius: 50% !important; border: 2px solid rgba(212,175,55,.45) !important; object-fit: cover; }
 .lobbyShell .builderCardHead img[src^="/assets/companions/"] { width: 48px !important; height: 48px !important; }
+/* ── Barrido final de paleta del lobby (2026-07-07): fuera lilas, naranjas y
+   teals legacy — todo a gold/cream/teal del pack. ─────────────────────────── */
+.lobbyStepTitle h2 { color: var(--tq-gold-hi); }
+.stepDiamond { border-color: rgba(212,175,55,.75); box-shadow: 0 0 12px rgba(212,175,55,.28); }
+.stepDiamond span { color: var(--tq-gold-hi); }
+.stepRule { background: linear-gradient(90deg, rgba(212,175,55,.5), rgba(212,175,55,.05)); }
+.stepRule::before { color: rgba(212,175,55,.7); }
+.lobbyShell .entryHint { color: rgba(234,223,198,.7); }
+.lobbyShell .quickChoiceGroup > span { color: rgba(212,175,55,.95); }
+.lobbyShell .portraitStatus { color: var(--tq-gold-hi); }
+.lobbyShell .storyForgeError { color: #e8a27c; }
+.lobbyShell .heroSummaryInfo .heroSummaryPet { color: #8fdcd2; border-color: rgba(46,196,182,.4); background: rgba(6,24,28,.55); }
+.lobbyShell .forgedTeaser { border-color: rgba(212,175,55,.32); background: linear-gradient(175deg, rgba(24,20,8,.55), rgba(5,10,18,.92)); border-radius: 12px; }
+.lobbyShell .forgedTeaser strong { color: var(--tq-gold-hi); font-family: Georgia, serif; font-size: 15px; }
+.lobbyShell .forgedTeaser em { color: rgba(212,175,55,.85); }
+.lobbyShell .forgedTeaser p { color: rgba(234,223,198,.88); }
+.lobbyShell .summaryCard { border-color: rgba(46,196,182,.3); background: rgba(5,20,24,.5); border-radius: 10px; }
+.lobbyShell .summaryCard em { color: var(--tq-teal); }
+.lobbyShell .summaryCard p { color: var(--tq-cream); }
+.lobbyShell .summaryCard.mission { border-color: rgba(212,175,55,.4); background: rgba(30,22,6,.45); }
+.lobbyShell .questTemper { color: rgba(234,223,198,.85); }
+/* Cards de mundo: leve zoom extra (los assets ya vienen recortados sin su marco
+   pintado; esto remata cualquier resto de borde en los extremos). */
+.worldCard.hasArt { background-size: 106% auto !important; background-position: center 40% !important; }
 /* ── Dimensiones fieles de imágenes (2026-07-07) ────────────────────────────── */
 /* Mundos: el arte es 1024×576 — la card mantiene 16:9 para que el encuadre del
    cuadro sea el mismo a cualquier ancho/zoom (antes quedaba una franja de ~3:1). */
