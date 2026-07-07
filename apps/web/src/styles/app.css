@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Fredoka:wght@600;700&family=Nunito:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Fredoka:wght@600;700&family=Nunito:wght@400;500;600;700;800;900&family=Alegreya:ital,wght@0,400;0,500;0,700;1,400&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -63,7 +63,7 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 .miniMeters span { display: flex; align-items: center; gap: 5px; }
 
 .centerColumn { position: relative; display: grid; grid-template-rows: 1fr auto; gap: 12px; min-width: 0; }
-.sceneImage { min-height: 270px; display: flex; align-items: end; border-radius: 8px; padding: 18px; background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,.12); box-shadow: inset 0 -80px 120px rgba(3,6,14,.6); }
+.sceneImage { min-height: 270px; display: flex; align-items: end; border-radius: 8px; padding: 18px; background-size: cover; background-position: center; border: 1px solid rgba(255,255,255,.12); box-shadow: inset 0 -80px 120px rgba(8, 6, 4,.6); }
 .scenePanel h2 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 46px); color: #ffda8a; text-shadow: 0 2px 16px rgba(0,0,0,.85); }
 .scenePanel p { max-width: 720px; margin: 0 0 12px; font-size: 17px; line-height: 1.45; }
 .sceneBriefGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
@@ -90,7 +90,7 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 .chosenAction { margin: 0 0 10px; color: #ffe4a5; line-height: 1.4; }
 .actionGuide { margin: 0 0 10px; padding: 9px 10px; border-radius: 8px; background: rgba(69, 234, 211, .1); border: 1px solid rgba(69,234,211,.22); color: #d8fff8; font-size: 12px; line-height: 1.35; }
 .diceRuleHint { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
-.diceRuleHint span { min-width: 0; padding: 8px 9px; border-radius: 8px; background: rgba(5, 12, 25, .62); border: 1px solid rgba(255,255,255,.08); color: #d8c9f5; font-size: 12px; line-height: 1.25; }
+.diceRuleHint span { min-width: 0; padding: 8px 9px; border-radius: 8px; background: rgba(12, 10, 6, .62); border: 1px solid rgba(255,255,255,.08); color: #d8c9f5; font-size: 12px; line-height: 1.25; }
 .diceRuleHint strong { color: #ffda8a; text-transform: uppercase; }
 .memoryPanel { padding-bottom: 12px; }
 .memoryGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
@@ -100,13 +100,13 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 .memoryGrid p { margin: 0; color: #e8d9ff; font-size: 12px; line-height: 1.35; }
 .controlRow { display: grid; grid-template-columns: 180px 1fr; gap: 10px; margin: 10px 0; }
 label { display: grid; gap: 6px; color: #ffd98c; text-transform: uppercase; font-weight: 900; font-size: 11px; }
-textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius: 8px; background: rgba(5, 12, 25, .86); color: #fff8df; padding: 10px; }
+textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius: 8px; background: rgba(12, 10, 6, .86); color: #fff8df; padding: 10px; }
 .petToggle { grid-template-columns: auto 1fr; align-items: start; text-transform: none; color: #efe4ff; font-size: 13px; margin: 8px 0 12px; }
 .petToggle input { width: auto; margin-top: 3px; }
 .turnError { margin: 8px 0 10px; padding: 9px 10px; border-radius: 8px; border: 1px solid rgba(255, 99, 99, .4); background: rgba(120, 18, 30, .28); color: #ffd0d0; font-size: 12px; line-height: 1.35; }
 .soloButton, .primaryButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: 0; border-radius: 8px; padding: 12px 16px; color: #13091e; background: linear-gradient(180deg, #ffd77b, #ff9c2e); font-weight: 900; line-height: 1.2; text-align: center; white-space: normal; overflow-wrap: anywhere; box-shadow: 0 0 22px rgba(255, 182, 63, .35); }
 .primaryButton { width: 100%; }
-.ghostButton { margin-top: 10px; border: 1px solid rgba(255, 191, 53, .35); border-radius: 8px; padding: 9px 12px; color: #ffda8a; background: rgba(5, 12, 25, .72); font-weight: 900; }
+.ghostButton { margin-top: 10px; border: 1px solid rgba(255, 191, 53, .35); border-radius: 8px; padding: 9px 12px; color: #ffda8a; background: rgba(12, 10, 6, .72); font-weight: 900; }
 .empty { color: #cabbe6; }
 
 .dmPanel { align-self: stretch; overflow: auto; }
@@ -176,7 +176,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 }
 .resolutionEmpty { margin: 0; color: var(--muted); font-size: 13px; }
 .diceGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: center; }
-.diceGrid > * { background: rgba(5, 12, 25, .7); border-radius: 8px; padding: 10px; min-height: 42px; }
+.diceGrid > * { background: rgba(12, 10, 6, .7); border-radius: 8px; padding: 10px; min-height: 42px; }
 .diceGrid b { color: #ffbf35; font-size: 20px; }
 .diceGrid em { color: #45ead3; font-style: normal; text-transform: uppercase; font-weight: 900; }
 .diceGrid p { grid-column: span 2; margin: 0; color: #ffe4a5; }
@@ -198,7 +198,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .lobbyShell { width: min(1760px, calc(100% - 28px)); min-height: 100vh; }
 .brandLogo { width: min(390px, 100%); height: auto; display: block; filter: drop-shadow(0 8px 18px rgba(0,0,0,.5)); }
 .brandLogoSmall { width: min(300px, 100%); margin-bottom: 2px; }
-.lobbyHeader { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(240px, auto); gap: 18px; align-items: center; margin-bottom: 12px; padding: 14px 22px; border: 1px solid rgba(217, 168, 77, .38); border-radius: 8px; background: linear-gradient(90deg, rgba(9, 13, 18, .92), rgba(31, 18, 20, .78)); box-shadow: inset 0 0 48px rgba(217,168,77,.08); }
+.lobbyHeader { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(240px, auto); gap: 18px; align-items: center; margin-bottom: 12px; padding: 14px 22px; border: 1px solid rgba(217, 168, 77, .38); border-radius: 8px; background: linear-gradient(90deg, rgba(14, 11, 7, .92), rgba(31, 18, 20, .78)); box-shadow: inset 0 0 48px rgba(217,168,77,.08); }
 .lobbyHeader h1 { font-size: clamp(34px, 4vw, 54px); }
 .lobbyHeader span { color: #eadfc6; font-weight: 900; text-transform: uppercase; font-size: 12px; letter-spacing: .02em; }
 .lobbyHeaderActions { display: grid; gap: 10px; justify-items: end; }
@@ -233,7 +233,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .lobbyHeroGrid .designer .forgeLeft { grid-column: 1; }
 .lobbyHeroGrid .designer .forgeRight { grid-column: 2; grid-row: 2; align-self: stretch; }
 .lobbyPreview { padding-bottom: 14px; overflow: hidden; }
-.lobbySceneImage { min-height: 205px; display: grid; align-content: end; padding: 18px; border-radius: 8px; background-size: cover; background-position: center; border: 1px solid rgba(217,168,77,.28); box-shadow: inset 0 -130px 130px rgba(3,6,14,.82); }
+.lobbySceneImage { min-height: 205px; display: grid; align-content: end; padding: 18px; border-radius: 8px; background-size: cover; background-position: center; border: 1px solid rgba(217,168,77,.28); box-shadow: inset 0 -130px 130px rgba(8, 6, 4,.82); }
 .lobbySceneImage h2 { margin: 0 0 7px; color: #ffda8a; font-size: clamp(24px, 2.4vw, 34px); line-height: 1.02; text-shadow: 0 2px 16px rgba(0,0,0,.85); }
 .lobbySceneImage p { max-width: 520px; margin: 0; color: #fff8df; line-height: 1.35; font-size: 14px; font-weight: 800; }
 .lobbyInfoGrid { display: grid; grid-template-columns: 1fr; gap: 8px; }
@@ -256,7 +256,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .themeGrid small { color: #ffe4a5; margin-top: 5px; font-size: 11px; }
 /* ── Forja de héroe (creador de personaje del lobby) ── */
 .forgeLeft, .forgeRight { min-width: 0; display: grid; gap: 12px; align-content: start; }
-.heroIdentity { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 13px; align-items: start; padding: 13px; border-radius: 10px; border: 1px solid rgba(217,168,77,.24); background: linear-gradient(160deg, rgba(28,18,6,.6), rgba(4,12,25,.7)); }
+.heroIdentity { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 13px; align-items: start; padding: 13px; border-radius: 10px; border: 1px solid rgba(217,168,77,.24); background: linear-gradient(160deg, rgba(28,18,6,.6), rgba(11, 9, 5,.7)); }
 .heroPortraitFrame { width: 104px; height: 104px; border-radius: 12px; padding: 3px; background: linear-gradient(150deg, rgba(255,198,95,.85), rgba(120,70,20,.4) 55%, rgba(255,198,95,.3)); box-shadow: 0 4px 18px rgba(0,0,0,.5), 0 0 24px rgba(255,183,69,.16); }
 .heroPortrait { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; display: block; }
 .heroIdentityFields { display: grid; gap: 8px; min-width: 0; }
@@ -271,12 +271,12 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .builderCardGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 8px; }
 .builderCard { position: relative; display: grid; gap: 5px; align-content: start; text-align: left; padding: 10px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(12,10,6,.62); min-height: 98px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
 .builderCard:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(255,191,53,.5); }
-.builderCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.66), rgba(6,13,26,.88)); box-shadow: 0 0 0 1px rgba(255,191,53,.25), 0 0 20px rgba(255,174,52,.16); }
+.builderCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.66), rgba(15, 12, 7,.88)); box-shadow: 0 0 0 1px rgba(255,191,53,.25), 0 0 20px rgba(255,174,52,.16); }
 .builderCard.selected::after { content: "✦"; position: absolute; top: 7px; right: 9px; color: #ffbf35; text-shadow: 0 0 10px rgba(255,191,53,.8); font-size: 13px; }
 .builderCard strong { color: #ffda8a; font-size: 13px; line-height: 1.15; padding-right: 14px; }
 .builderCard > span { color: #d8c9f5; font-size: 11px; line-height: 1.3; }
 .builderCard .cardChips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-.builderDetail { display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(217,168,77,.18); background: rgba(4,12,25,.58); }
+.builderDetail { display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(217,168,77,.18); background: rgba(11, 9, 5,.58); }
 .builderDetail p { margin: 0; display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; font-size: 12px; line-height: 1.35; color: #e8d9ff; }
 .builderDetail p strong { color: #75eadb; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
 .affinityMark { font-style: normal; margin-left: 5px; color: #ffbf35; text-shadow: 0 0 8px rgba(255,191,53,.6); font-size: 10px; cursor: help; }
@@ -335,7 +335,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .worldGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 12px; }
 .worldCard { display: grid; gap: 5px; align-content: start; text-align: left; padding: 13px 14px; min-height: 118px; border-radius: 11px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(165deg, rgba(24,19,11,.85), rgba(10,8,5,.8)); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
 .worldCard:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(255,191,53,.5); }
-.worldCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.7), rgba(6,13,26,.9)); box-shadow: 0 0 0 1px rgba(255,191,53,.28), 0 0 26px rgba(255,174,52,.18); }
+.worldCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.7), rgba(15, 12, 7,.9)); box-shadow: 0 0 0 1px rgba(255,191,53,.28), 0 0 26px rgba(255,174,52,.18); }
 .worldCard em { color: #75eadb; font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
 .worldCard strong { color: #ffda8a; font-size: 15px; line-height: 1.15; }
 .worldCard span { color: #e8d9ff; font-size: 12px; line-height: 1.35; }
@@ -350,7 +350,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .perspectiveRow button small { color: #d8c9f5; font-size: 11px; line-height: 1.35; }
 .storyForgeStatus.forged { color: #ffda8a; animation: none; }
 .retryForge { margin-left: 8px; padding: 2px 10px; font-size: 11px; }
-.forgedTeaser { display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(255,191,53,.34); background: linear-gradient(165deg, rgba(56,36,10,.5), rgba(6,13,26,.85)); }
+.forgedTeaser { display: grid; gap: 6px; padding: 11px 12px; border-radius: 10px; border: 1px solid rgba(255,191,53,.34); background: linear-gradient(165deg, rgba(56,36,10,.5), rgba(15, 12, 7,.85)); }
 .forgedTeaser strong { color: #ffda8a; font-size: 14px; }
 .forgedTeaser p { margin: 0; color: #e8d9ff; font-size: 12px; line-height: 1.4; }
 .forgedTeaserMeta { display: grid; gap: 3px; }
@@ -393,7 +393,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .castChip.threat { border-color: rgba(232,100,80,.45); color: #ffb4a0; }
 
 /* ── Forja de historias (modo improvisado) ── */
-.storyForge { display: grid; gap: 8px; margin-bottom: 12px; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(69,234,211,.28); background: linear-gradient(160deg, rgba(4,26,32,.72), rgba(4,12,25,.66)); }
+.storyForge { display: grid; gap: 8px; margin-bottom: 12px; padding: 12px 13px; border-radius: 10px; border: 1px solid rgba(69,234,211,.28); background: linear-gradient(160deg, rgba(9, 24, 21,.72), rgba(11, 9, 5,.66)); }
 .storyForgeIntro { display: grid; gap: 2px; }
 .storyForgeIntro strong { color: #75eadb; font-size: 13px; letter-spacing: .02em; }
 .storyForgeIntro span { color: #d8c9f5; font-size: 12px; }
@@ -403,7 +403,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .storyForgeStatus { margin: 0; color: #75eadb; font-size: 12px; animation: forgePulse 1.6s ease-in-out infinite; }
 .storyForgeError { margin: 0; color: #ff9d7a; font-size: 12px; }
 @keyframes forgePulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-.lobbyThemeCard.improvisedCard { border-color: rgba(69,234,211,.5); background-image: linear-gradient(165deg, rgba(6,40,44,.85), rgba(6,13,26,.92)); }
+.lobbyThemeCard.improvisedCard { border-color: rgba(69,234,211,.5); background-image: linear-gradient(165deg, rgba(6,40,44,.85), rgba(15, 12, 7,.92)); }
 .lobbyThemeCard.improvisedCard.selected { border-color: #75eadb; box-shadow: 0 0 0 1px rgba(117,234,219,.3), 0 0 22px rgba(69,234,211,.22); }
 
 /* Columna de acción (derecha en juego): elección y dados en carril angosto. */
@@ -514,7 +514,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
   place-items: center;
   border-radius: 999px;
   border: 1px solid rgba(217,168,77,.36);
-  background: rgba(9, 13, 18, .88);
+  background: rgba(14, 11, 7, .88);
   color: #f1c970;
   box-shadow: 0 10px 24px rgba(0,0,0,.34);
 }
@@ -539,7 +539,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
   padding: 18px;
   border-radius: 8px;
   border: 1px solid rgba(217,168,77,.36);
-  background: linear-gradient(180deg, rgba(36, 23, 26, .98), rgba(9, 13, 18, .98));
+  background: linear-gradient(180deg, rgba(36, 23, 26, .98), rgba(14, 11, 7, .98));
   color: #eadfc6;
   box-shadow: 0 30px 90px rgba(0,0,0,.54);
 }
@@ -624,7 +624,7 @@ body {
 .appShell { width: min(1720px, calc(100% - 28px)); }
 .brandBlock, .statusPill, .panel {
   border-color: rgba(217, 168, 77, .28);
-  background: linear-gradient(180deg, rgba(36, 23, 26, .96), rgba(9, 13, 18, .94));
+  background: linear-gradient(180deg, rgba(36, 23, 26, .96), rgba(14, 11, 7, .94));
   box-shadow: inset 0 1px rgba(255,255,255,.06), 0 16px 34px rgba(0,0,0,.34);
 }
 .brandBlock {
@@ -696,7 +696,7 @@ h1 {
 .choiceGrid button {
   min-height: 92px;
   padding: 14px;
-  background: linear-gradient(180deg, rgba(15, 20, 28, .9), rgba(9, 13, 18, .88));
+  background: linear-gradient(180deg, rgba(15, 20, 28, .9), rgba(14, 11, 7, .88));
   border-color: rgba(130,168,232,.22);
 }
 .choiceGrid button:hover { border-color: rgba(217,168,77,.58); transform: translateY(-1px); }
@@ -1191,7 +1191,7 @@ h1 {
     position: sticky;
     bottom: 0;
     z-index: 5;
-    background: linear-gradient(180deg, rgba(36, 23, 26, .98), rgba(9, 13, 18, .98));
+    background: linear-gradient(180deg, rgba(36, 23, 26, .98), rgba(14, 11, 7, .98));
   }
   .diceBar .resolutionBoard {
     grid-template-columns: minmax(86px, .82fr) repeat(3, minmax(76px, .72fr)) minmax(62px, .52fr) minmax(86px, .7fr);
@@ -1504,7 +1504,7 @@ h1 {
   border-color: rgba(255, 191, 53, .62);
   background:
     radial-gradient(circle at top left, rgba(255, 191, 53, .18), transparent 34%),
-    linear-gradient(180deg, rgba(54, 35, 25, .96), rgba(9, 13, 18, .94));
+    linear-gradient(180deg, rgba(54, 35, 25, .96), rgba(14, 11, 7, .94));
 }
 .finalBanner h2 {
   margin: 0 0 8px;
@@ -3420,7 +3420,7 @@ h1 {
 .teaserHint { color: #9b8db5; font-size: 10.5px; font-style: normal; }
 
 /* Ritual de forja: frases rotativas, brasas y barra de calor mientras escribe el LLM. */
-.forgeRitual { position: relative; overflow: hidden; display: grid; gap: 8px; padding: 13px 14px; border-radius: 10px; border: 1px dashed rgba(255,191,53,.42); background: linear-gradient(165deg, rgba(56,36,10,.42), rgba(6,13,26,.82)); }
+.forgeRitual { position: relative; overflow: hidden; display: grid; gap: 8px; padding: 13px 14px; border-radius: 10px; border: 1px dashed rgba(255,191,53,.42); background: linear-gradient(165deg, rgba(56,36,10,.42), rgba(15, 12, 7,.82)); }
 .forgeRitual p { margin: 0; color: #ffda8a; font-size: 12.5px; font-weight: 700; animation: ritualLine .5s ease; }
 @keyframes ritualLine { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 .forgeEmberBar { height: 4px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
@@ -3452,7 +3452,7 @@ h1 {
 .portraitStatus { color: #ffda8a; font-size: 11px; margin: 0; animation: forgePulse 1.6s ease-in-out infinite; }
 
 /* Rasgos del retrato: género en pills, piel/ojos en swatches de color. */
-.lookPicker { display: grid; gap: 7px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(217,168,77,.2); background: rgba(4,12,25,.45); }
+.lookPicker { display: grid; gap: 7px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(217,168,77,.2); background: rgba(11, 9, 5,.45); }
 .lookGroup { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; }
 .lookGroup > span { color: #9b8db5; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .lookPills { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -3470,7 +3470,7 @@ h1 {
 
 /* ── Flujo en 4 pasos + forja enriquecida (2026-07-06 tarde) ────────────────── */
 .stepDivider { margin-top: 6px; padding-top: 10px; border-top: 1px dashed rgba(217,168,77,.22); }
-.forgedSummary { display: grid; gap: 4px; padding: 9px 11px; border-radius: 9px; border: 1px solid rgba(117,234,219,.25); background: rgba(4,26,32,.5); }
+.forgedSummary { display: grid; gap: 4px; padding: 9px 11px; border-radius: 9px; border: 1px solid rgba(117,234,219,.25); background: rgba(9, 24, 21,.5); }
 .forgedSummary p { margin: 0; color: #d8f5ef; font-size: 12px; line-height: 1.4; }
 .forgedSummary em { color: #75eadb; font-style: normal; font-weight: 800; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; margin-right: 7px; }
 .heroBondLine { margin: 0; color: #ffda8a; font-size: 12px; font-weight: 700; line-height: 1.4; }
@@ -3490,7 +3490,7 @@ h1 {
 .forgedTeaser > strong { font-size: 17px; }
 .forgedTeaser > p { font-size: 12.5px; line-height: 1.55; }
 .summaryGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 9px; }
-.summaryCard { display: grid; gap: 5px; align-content: start; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(117,234,219,.25); background: rgba(4,26,32,.5); }
+.summaryCard { display: grid; gap: 5px; align-content: start; padding: 10px 12px; border-radius: 9px; border: 1px solid rgba(117,234,219,.25); background: rgba(9, 24, 21,.5); }
 .summaryCard em { font-style: normal; font-weight: 900; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: #75eadb; }
 .summaryCard p { margin: 0; color: #e6f5f1; font-size: 12.5px; line-height: 1.5; }
 .summaryCard.mission { border-color: rgba(255,191,53,.35); background: rgba(46,32,8,.4); }
@@ -3606,7 +3606,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .heroSpecial .heroSummaryRow { grid-template-columns: 112px minmax(0, 1fr) auto; }
 .heroSpecial .heroSummaryRow img { width: 112px; height: 140px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,198,95,.5); }
 .heroSummaryInfo strong { font-family: 'Cinzel', Georgia, serif; font-size: 26px; }
-.heroSummaryInfo .heroSummaryPet { padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid rgba(117,234,219,.35); background: rgba(4,20,25,.55); justify-self: start; }
+.heroSummaryInfo .heroSummaryPet { padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid rgba(117,234,219,.35); background: rgba(8, 20, 18,.55); justify-self: start; }
 /* Paso 3: labels en caps, input alto, botón de yunque. */
 .quickChoiceGroup > span { text-transform: uppercase; letter-spacing: .07em; }
 .quickChoiceGroup .pillRow button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(212,175,55,.3); background: linear-gradient(180deg, rgba(30,24,14,.85), rgba(11,9,5,.92)); color: #EADFC6; font-family: 'Cinzel', Georgia, serif; }
@@ -3717,7 +3717,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* Cards de linaje/oficio/compañero: retrato con aro, serif y selección dorada. */
 .lobbyShell .builderCard { border-radius: 12px; border-color: rgba(212,175,55,.22); background: linear-gradient(180deg, rgba(30,24,14,.72), rgba(11,9,5,.9)); padding: 12px 13px; gap: 7px; }
 .lobbyShell .builderCard:hover:not(:disabled) { border-color: rgba(212,175,55,.55); }
-.lobbyShell .builderCard.selected { border-color: var(--tq-gold); background: linear-gradient(170deg, rgba(56,40,12,.55), rgba(6,10,22,.92)); box-shadow: 0 0 0 1px rgba(212,175,55,.3), 0 0 22px rgba(212,175,55,.18); }
+.lobbyShell .builderCard.selected { border-color: var(--tq-gold); background: linear-gradient(170deg, rgba(56,40,12,.55), rgba(13, 10, 6,.92)); box-shadow: 0 0 0 1px rgba(212,175,55,.3), 0 0 22px rgba(212,175,55,.18); }
 .lobbyShell .builderCard strong { font-family: 'Cinzel', Georgia, serif; font-size: 15px; color: var(--tq-gold-hi); }
 .lobbyShell .builderCard > span { color: rgba(234,223,198,.82); }
 .lobbyShell .builderCardHead { gap: 10px; }
@@ -3734,17 +3734,28 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .quickChoiceGroup > span { color: rgba(212,175,55,.95); }
 .lobbyShell .portraitStatus { color: var(--tq-gold-hi); }
 .lobbyShell .storyForgeError { color: #e8a27c; }
-.lobbyShell .heroSummaryInfo .heroSummaryPet { color: #8fdcd2; border-color: rgba(46,196,182,.4); background: rgba(6,24,28,.55); }
+.lobbyShell .heroSummaryInfo .heroSummaryPet { color: #8fdcd2; border-color: rgba(46,196,182,.4); background: rgba(10, 24, 20,.55); }
 .lobbyShell .forgedTeaser { border-color: rgba(212,175,55,.32); background: linear-gradient(175deg, rgba(24,20,8,.55), rgba(11,9,5,.92)); border-radius: 12px; }
 .lobbyShell .forgedTeaser strong { color: var(--tq-gold-hi); font-family: 'Cinzel', Georgia, serif; font-size: 15px; }
 .lobbyShell .forgedTeaser em { color: rgba(212,175,55,.85); }
 .lobbyShell .forgedTeaser p { color: rgba(234,223,198,.88); }
-.lobbyShell .summaryCard { border-color: rgba(46,196,182,.3); background: rgba(5,20,24,.5); border-radius: 10px; }
+.lobbyShell .summaryCard { border-color: rgba(46,196,182,.3); background: rgba(9, 22, 19,.5); border-radius: 10px; }
 .lobbyShell .summaryCard em { color: var(--tq-teal); }
 .lobbyShell .summaryCard p { color: var(--tq-cream); }
 .lobbyShell .summaryCard.mission { border-color: rgba(212,175,55,.4); background: rgba(30,22,6,.45); }
 .lobbyShell .questTemper { color: rgba(234,223,198,.85); }
 .lobbyShell .lookGroup > span { color: rgba(212,175,55,.9); }
+/* Editor del héroe SIN el ornamento de fondo (pentagrama + espada): solo va en
+   la card resumen del paso 1, no mientras editás. */
+.heroEditWrap.heroSpecial::before { display: none; }
+/* Botones del JUEGO al mismo sistema: primarios dorados Cinzel, flechas de
+   stats en carbón/oro — un solo lenguaje en todo el juego. */
+.soloButton, .primaryButton { background: linear-gradient(180deg, #F2D27C 0%, #D4AF37 55%, #b98e22 100%); color: #241703; border: 1px solid rgba(255,230,160,.8); font-family: 'Cinzel', Georgia, serif; font-weight: 700; box-shadow: 0 0 18px rgba(212,175,55,.3); }
+.statArrow { border-color: rgba(212,175,55,.45); background: radial-gradient(circle, rgba(212,175,55,.14), rgba(12,9,5,.92)); color: var(--tq-gold-hi); }
+/* Narración estilo libro: serif de lectura para el texto del narrador,
+   diálogos e historial — la UI sigue en Nunito, los títulos en Cinzel. */
+.dmPanel p, .historyNarration { font-family: 'Alegreya', Georgia, serif; font-size: 15.5px; line-height: 1.6; }
+.dmPanel details p, .dmPanel .warning { font-family: 'Nunito', system-ui, sans-serif; font-size: 12.5px; }
 /* Cards de mundo: leve zoom extra (los assets ya vienen recortados sin su marco
    pintado; esto remata cualquier resto de borde en los extremos). */
 .worldCard.hasArt { background-size: 106% auto !important; background-position: center 40% !important; }
@@ -3769,7 +3780,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .worldCard { animation: portraitIn .5s ease; }
 
 /* El héroe es el paso 1: sección con marco dorado protagonista. */
-.heroSpecial { border: 1px solid rgba(255,191,53,.4) !important; background: linear-gradient(160deg, rgba(46,30,9,.5), rgba(6,10,22,.92)) !important; box-shadow: inset 0 0 42px rgba(255,183,69,.07), 0 6px 26px rgba(0,0,0,.35); }
+.heroSpecial { border: 1px solid rgba(255,191,53,.4) !important; background: linear-gradient(160deg, rgba(46,30,9,.5), rgba(13, 10, 6,.92)) !important; box-shadow: inset 0 0 42px rgba(255,183,69,.07), 0 6px 26px rgba(0,0,0,.35); }
 .heroSpecial .heroSummaryRow { border-color: rgba(255,198,95,.35); }
 .heroSpecial .heroSummaryRow img { width: 76px; height: 76px; }
 .heroSummaryRow { grid-template-columns: 76px minmax(0, 1fr) auto; }
@@ -3777,7 +3788,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* Designer: cards con imagen de arquetipo, picker de mascota y ficha viva rica. */
 .builderCardHead { display: flex; align-items: center; gap: 9px; }
 .builderCardHead .npcPortrait { flex: 0 0 auto; }
-.petPicker { display: grid; gap: 6px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(117,234,219,.22); background: rgba(4,20,25,.4); }
+.petPicker { display: grid; gap: 6px; padding: 9px 10px; border-radius: 9px; border: 1px solid rgba(117,234,219,.22); background: rgba(8, 20, 18,.4); }
 .petPicker > span { color: #75eadb; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .petPickerRow { display: flex; gap: 10px; }
 .petPickerRow button { display: grid; gap: 3px; justify-items: center; padding: 6px 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.03); cursor: pointer; transition: transform .13s ease, border-color .13s ease; }
