@@ -1423,8 +1423,8 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
             <div className="quickChoiceGroup">
               <span>Entrás:</span>
               <div className="pillRow">
-                <button type="button" className={perspective === "exterior" ? "selected" : ""} onClick={() => onChoosePerspective("exterior")} disabled={forgingStory}>🌒 Desde afuera</button>
-                <button type="button" className={perspective === "interior" ? "selected" : ""} onClick={() => onChoosePerspective("interior")} disabled={forgingStory}>👤 Desde adentro</button>
+                <button type="button" className={perspective === "exterior" ? "selected" : ""} onClick={() => onChoosePerspective("exterior")} disabled={forgingStory}>Desde afuera</button>
+                <button type="button" className={perspective === "interior" ? "selected" : ""} onClick={() => onChoosePerspective("interior")} disabled={forgingStory}><img className="uiIcon" src={uiIcon("solitario")} alt="" /> Desde adentro</button>
               </div>
             </div>
             <div className="quickChoiceGroup">
