@@ -165,6 +165,11 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     name: b.name, intent: b.botIntent, emotion: b.botEmotion, action: b.allowedActions[0] ?? ""
   }));
 
+  // Pistas plantadas (isFalse en la campaña) dentro de las revelables: el narrador
+  // las vende creíbles pero siembra el detalle que no cierra — jamás las declara falsas.
+  const clueIds = plan.cluePolicy.canRevealNewClue ? plan.cluePolicy.allowedClueIds.slice(0, 3) : [];
+  const plantadas = clueIds.filter((id) => input?.selectedCampaign?.clues?.find((c) => c.id === id)?.isFalse);
+
   const payload = {
     story: storyLast,
     turn: {
@@ -176,7 +181,7 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       consequence: plan.consequence.summary,
       forbidden,
       clue: plan.cluePolicy.canRevealNewClue
-        ? { canReveal: true, ids: plan.cluePolicy.allowedClueIds.slice(0, 3) }
+        ? { canReveal: true, ids: clueIds, ...(plantadas.length ? { plantadas } : {}) }
         : { canReveal: false }
     },
     scene: {
@@ -196,6 +201,9 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
       ...(npcs.some((n) => "hiddenTies" in n && n.hiddenTies)
         ? ["npcs[].hiddenTies = relaciones SECRETAS entre personajes: usalas SOLO como subtexto (una mirada esquivada, una tensión, un nombre que incomoda). PROHIBIDO declararlas o revelarlas en la narración."]
+        : []),
+      ...(plantadas.length
+        ? ["clue.plantadas = pistas FALSAS sembradas en la historia: si revelás una, narrala tan creíble como cualquier otra PERO dejá un detalle concreto que no cierra del todo (una hora, una mano, un olor). JAMÁS digas ni insinúes que es falsa."]
         : []),
       "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",
       "VARIÁ LA APERTURA: está PROHIBIDO empezar con las mismas palabras, el mismo sujeto o la misma imagen que cualquier entrada de noRepeat. Abrí cada turno distinto: a veces con una acción, a veces con un diálogo, a veces con un detalle sensorial NUEVO.",

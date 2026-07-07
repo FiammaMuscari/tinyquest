@@ -663,6 +663,7 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     return {
       id: `${slug}-clue-${index + 1}`,
       text: clampText(clue?.text, "Una prueba física contradice la explicación pública.", 220),
+      ...(clue?.isFalse ? { isFalse: true } : {}),
       sceneId: `${slug}-scene-${sceneIndex}`,
       unlocksFlags: [`${slug}_clue_${index + 1}`]
     };

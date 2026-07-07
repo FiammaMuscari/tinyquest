@@ -40,7 +40,8 @@ export const improvisedStorySchema = z.object({
   clues: z.array(z.object({
     title: z.string().catch(""),
     text: z.string().catch(""),
-    sceneIndex: z.number().catch(1)
+    sceneIndex: z.number().catch(1),
+    isFalse: z.boolean().optional().catch(undefined)
   })).min(1),
   // Bloques nuevos, todos opcionales: si el LLM los omite o los rompe, la historia sigue válida.
   summary: z.object({

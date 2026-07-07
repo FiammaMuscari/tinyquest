@@ -444,6 +444,9 @@ export type CampaignClue = {
   id: string;
   label?: string;
   text: string;
+  /** Pista PLANTADA: creíble pero falsa; el narrador siembra un detalle que no
+   * cierra y jugando se la puede desmentir. Jamás se marca en la UI. */
+  isFalse?: boolean;
   description?: string;
   source?: string;
   sceneId?: string;
@@ -1085,7 +1088,7 @@ export type ImprovisedStoryContent = {
   threat: { name: string; description: string; specialMove: string };
   scenes: ImprovisedSceneContent[];
   npcs: ImprovisedNpcContent[];
-  clues: Array<{ title: string; text: string; sceneIndex: number }>;
+  clues: Array<{ title: string; text: string; sceneIndex: number; isFalse?: boolean }>;
   /** Card de resumen jugable: qué lograr, qué se pierde, primer misterio, reloj. */
   summary?: { objective?: string; risk?: string; firstMystery?: string; timeLimit?: string };
   /** Cómo se usó cada idea del pedido especial ("elfos → Clan Lunargenta"). */

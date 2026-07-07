@@ -3,20 +3,20 @@
 
 :root {
   color: #fff8df;
-  background: #07111d;
+  background: #0a0806;
   font-family: 'Nunito', system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 20% 10%, rgba(255, 184, 62, .22), transparent 28%), linear-gradient(145deg, #06101c, #1f1228 48%, #06262a); }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: radial-gradient(circle at 20% 8%, rgba(212,175,55,.12), transparent 30%), linear-gradient(150deg, #16110a, #0a0806 55%, #060403); }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: .55; }
 
 .appShell { width: min(1540px, calc(100% - 28px)); margin: 0 auto; padding: 16px 0 26px; }
 .topStatus { display: grid; grid-template-columns: minmax(260px, 1.25fr) repeat(4, minmax(120px, .65fr)); gap: 12px; align-items: stretch; margin-bottom: 12px; }
-.brandBlock, .statusPill, .panel { border: 1px solid rgba(151, 109, 205, .58); border-radius: 8px; background: linear-gradient(180deg, rgba(37, 28, 56, .94), rgba(9, 16, 31, .92)); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 14px 34px rgba(0,0,0,.28); }
-.brandBlock { padding: 14px 18px; background: linear-gradient(90deg, rgba(16, 16, 34, .95), rgba(63, 33, 82, .86)); }
+.brandBlock, .statusPill, .panel { border: 1px solid rgba(212, 175, 55, .24); border-radius: 10px; background: linear-gradient(180deg, rgba(28, 22, 13, .94), rgba(10, 8, 5, .92)); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 14px 34px rgba(0,0,0,.28); }
+.brandBlock { padding: 14px 18px; background: linear-gradient(90deg, rgba(20, 16, 9, .95), rgba(38, 29, 15, .88)); }
 h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70px); line-height: .85; color: #ffbf35; text-shadow: 0 4px 0 #5a2a11, 0 0 20px rgba(255, 205, 105, .68); }
 .brandBlock span { display: block; margin-top: 8px; color: #efe4ff; font-weight: 800; text-transform: uppercase; font-size: 12px; }
 .statusPill { padding: 12px; display: grid; gap: 4px; min-width: 0; }
@@ -25,7 +25,7 @@ h1 { margin: 0; font-family: Fredoka, sans-serif; font-size: clamp(42px, 5vw, 70
 .statusPill small { color: #d8c9f5; font-size: 10px; line-height: 1.25; }
 .statusPill.accent strong { color: #ffb23d; }
 
-.gameFrame { min-height: 610px; display: grid; grid-template-columns: minmax(240px, .78fr) minmax(520px, 1.62fr) minmax(320px, .95fr); gap: 12px; padding: 14px; border: 1px solid #523e71; border-radius: 8px; background: radial-gradient(circle at 46% 44%, rgba(124, 90, 255, .22), transparent 22%), linear-gradient(90deg, rgba(6,10,20,.95), rgba(20,12,35,.78)), url("https://images.unsplash.com/photo-1518709268805-4e9042af2176?auto=format&fit=crop&w=1600&q=80"); background-size: cover; background-position: center; box-shadow: 0 24px 80px rgba(0,0,0,.42); }
+.gameFrame { min-height: 610px; display: grid; grid-template-columns: minmax(240px, .78fr) minmax(520px, 1.62fr) minmax(320px, .95fr); gap: 12px; padding: 14px; border: 1px solid rgba(212,175,55,.26); border-radius: 10px; background: radial-gradient(circle at 46% 40%, rgba(212,175,55,.10), transparent 26%), linear-gradient(150deg, #171208 0%, #0c0906 52%, #070503 100%); box-shadow: 0 24px 80px rgba(0,0,0,.42); }
 .panel { padding: 0 14px 14px; min-width: 0; }
 /* Cast: chip flotante sobre la escena (no ocupa fila del grid) + modal */
 .castTrigger { position: absolute; top: 12px; right: 12px; z-index: 6; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,215,120,.45); background: rgba(12,9,20,.78); backdrop-filter: blur(4px); color: #ffda8a; font-size: 12px; font-weight: 700; cursor: pointer; transition: border-color .15s, background .15s; }
@@ -264,12 +264,12 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .heroAvatarPicker { margin: 0; }
 .heroAvatarPicker button { width: 38px; height: 38px; }
 .builderTabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.builderTabs button { display: grid; gap: 2px; text-align: left; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(217,168,77,.2); background: rgba(4,12,25,.6); transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.builderTabs button { display: grid; gap: 2px; text-align: left; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(217,168,77,.2); background: rgba(12,10,6,.6); transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
 .builderTabs button span { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #d9b66a; font-weight: 900; }
 .builderTabs button strong { color: #fff8df; font-size: 13px; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .builderTabs button.active { border-color: #f1c970; background: linear-gradient(160deg, rgba(56,36,10,.72), rgba(9,16,28,.85)); box-shadow: 0 0 0 1px rgba(241,201,112,.18), 0 0 22px rgba(255,174,52,.16); }
 .builderCardGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(164px, 1fr)); gap: 8px; }
-.builderCard { position: relative; display: grid; gap: 5px; align-content: start; text-align: left; padding: 10px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(4,12,25,.62); min-height: 98px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.builderCard { position: relative; display: grid; gap: 5px; align-content: start; text-align: left; padding: 10px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(12,10,6,.62); min-height: 98px; transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
 .builderCard:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(255,191,53,.5); }
 .builderCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.66), rgba(6,13,26,.88)); box-shadow: 0 0 0 1px rgba(255,191,53,.25), 0 0 20px rgba(255,174,52,.16); }
 .builderCard.selected::after { content: "✦"; position: absolute; top: 7px; right: 9px; color: #ffbf35; text-shadow: 0 0 10px rgba(255,191,53,.8); font-size: 13px; }
@@ -333,7 +333,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 
 /* ── Mundos sellados y perspectiva de entrada ── */
 .worldGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-bottom: 12px; }
-.worldCard { display: grid; gap: 5px; align-content: start; text-align: left; padding: 13px 14px; min-height: 118px; border-radius: 11px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(165deg, rgba(14,10,24,.85), rgba(4,12,25,.8)); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
+.worldCard { display: grid; gap: 5px; align-content: start; text-align: left; padding: 13px 14px; min-height: 118px; border-radius: 11px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(165deg, rgba(24,19,11,.85), rgba(10,8,5,.8)); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease; }
 .worldCard:hover:not(:disabled) { transform: translateY(-2px); border-color: rgba(255,191,53,.5); }
 .worldCard.selected { border-color: #ffbf35; background: linear-gradient(165deg, rgba(56,36,10,.7), rgba(6,13,26,.9)); box-shadow: 0 0 0 1px rgba(255,191,53,.28), 0 0 26px rgba(255,174,52,.18); }
 .worldCard em { color: #75eadb; font-style: normal; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; font-weight: 900; }
@@ -344,7 +344,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .perspectivePicker { display: grid; gap: 8px; margin-bottom: 12px; }
 .perspectivePicker > strong { color: #d9b66a; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 .perspectiveRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.perspectiveRow button { display: grid; gap: 4px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(4,12,25,.6); transition: border-color .15s ease, box-shadow .15s ease; }
+.perspectiveRow button { display: grid; gap: 4px; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(12,10,6,.6); transition: border-color .15s ease, box-shadow .15s ease; }
 .perspectiveRow button.selected { border-color: #75eadb; box-shadow: 0 0 0 1px rgba(117,234,219,.25), 0 0 18px rgba(69,234,211,.16); }
 .perspectiveRow button span { color: #fff8df; font-weight: 900; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
 .perspectiveRow button small { color: #d8c9f5; font-size: 11px; line-height: 1.35; }
@@ -365,7 +365,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .quickChoices { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
 .quickChoiceGroup { display: flex; align-items: center; gap: 8px; }
 .quickChoiceGroup > span { color: #d9b66a; font-size: 10px; text-transform: uppercase; font-weight: 900; letter-spacing: .06em; }
-.pillRow { display: inline-flex; border: 1px solid rgba(217,168,77,.28); border-radius: 999px; overflow: hidden; background: rgba(4,12,25,.6); }
+.pillRow { display: inline-flex; border: 1px solid rgba(217,168,77,.28); border-radius: 999px; overflow: hidden; background: rgba(12,10,6,.6); }
 .pillRow button { padding: 6px 15px; border: 0; border-radius: 0; background: transparent; color: #d8c9f5; font-size: 12px; font-weight: 800; transition: background .15s ease, color .15s ease; }
 .pillRow button.selected { background: linear-gradient(160deg, rgba(66,42,12,.95), rgba(20,16,30,.95)); color: #ffda8a; box-shadow: inset 0 0 0 1px rgba(255,191,53,.45); }
 .pillRow button:disabled { opacity: .5; }
@@ -374,7 +374,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .startCta:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.12); box-shadow: 0 12px 38px rgba(255,174,52,.4), inset 0 1px rgba(255,255,255,.3); }
 .startCta:disabled { opacity: .7; animation: forgePulse 1.6s ease-in-out infinite; }
 .heroSummary { display: grid; gap: 8px; }
-.heroSummaryRow { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(217,168,77,.22); background: rgba(4,12,25,.55); }
+.heroSummaryRow { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(217,168,77,.22); background: rgba(12,10,6,.55); }
 .heroSummaryRow img { width: 64px; height: 64px; border-radius: 10px; object-fit: cover; border: 2px solid rgba(255,198,95,.5); }
 .heroSummaryInfo { display: grid; gap: 2px; min-width: 0; }
 .heroSummaryInfo strong { color: #ffda8a; font-size: 15px; }
@@ -389,7 +389,7 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .castCard .castHead { display: flex !important; align-items: center; gap: 10px; }
 .castHeadText { display: grid; gap: 2px; min-width: 0; }
 .forgedTeaserCast { display: flex; flex-wrap: wrap; gap: 8px; }
-.castChip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid rgba(217,168,77,.3); background: rgba(4,12,25,.62); color: #fff3d8; font-size: 12px; font-weight: 700; }
+.castChip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px; border: 1px solid rgba(217,168,77,.3); background: rgba(12,10,6,.62); color: #fff3d8; font-size: 12px; font-weight: 700; }
 .castChip.threat { border-color: rgba(232,100,80,.45); color: #ffb4a0; }
 
 /* ── Forja de historias (modo improvisado) ── */
@@ -3537,9 +3537,9 @@ h1 {
 /* Assets del pack de diseño en /assets/ui|worlds|companions (palette.json:
    gold #D4AF37, blue_deep #0D1B2A, black_panel #050A12, parchment #EADFC6). */
 /* Fondo azul marino profundo del mockup (blue_deep→black_panel) + header limpio. */
-.appShell.lobbyShell { background: radial-gradient(1100px 520px at 18% -8%, rgba(27,54,86,.5), transparent 62%), linear-gradient(180deg, #0D1B2A 0%, #070f1b 48%, #04070d 100%) !important; }
+.appShell.lobbyShell { background: radial-gradient(1100px 520px at 18% -8%, rgba(212,175,55,.09), transparent 62%), linear-gradient(180deg, #171209 0%, #0d0a06 48%, #070503 100%) !important; }
 .lobbyShell .lobbyHeader { background: transparent !important; border: 0 !important; box-shadow: none !important; }
-.lobbyShell .panel { background: linear-gradient(180deg, rgba(13,27,42,.72), rgba(5,10,18,.9)); border: 1px solid rgba(212,175,55,.26); border-radius: 14px; }
+.lobbyShell .panel { background: linear-gradient(180deg, rgba(30,24,14,.72), rgba(11,9,5,.9)); border: 1px solid rgba(212,175,55,.26); border-radius: 14px; }
 /* Botones dorados brillantes (CTA y forja) como la referencia. */
 .forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(180deg, #F2D27C 0%, #D4AF37 55%, #b98e22 100%) !important; color: #241703 !important; font-weight: 800; border: 1px solid rgba(255,230,160,.8) !important; box-shadow: 0 0 18px rgba(212,175,55,.35); }
 /* !important: reglas de retrato como `.heroSummaryRow img` pisan a los iconos. */
@@ -3547,17 +3547,17 @@ h1 {
 .helpButton .uiIcon { width: 24px !important; height: 24px !important; }
 /* Gemelo del botón de ayuda: engranaje de ajustes con popover de preferencias. */
 .settingsButton { right: 58px; }
-.settingsPop { position: fixed; top: 56px; right: 14px; z-index: 41; width: 250px; display: grid; gap: 7px; padding: 13px 14px; border-radius: 12px; border: 1px solid rgba(212,175,55,.45); background: linear-gradient(180deg, rgba(13,27,42,.97), rgba(5,10,18,.98)); box-shadow: 0 14px 40px rgba(0,0,0,.6); }
-.settingsPop strong { font-family: Georgia, serif; color: var(--tq-gold-hi); font-size: 13.5px; }
+.settingsPop { position: fixed; top: 56px; right: 14px; z-index: 41; width: 250px; display: grid; gap: 7px; padding: 13px 14px; border-radius: 12px; border: 1px solid rgba(212,175,55,.45); background: linear-gradient(180deg, rgba(30,24,14,.97), rgba(11,9,5,.98)); box-shadow: 0 14px 40px rgba(0,0,0,.6); }
+.settingsPop strong { font-family: 'Cinzel', Georgia, serif; color: var(--tq-gold-hi); font-size: 13.5px; }
 .settingsPop p { margin: 0; color: rgba(234,223,198,.7); font-size: 11.5px; line-height: 1.35; }
-.settingsPop button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(212,175,55,.3); background: rgba(5,10,18,.7); color: var(--tq-cream); font-size: 12.5px; }
+.settingsPop button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(212,175,55,.3); background: rgba(11,9,5,.7); color: var(--tq-cream); font-size: 12.5px; }
 .settingsPop button.selected { border-color: var(--tq-gold); color: var(--tq-gold-hi); background: rgba(212,175,55,.12); }
-.lobbyHeaderActions .ghostButton { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(212,175,55,.45); border-radius: 10px; background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95)); padding: 10px 16px; font-family: Georgia, serif; font-size: 14px; color: #EADFC6; }
+.lobbyHeaderActions .ghostButton { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(212,175,55,.45); border-radius: 10px; background: linear-gradient(180deg, rgba(30,24,14,.9), rgba(11,9,5,.95)); padding: 10px 16px; font-family: 'Cinzel', Georgia, serif; font-size: 14px; color: #EADFC6; }
 .lobbyHeaderActions .ghostButton .uiIcon { width: 20px; height: 20px; }
 /* Panel del héroe: marco fino dorado con esquinas ornamentadas + rosa de los
    vientos de marca de agua (como el mockup). Las esquinas son 4 pseudo-marcos:
    dos pseudo-elementos con gradientes en las 4 puntas. */
-.heroSpecial { position: relative; background: linear-gradient(180deg, rgba(13,27,42,.55), rgba(5,10,18,.85)); border: 1px solid rgba(212,175,55,.28); overflow: hidden; }
+.heroSpecial { position: relative; background: linear-gradient(180deg, rgba(30,24,14,.55), rgba(11,9,5,.85)); border: 1px solid rgba(212,175,55,.28); overflow: hidden; }
 /* Detalle central del mockup: círculo arcano + espada de filigrana AL FONDO,
    centrados; todo el contenido del panel queda por encima (z-index). */
 .heroSpecial::before { content: ""; position: absolute; inset: 0; background: url("/assets/ui/ornamento-espada.webp") no-repeat center / auto 86%, url("/assets/ui/ornamento-circulo.webp") no-repeat center / auto 96%; opacity: .3; pointer-events: none; z-index: 0; }
@@ -3578,19 +3578,19 @@ h1 {
   opacity: .8;
 }
 /* Fondo global azul profundo solo cuando el lobby está en pantalla. */
-body:has(.lobbyShell) { background: radial-gradient(circle at 16% 6%, rgba(27,54,86,.5), transparent 34%), linear-gradient(160deg, #0D1B2A, #070f1b 52%, #04070d); }
+body:has(.lobbyShell) { background: radial-gradient(circle at 16% 6%, rgba(212,175,55,.10), transparent 34%), linear-gradient(160deg, #171209, #0c0906 52%, #070503); }
 /* Los medallones pintados de compañeros traen su propio marco: sin recortes ni bordes. */
 img[src^="/assets/companions/"] { background: none !important; border: 0 !important; border-radius: 0 !important; object-fit: contain; }
 /* Botones enmarcados del héroe (navy + borde dorado, como la referencia). */
-.framedButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(212,175,55,.5) !important; border-radius: 10px; background: linear-gradient(180deg, rgba(13,27,42,.92), rgba(5,10,18,.96)) !important; color: #F2D27C !important; font-family: Georgia, serif; padding: 10px 18px; }
+.framedButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(212,175,55,.5) !important; border-radius: 10px; background: linear-gradient(180deg, rgba(30,24,14,.92), rgba(11,9,5,.96)) !important; color: #F2D27C !important; font-family: 'Cinzel', Georgia, serif; padding: 10px 18px; }
 .framedButton:disabled { opacity: .55; }
 /* Hint del héroe sin cara: franja de pergamino. */
 .heroSpecial .startHint { position: relative; background: linear-gradient(180deg, #EADFC6, #dccfae); color: #3c2f18; border-radius: 8px; padding: 8px 12px; font-weight: 600; }
 .heroSpecial .startHint strong { color: #241703; }
 .lobbyStepTitle { display: flex; align-items: center; gap: 13px; margin-bottom: 12px; }
 .stepDiamond { width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; transform: rotate(45deg); border: 1.5px solid rgba(255,203,112,.75); border-radius: 7px; background: linear-gradient(160deg, rgba(56,36,10,.85), rgba(10,8,4,.95)); box-shadow: 0 0 12px rgba(255,183,69,.28); font-style: normal; }
-.stepDiamond span { transform: rotate(-45deg); color: #ffda8a; font-weight: 900; font-size: 14px; font-family: Georgia, serif; }
-.lobbyStepTitle h2 { margin: 0; font-family: Georgia, "Palatino Linotype", serif; font-size: 19px; letter-spacing: .14em; text-transform: uppercase; color: #ffda8a; font-weight: 700; text-shadow: 0 1px 8px rgba(255,183,69,.25); }
+.stepDiamond span { transform: rotate(-45deg); color: #ffda8a; font-weight: 900; font-size: 14px; font-family: 'Cinzel', Georgia, serif; }
+.lobbyStepTitle h2 { margin: 0; font-family: 'Cinzel', Georgia, serif; font-size: 19px; letter-spacing: .14em; text-transform: uppercase; color: #ffda8a; font-weight: 700; text-shadow: 0 1px 8px rgba(255,183,69,.25); }
 .stepRule { flex: 1 1 auto; height: 1px; background: linear-gradient(90deg, rgba(255,203,112,.5), rgba(255,203,112,.05)); position: relative; }
 .stepRule::before { content: "◈"; position: absolute; left: 0; top: -8px; color: rgba(255,203,112,.7); font-size: 11px; }
 /* Mundos: cards grandes con emblema y tilde de selección. */
@@ -3599,23 +3599,23 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* Los emblemas nuevos son medallones con marco propio: sin círculo CSS extra. */
 .worldEmblem { position: absolute; top: 8px; left: 8px; width: 44px; height: 44px; display: grid; place-items: center; filter: drop-shadow(0 2px 8px rgba(0,0,0,.7)); }
 .worldEmblem img { width: 44px; height: 44px; object-fit: contain; }
-.worldCheck { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(5,10,18,.88); border: 1.5px solid #D4AF37; box-shadow: 0 0 14px rgba(212,175,55,.55); }
+.worldCheck { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(11,9,5,.88); border: 1.5px solid #D4AF37; box-shadow: 0 0 14px rgba(212,175,55,.55); }
 .worldCheck img { width: 18px; height: 18px; object-fit: contain; }
-.worldCard.hasArt strong { font-family: Georgia, serif; font-size: 19px; }
+.worldCard.hasArt strong { font-family: 'Cinzel', Georgia, serif; font-size: 19px; }
 /* Héroe protagonista: retrato alto y nombre en serif grande. */
 .heroSpecial .heroSummaryRow { grid-template-columns: 112px minmax(0, 1fr) auto; }
 .heroSpecial .heroSummaryRow img { width: 112px; height: 140px; object-fit: cover; border-radius: 12px; border: 2px solid rgba(255,198,95,.5); }
-.heroSummaryInfo strong { font-family: Georgia, serif; font-size: 26px; }
+.heroSummaryInfo strong { font-family: 'Cinzel', Georgia, serif; font-size: 26px; }
 .heroSummaryInfo .heroSummaryPet { padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid rgba(117,234,219,.35); background: rgba(4,20,25,.55); justify-self: start; }
 /* Paso 3: labels en caps, input alto, botón de yunque. */
 .quickChoiceGroup > span { text-transform: uppercase; letter-spacing: .07em; }
-.quickChoiceGroup .pillRow button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(212,175,55,.3); background: linear-gradient(180deg, rgba(13,27,42,.85), rgba(5,10,18,.92)); color: #EADFC6; font-family: Georgia, serif; }
-.quickChoiceGroup .pillRow button.selected { border-color: #D4AF37 !important; color: #F2D27C !important; background: linear-gradient(180deg, rgba(27,44,66,.95), rgba(8,14,24,.95)) !important; box-shadow: 0 0 10px rgba(212,175,55,.35); }
+.quickChoiceGroup .pillRow button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(212,175,55,.3); background: linear-gradient(180deg, rgba(30,24,14,.85), rgba(11,9,5,.92)); color: #EADFC6; font-family: 'Cinzel', Georgia, serif; }
+.quickChoiceGroup .pillRow button.selected { border-color: #D4AF37 !important; color: #F2D27C !important; background: linear-gradient(180deg, rgba(52,41,22,.95), rgba(16,13,7,.95)) !important; box-shadow: 0 0 10px rgba(212,175,55,.35); }
 .quickChoiceGroup .pillRow button .uiIcon { width: 16px; height: 16px; }
-.storyForgeRow input { padding: 12px 14px; border-radius: 12px; font-size: 13.5px; border: 1px solid rgba(212,175,55,.35); background: rgba(5,10,18,.75); }
+.storyForgeRow input { padding: 12px 14px; border-radius: 12px; font-size: 13.5px; border: 1px solid rgba(212,175,55,.35); background: rgba(11,9,5,.75); }
 .forgeButton { border-radius: 12px; }
 .entryHint { font-style: italic; }
-.startCta { font-family: Georgia, serif; letter-spacing: .04em; }
+.startCta { font-family: 'Cinzel', Georgia, serif; letter-spacing: .04em; }
 .firstPaths { display: grid; gap: 3px; }
 .firstPaths em { color: #9b8db5; font-style: normal; font-size: 10.5px; font-weight: 800; }
 .firstPaths ol { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
@@ -3650,7 +3650,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* ── Marco contenedor del lobby según mockup (2026-07-07) ───────────────────
    Un solo marco envuelve los pasos; los rombos numerados viven en un gutter
    izquierdo unidos por una línea vertical dorada. */
-.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.26); border-radius: 18px; padding: clamp(14px, 1.6vw, 24px) clamp(14px, 1.8vw, 26px) clamp(16px, 2vw, 28px) clamp(52px, 5vw, 72px); background: linear-gradient(180deg, rgba(10,18,30,.3), rgba(4,8,16,.45)); display: grid; gap: clamp(18px, 2.2vw, 30px); }
+.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.26); border-radius: 18px; padding: clamp(14px, 1.6vw, 24px) clamp(14px, 1.8vw, 26px) clamp(16px, 2vw, 28px) clamp(52px, 5vw, 72px); background: linear-gradient(180deg, rgba(24,19,11,.3), rgba(10,8,5,.45)); display: grid; gap: clamp(18px, 2.2vw, 30px); }
 /* UN solo nivel de caja: los paneles internos se aplanan (el marco lo pone
    lobbyLayout; los bordes con contenido son el card del héroe y las world cards). */
 .lobbyShell .lobbyLayout > .panel { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; display: grid; gap: 13px; }
@@ -3684,11 +3684,11 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
    Paleta: gold #D4AF37 · gold claro #F2D27C · navy #0D1B2A · panel #050A12 ·
    pergamino #EADFC6 · teal #2EC4B6. Radios: paneles 14 / cards y botones 12 /
    pills y chips 999. Todo scoped al lobby (el juego conserva su tema). */
-:root { --tq-gold: #D4AF37; --tq-gold-hi: #F2D27C; --tq-navy: #0D1B2A; --tq-panel: #050A12; --tq-cream: #EADFC6; --tq-teal: #2EC4B6; }
+:root { --tq-gold: #D4AF37; --tq-gold-hi: #F2D27C; --tq-navy: #1a1510; --tq-panel: #050A12; --tq-cream: #EADFC6; --tq-teal: #2EC4B6; }
 .lobbyShell .ghostButton, .lobbyShell .reimagineButton, .lobbyShell .heroDone, .lobbyShell .retryForge, .lobbyShell .shotToggle button, .lobbyShell .builderTabs button {
-  font-family: Georgia, serif; font-weight: 700; color: var(--tq-cream);
+  font-family: 'Cinzel', Georgia, serif; font-weight: 700; color: var(--tq-cream);
   border: 1px solid rgba(212,175,55,.42); border-radius: 12px;
-  background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95));
+  background: linear-gradient(180deg, rgba(30,24,14,.9), rgba(11,9,5,.95));
   box-shadow: none; transition: border-color .15s ease, color .15s ease, box-shadow .15s ease;
 }
 .lobbyShell .ghostButton:hover:not(:disabled), .lobbyShell .reimagineButton:hover:not(:disabled), .lobbyShell .heroDone:hover:not(:disabled), .lobbyShell .shotToggle button:hover:not(:disabled), .lobbyShell .shotToggle button.selected, .lobbyShell .builderTabs button.active {
@@ -3696,7 +3696,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 }
 .lobbyShell .builderTabs button span { color: rgba(212,175,55,.85); }
 .lobbyShell .builderTabs button strong { color: var(--tq-cream); }
-.lobbyShell .lookPills button { border: 1px solid rgba(212,175,55,.35); border-radius: 999px; background: rgba(5,10,18,.7); color: var(--tq-cream); }
+.lobbyShell .lookPills button { border: 1px solid rgba(212,175,55,.35); border-radius: 999px; background: rgba(11,9,5,.7); color: var(--tq-cream); }
 .lobbyShell .lookPills button.selected { border-color: var(--tq-gold); color: var(--tq-gold-hi); background: rgba(212,175,55,.14); box-shadow: 0 0 10px rgba(212,175,55,.3); }
 /* Texto lila heredado del tema viejo → pergamino/teal de la paleta. */
 .lobbyShell .worldCard span { color: var(--tq-cream); }
@@ -3708,17 +3708,17 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .storyForgeRow input::placeholder { color: rgba(234,223,198,.55); }
 .forgeButton:disabled { opacity: .55; }
 .lobbyShell .startCta { border-radius: 14px; }
-.lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
+.lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(30,24,14,.9), rgba(11,9,5,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
 /* Descarga de tomas: solo el icono de descarga, sin texto ni borde, uno bajo
    cada botón del toggle Frente/Cuerpo. */
 .shotDownloads { display: flex; gap: 26px; justify-content: center; }
 .shotDownloads button { padding: 3px; border: 0 !important; background: none !important; color: rgba(212,175,55,.75); display: grid; place-items: center; transition: color .15s ease, transform .15s ease; }
 .shotDownloads button:hover:not(:disabled) { color: var(--tq-gold-hi); transform: translateY(1px); }
 /* Cards de linaje/oficio/compañero: retrato con aro, serif y selección dorada. */
-.lobbyShell .builderCard { border-radius: 12px; border-color: rgba(212,175,55,.22); background: linear-gradient(180deg, rgba(13,27,42,.72), rgba(5,10,18,.9)); padding: 12px 13px; gap: 7px; }
+.lobbyShell .builderCard { border-radius: 12px; border-color: rgba(212,175,55,.22); background: linear-gradient(180deg, rgba(30,24,14,.72), rgba(11,9,5,.9)); padding: 12px 13px; gap: 7px; }
 .lobbyShell .builderCard:hover:not(:disabled) { border-color: rgba(212,175,55,.55); }
 .lobbyShell .builderCard.selected { border-color: var(--tq-gold); background: linear-gradient(170deg, rgba(56,40,12,.55), rgba(6,10,22,.92)); box-shadow: 0 0 0 1px rgba(212,175,55,.3), 0 0 22px rgba(212,175,55,.18); }
-.lobbyShell .builderCard strong { font-family: Georgia, serif; font-size: 15px; color: var(--tq-gold-hi); }
+.lobbyShell .builderCard strong { font-family: 'Cinzel', Georgia, serif; font-size: 15px; color: var(--tq-gold-hi); }
 .lobbyShell .builderCard > span { color: rgba(234,223,198,.82); }
 .lobbyShell .builderCardHead { gap: 10px; }
 .lobbyShell .builderCardHead img:not([src^="/assets/companions/"]) { width: 48px !important; height: 48px !important; border-radius: 50% !important; border: 2px solid rgba(212,175,55,.45) !important; object-fit: cover; }
@@ -3735,8 +3735,8 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .portraitStatus { color: var(--tq-gold-hi); }
 .lobbyShell .storyForgeError { color: #e8a27c; }
 .lobbyShell .heroSummaryInfo .heroSummaryPet { color: #8fdcd2; border-color: rgba(46,196,182,.4); background: rgba(6,24,28,.55); }
-.lobbyShell .forgedTeaser { border-color: rgba(212,175,55,.32); background: linear-gradient(175deg, rgba(24,20,8,.55), rgba(5,10,18,.92)); border-radius: 12px; }
-.lobbyShell .forgedTeaser strong { color: var(--tq-gold-hi); font-family: Georgia, serif; font-size: 15px; }
+.lobbyShell .forgedTeaser { border-color: rgba(212,175,55,.32); background: linear-gradient(175deg, rgba(24,20,8,.55), rgba(11,9,5,.92)); border-radius: 12px; }
+.lobbyShell .forgedTeaser strong { color: var(--tq-gold-hi); font-family: 'Cinzel', Georgia, serif; font-size: 15px; }
 .lobbyShell .forgedTeaser em { color: rgba(212,175,55,.85); }
 .lobbyShell .forgedTeaser p { color: rgba(234,223,198,.88); }
 .lobbyShell .summaryCard { border-color: rgba(46,196,182,.3); background: rgba(5,20,24,.5); border-radius: 10px; }

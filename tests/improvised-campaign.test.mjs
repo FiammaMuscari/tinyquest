@@ -121,3 +121,17 @@ test("sin npcRelations no aparece relationshipToOtherNPCs", () => {
   const campaign = buildImprovisedCampaign(fullContent);
   for (const npc of campaign.npcs) assert.equal(npc.relationshipToOtherNPCs, undefined);
 });
+
+test("la pista marcada isFalse viaja a la campaña como pista plantada", () => {
+  const campaign = buildImprovisedCampaign({
+    ...fullContent,
+    clues: [
+      { title: "Amarres sin dueño", text: "El cuaderno del muelle tiene manos que no recuerdan.", sceneIndex: 1 },
+      { title: "Iniciales raspadas", text: "La jarra tiene otras iniciales debajo.", sceneIndex: 2, isFalse: true },
+      { title: "El libro a medio quemar", text: "Los nombres quemados coinciden.", sceneIndex: 4 }
+    ]
+  });
+  assert.equal(campaign.clues[0].isFalse, undefined);
+  assert.equal(campaign.clues[1].isFalse, true);
+  assert.equal(campaign.clues[2].isFalse, undefined);
+});

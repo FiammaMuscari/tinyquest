@@ -160,3 +160,24 @@ test("8d) sin relaciones secretas no se gasta la regla de hiddenTies", () => {
   const parsed = JSON.parse(prompt);
   assert.ok(!parsed.rules.some((r) => r.includes("hiddenTies")));
 });
+
+test("8e) las pistas plantadas viajan en clue.plantadas con su regla, solo si existen", () => {
+  const input = {
+    recentSessionLog: [],
+    selectedCampaign: {
+      npcs: [], enemies: [], storyObjects: [],
+      clues: [
+        { id: "bell-after-death", text: "La campana sonó después de la muerte.", isFalse: true },
+        { id: "clue-real", text: "Una pista verdadera." }
+      ]
+    }
+  };
+  const prompt = budget.buildCompactGroqPrompt(plan(), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input);
+  const parsed = JSON.parse(prompt);
+  assert.deepEqual(parsed.turn.clue.plantadas, ["bell-after-death"]);
+  assert.ok(parsed.rules.some((r) => r.includes("plantadas")));
+  // sin pistas falsas: ni campo ni regla
+  const clean = JSON.parse(budget.buildCompactGroqPrompt(plan(), budget.DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, { recentSessionLog: [], selectedCampaign: { npcs: [], enemies: [], storyObjects: [], clues: [{ id: "bell-after-death", text: "real" }] } }));
+  assert.equal(clean.turn.clue.plantadas, undefined);
+  assert.ok(!clean.rules.some((r) => r.includes("plantadas")));
+});
