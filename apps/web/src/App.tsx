@@ -2719,7 +2719,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
               <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled || !heroLookDone} title={heroLookDone ? "La IA imagina otra cara para la misma identidad" : "Elegí género, piel, ojos y pelo primero"}>
-                <Sparkles size={13} /> Reimaginar héroe
+                <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> Reimaginar héroe
               </button>
             )}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
