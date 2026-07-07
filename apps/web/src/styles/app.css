@@ -3676,10 +3676,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .lobbyLayout > .panel { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; display: grid; gap: 13px; }
 /* El retrato sobresale hacia ESTE espacio, no sobre el título. */
 .heroSpecial .heroSummaryRow { margin-top: 26px; }
-/* El flujo entre pasos lo marca un CONECTOR ORNAMENTAL (filigrana dorada, asset
-   generado) que corre por el gutter izquierdo detrás de los rombos numerados —
-   no una línea recta eterna. */
-.lobbyShell .lobbyLayout::before { content: ""; position: absolute; left: 30px; top: 54px; bottom: 46px; width: 22px; background: url("/assets/ui/step-connector.webp") no-repeat center top / 22px 100%; opacity: .8; pointer-events: none; }
+/* Pasos limpios: solo los rombos numerados, sin línea ni conector en el gutter. */
 .lobbyStepTitle { position: relative; }
 .lobbyStepTitle .stepDiamond { position: absolute; left: -55px; top: -3px; z-index: 2; }
 .lobbyStepTitle h2 { font-size: 16.5px; letter-spacing: .12em; font-weight: 600; }
