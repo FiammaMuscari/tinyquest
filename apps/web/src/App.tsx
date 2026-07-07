@@ -5,7 +5,17 @@ import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
 import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
-import { installUiClickSound, setUiSoundEnabled, uiSoundEnabled } from "./ui-sound";
+import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
+
+// Play/pausa del ambiente (song-of-the-north) — vive en los popups de ayuda y ajustes.
+function AmbientRow() {
+  const [playing, setPlaying] = useState(() => ambientPlaying());
+  return (
+    <button type="button" className={`ambientRow ${playing ? "selected" : ""}`} onClick={() => setPlaying(toggleAmbient())}>
+      <span aria-hidden="true">{playing ? "⏸" : "▶"}</span> {playing ? "Ambiente sonando · pausar" : "Reproducir sonido de ambiente"}
+    </button>
+  );
+}
 import { campaignCardImage } from "./campaign-assets";
 import {
   applyNarration,
@@ -896,6 +906,8 @@ export function App() {
   }
 
   function launchSolo(campaignToPlay: Campaign) {
+    // El lobby suelta su ambiente: en partida manda el reproductor por escena.
+    stopAmbient();
     narrativeIndexRef.current = new NarrativeMemoryIndex({
       embeddingProvider: new MockEmbeddingProvider(),
       store: new InMemoryVectorStore()
@@ -1982,6 +1994,8 @@ function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode:
           <button type="button" className={sound ? "selected" : ""} onClick={() => { setUiSoundEnabled(!sound); setSound(!sound); }}>
             <span aria-hidden="true">{sound ? "🔔" : "🔕"}</span> {sound ? "Clicks con sonido" : "Silencio"}
           </button>
+          <strong>Sonido de ambiente</strong>
+          <AmbientRow />
         </div>
       )}
     </>
@@ -2511,6 +2525,7 @@ function HelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boolean)
           <section className="helpPanel">
             <button className="helpClose" type="button" onClick={() => setOpen(false)} aria-label="Cerrar ayuda"><X size={16} /></button>
             <h2>Cómo jugar</h2>
+            <AmbientRow />
             <p>En Tiny Quest cada campaña dura hasta 15 minutos y tiene 3 escenas. En tu turno elegís una acción, un stat y opcionalmente tu mascota.</p>
             <ul>
               <li><strong>d20</strong>: dado principal. Se suma al modificador del stat elegido para obtener el total. Si el total supera la dificultad (DC) es éxito; si queda 1-2 puntos abajo es éxito parcial; más abajo es fallo.</li>
@@ -2693,7 +2708,9 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: stored ?? legacy }));
   }
-  // Descarga la toma pedida (frente o cuerpo) como archivo — siempre del par fijado.
+  // Descarga la toma pedida (frente o cuerpo) — siempre del par fijado, exportada
+  // como PNG con el fondo superior fundido a TRANSPARENTE (la cabeza queda
+  // flotando, nítida, sin fondo arriba — el mismo look que en la UI).
   async function downloadShot(shot: "face" | "fullbody") {
     const stored = shot === "face" ? draft.look?.faceUrl : draft.look?.fullBodyUrl;
     const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
@@ -2701,9 +2718,27 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
       ? heroImageUrls(draft)[shot].replace(/seed=\d+$/, `seed=${currentSeed}`)
       : heroImageUrls(draft)[shot];
     const src = await loadPortrait(stored ?? legacy, { priority: true });
+    const image = new Image();
+    image.src = src;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const ctx2d = canvas.getContext("2d");
+    if (!ctx2d) return;
+    ctx2d.drawImage(image, 0, 0);
+    // Degradado de alpha en la franja superior: 0 arriba → nítido al ~22%.
+    const fadeHeight = Math.round(canvas.height * 0.22);
+    const fade = ctx2d.createLinearGradient(0, 0, 0, fadeHeight);
+    fade.addColorStop(0, "rgba(0,0,0,1)");
+    fade.addColorStop(1, "rgba(0,0,0,0)");
+    ctx2d.globalCompositeOperation = "destination-out";
+    ctx2d.fillStyle = fade;
+    ctx2d.fillRect(0, 0, canvas.width, fadeHeight);
+    ctx2d.globalCompositeOperation = "source-over";
     const link = document.createElement("a");
-    link.href = src;
-    link.download = `${(draft.name || "heroe").toLowerCase().replace(/\s+/g, "-")}-${shot === "face" ? "frente" : "cuerpo"}.jpg`;
+    link.href = canvas.toDataURL("image/png");
+    link.download = `${(draft.name || "heroe").toLowerCase().replace(/\s+/g, "-")}-${shot === "face" ? "frente" : "cuerpo"}.png`;
     link.click();
   }
   return (

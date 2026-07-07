@@ -62,6 +62,35 @@ export function playUiClick(kind: ClickKind = "soft") {
   }
 }
 
+// ── Sonido de AMBIENTE del lobby: el track de siempre (song-of-the-north), en
+// loop, con play/pausa desde los popups de ayuda y ajustes. Vive a nivel módulo
+// para sobrevivir a que el popover se cierre; al entrar a la partida se corta
+// (el juego tiene su propio reproductor por escena con este mismo track).
+const AMBIENT_SRC = "/assets/audio/song-of-the-north.mp3";
+let ambient: HTMLAudioElement | null = null;
+
+export function ambientPlaying(): boolean {
+  return ambient !== null && !ambient.paused;
+}
+
+export function toggleAmbient(): boolean {
+  if (!ambient) {
+    ambient = new Audio(AMBIENT_SRC);
+    ambient.loop = true;
+  }
+  ambient.volume = Number(localStorage.getItem("tiny-quest-volume") ?? "0.35");
+  if (ambient.paused) {
+    void ambient.play().catch(() => undefined);
+    return true;
+  }
+  ambient.pause();
+  return false;
+}
+
+export function stopAmbient() {
+  ambient?.pause();
+}
+
 /** Botones del menú principal: header (crear sala / unirse), ayuda y ajustes. */
 const MENU_SCOPE = ".lobbyHeaderActions, .helpButton, .settingsButton, .settingsPop, .helpPanel";
 /** Acciones grandes: elegir mundo, crear/editar/guardar héroe, forjar historia y empezar. */

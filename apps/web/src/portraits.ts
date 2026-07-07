@@ -32,10 +32,17 @@ export function nameHash(name: string): number {
 // El LLM imagina el aspecto (appearance) y este prompt lo pinta. Seed determinística
 // por nombre → mismo personaje, mismo retrato durante toda la partida. `seedNonce`
 // permite "reimaginar": nueva cara para la misma identidad.
+// MISMO TRAZO en las dos tomas: la raíz del prompt es idéntica palabra por palabra
+// y solo cambia el ENCUADRE — frente = plano 3/4 (cintura hacia arriba, 4:5);
+// cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
+const heroPromptRoot = "Fantasy RPG book character illustration, dark moody lighting, natural proportions, detailed painting";
+const heroPromptTail = (name: string, appearance: string | undefined, styleHint: string) =>
+  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  const prompt = `Fantasy RPG book character portrait, dark moody lighting, half body, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  const prompt = `${heroPromptRoot}, three-quarter shot from the waist up, face clearly visible${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=640&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Imagen de cuerpo entero del héroe: MISMO personaje que el retrato de frente.
@@ -44,11 +51,10 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
 // "half body" → "full body standing, head to toe". No tocar el estilo acá — si
 // diverge del prompt de characterPortraitUrl, flux pinta OTRO personaje.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // 512×768: a 256×384 flux deformaba los cuerpos (figuras elongadas).
   // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
   // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
-  // empuja al encuadre de busto.
-  const prompt = `Fantasy RPG book character illustration, dark moody lighting, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, standing pose, natural proportions, detailed painting: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
+  const prompt = `${heroPromptRoot}, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, standing pose${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
