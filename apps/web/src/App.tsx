@@ -1707,7 +1707,7 @@ function LobbyStepTitle({ number, title }: { number: number; title: string }) {
 const uiIcon = (name: string) => `/assets/ui/${name}.webp`;
 const worldArt: Record<string, string> = { veldaran: "/assets/worlds/veldaran.webp", "marea-ceniza": "/assets/worlds/marea-ceniza.webp", "islas-juramento": "/assets/worlds/islas-juramento.webp" };
 const worldEmblems: Record<string, string> = { veldaran: uiIcon("shield_medieval"), "marea-ceniza": uiIcon("skull_apocalyptic"), "islas-juramento": uiIcon("tridente_mitologico") };
-const companionLogos: Record<string, string> = { "Alma Dracónica": "/assets/companions/alma-draconica.webp", "Polilla de Cripta": "/assets/companions/polilla-de-cripta.webp", "Sabueso del Umbral": "/assets/companions/sabueso-del-umbral.webp" };
+const companionLogos: Record<string, string> = { "Alma Dracónica": "/assets/companions/alma-draconica.png", "Polilla de Cripta": "/assets/companions/polilla-de-cripta.png", "Sabueso del Umbral": "/assets/companions/sabueso-del-umbral.png" };
 // Los 3 compañeros base tienen su logo del pack de diseño; uno futuro cae al retrato IA.
 const petImage = (pet: { name: string; description: string }) => companionLogos[pet.name] ?? petPortraitUrl(pet.name, pet.description);
 

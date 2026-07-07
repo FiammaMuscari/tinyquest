@@ -3569,8 +3569,8 @@ h1 {
 }
 /* Fondo global azul profundo solo cuando el lobby está en pantalla. */
 body:has(.lobbyShell) { background: radial-gradient(circle at 16% 6%, rgba(27,54,86,.5), transparent 34%), linear-gradient(160deg, #0D1B2A, #070f1b 52%, #04070d); }
-/* Los logos de compañeros son teal/oro sobre transparente: backdrop claro para leerse. */
-img[src^="/assets/companions/"] { background: radial-gradient(circle, #EADFC6 0%, #d9cbaa 100%); border-radius: 50%; }
+/* Los medallones pintados de compañeros traen su propio marco: sin recortes ni bordes. */
+img[src^="/assets/companions/"] { background: none !important; border: 0 !important; border-radius: 0 !important; object-fit: contain; }
 /* Botones enmarcados del héroe (navy + borde dorado, como la referencia). */
 .framedButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(212,175,55,.5) !important; border-radius: 10px; background: linear-gradient(180deg, rgba(13,27,42,.92), rgba(5,10,18,.96)) !important; color: #F2D27C !important; font-family: Georgia, serif; padding: 10px 18px; }
 .framedButton:disabled { opacity: .55; }
