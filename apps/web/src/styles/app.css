@@ -3549,8 +3549,21 @@ h1 {
 .appShell.lobbyShell { width: min(1360px, calc(100% - clamp(28px, 7vw, 120px))) !important; margin: 0 auto !important; padding: clamp(18px, 2vw, 32px) 0 40px !important; }
 .lobbyShell .lobbyHeader { background: transparent !important; border: 0 !important; box-shadow: none !important; }
 .lobbyShell .panel { background: linear-gradient(180deg, rgba(30,24,14,.72), rgba(11,9,5,.9)); border: 1px solid rgba(212,175,55,.26); border-radius: 14px; }
-/* Botones dorados brillantes (CTA y forja) como la referencia. */
-.forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(180deg, #F2D27C 0%, #D4AF37 55%, #b98e22 100%) !important; color: #241703 !important; font-weight: 800; border: 1px solid rgba(255,230,160,.8) !important; box-shadow: 0 0 18px rgba(212,175,55,.35); }
+/* Fondo VIVO: brillos cálidos de vela que derivan lento (nada de azul, nada plano). */
+body:has(.lobbyShell)::before {
+  content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(620px 440px at 18% 12%, rgba(212,175,55,.11), transparent 60%),
+    radial-gradient(720px 520px at 86% 82%, rgba(176,104,40,.10), transparent 62%),
+    radial-gradient(560px 520px at 62% 45%, rgba(120,68,20,.07), transparent 62%);
+  animation: bgDrift 26s ease-in-out infinite alternate;
+}
+@keyframes bgDrift { from { transform: translate3d(-2%, -1%, 0) scale(1); } to { transform: translate3d(3%, 2%, 0) scale(1.08); } }
+@media (prefers-reduced-motion: reduce) { body:has(.lobbyShell)::before { animation: none; } }
+.appShell.lobbyShell { position: relative; z-index: 1; }
+/* Botones dorados METÁLICOS (oro cepillado con brillo y borde profundo, no amarillo plano). */
+.forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(158deg, #f4dd97 0%, #ddb857 36%, #c69c3b 62%, #a67c26 100%) !important; color: #2e2007 !important; font-weight: 800; border: 1px solid #7d5e22 !important; box-shadow: inset 0 1px 0 rgba(255,248,220,.55), inset 0 -2px 7px rgba(120,86,20,.4), 0 6px 18px rgba(0,0,0,.38) !important; }
+.forgeButton:hover:not(:disabled), .lobbyShell .startCta:not(:disabled):hover { filter: brightness(1.06); }
 /* !important: reglas de retrato como `.heroSummaryRow img` pisan a los iconos. */
 .uiIcon { width: 18px !important; height: 18px !important; object-fit: contain !important; vertical-align: -4px; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: none !important; }
 .helpButton .uiIcon { width: 24px !important; height: 24px !important; }
@@ -3675,7 +3688,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* ── Marco contenedor del lobby según mockup (2026-07-07) ───────────────────
    Un solo marco envuelve los pasos; los rombos numerados viven en un gutter
    izquierdo unidos por una línea vertical dorada. */
-.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.22); border-radius: 20px; padding: clamp(16px, 1.8vw, 26px) clamp(16px, 2vw, 30px) clamp(18px, 2.2vw, 32px) clamp(54px, 5vw, 74px); background: linear-gradient(180deg, rgba(24,19,11,.34), rgba(9,7,4,.5)); display: grid; gap: clamp(20px, 2.4vw, 34px); box-shadow: 0 24px 70px rgba(0,0,0,.4), inset 0 1px rgba(242,210,124,.06); }
+.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.2); border-radius: 20px; padding: clamp(18px, 2vw, 30px) clamp(22px, 2.6vw, 40px) clamp(22px, 2.4vw, 36px) clamp(58px, 5.2vw, 78px); background: linear-gradient(180deg, rgba(24,19,11,.22), rgba(9,7,4,.34)); display: grid; gap: clamp(20px, 2.4vw, 34px); box-shadow: 0 24px 70px rgba(0,0,0,.4), inset 0 1px rgba(242,210,124,.05); }
 /* UN solo nivel de caja: los paneles internos se aplanan (el marco lo pone
    lobbyLayout; los bordes con contenido son el card del héroe y las world cards). */
 .lobbyShell .lobbyLayout > .panel { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; display: grid; gap: 13px; }
@@ -3725,7 +3738,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .lookPills button.selected { border-color: var(--tq-gold); color: var(--tq-gold-hi); background: rgba(212,175,55,.14); box-shadow: 0 0 10px rgba(212,175,55,.3); }
 /* Texto lila heredado del tema viejo → pergamino/teal de la paleta. */
 .lobbyShell .worldCard span { color: var(--tq-cream); }
-.lobbyShell .worldCard em { color: var(--tq-teal); }
+.lobbyShell .worldCard em { color: #e2b45f; }
 .lobbyShell .worldCard small { color: rgba(234,223,198,.6); }
 /* Forjá tu historia: input y botón con el mismo radio y la misma altura. */
 .storyForgeRow input, .storyForgeRow .forgeButton { border-radius: 12px !important; min-height: 48px; }
@@ -3733,7 +3746,9 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .storyForgeRow input::placeholder { color: rgba(234,223,198,.55); }
 .forgeButton:disabled { opacity: .55; }
 .lobbyShell .startCta { border-radius: 14px; }
-.lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(30,24,14,.9), rgba(11,9,5,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
+/* CTA de empezar deshabilitado: NO una caja oscura vacía — pergamino cálido con
+   borde dorado punteado, se lee como "todavía en preparación". */
+.lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(58,44,20,.5), rgba(24,18,9,.7)) !important; border: 1px dashed rgba(212,175,55,.45) !important; color: rgba(234,223,198,.75) !important; box-shadow: inset 0 0 30px rgba(212,175,55,.05) !important; }
 /* Descarga de la toma: flechita superpuesta en la esquina del retrato (mismo
    estilo que la portada); el marco necesita position para anclarla. */
 .heroPortraitFrame { position: relative; }
@@ -3758,7 +3773,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyShell .quickChoiceGroup > span { color: rgba(212,175,55,.95); }
 .lobbyShell .portraitStatus { color: var(--tq-gold-hi); }
 .lobbyShell .storyForgeError { color: #e8a27c; }
-.lobbyShell .heroSummaryInfo .heroSummaryPet { color: #8fdcd2; border-color: rgba(46,196,182,.4); background: rgba(10, 24, 20,.55); }
+.lobbyShell .heroSummaryInfo .heroSummaryPet { color: #e6c88a; border-color: rgba(212,175,55,.4); background: rgba(30, 24, 14,.55); }
 .lobbyShell .forgedTeaser { border-color: rgba(212,175,55,.32); background: linear-gradient(175deg, rgba(24,20,8,.55), rgba(11,9,5,.92)); border-radius: 12px; }
 .lobbyShell .forgedTeaser strong { color: var(--tq-gold-hi); font-family: 'Cinzel', Georgia, serif; font-size: 15px; }
 .lobbyShell .forgedTeaser em { color: rgba(212,175,55,.85); }
