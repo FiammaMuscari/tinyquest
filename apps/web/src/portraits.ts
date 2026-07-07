@@ -25,13 +25,17 @@ export function nameHash(name: string): number {
   return hash;
 }
 
+// DIMENSIONES MÍNIMAS DE GENERACIÓN (calidad en desktop): retratos ≥512px de lado,
+// arte de mundos/escenas ≥896px de ancho. Nunca pedir menos: la imagen se muestra
+// hasta 2x en pantallas grandes y el upscale se nota. Cambiar dims cambia la URL
+// (invalida esa caché) — hacerlo solo a propósito.
 // El LLM imagina el aspecto (appearance) y este prompt lo pinta. Seed determinística
 // por nombre → mismo personaje, mismo retrato durante toda la partida. `seedNonce`
 // permite "reimaginar": nueva cara para la misma identidad.
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   const prompt = `Fantasy RPG book character portrait, dark moody lighting, half body, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Imagen de cuerpo entero del héroe: template propio (de pies a cabeza, pose de
@@ -50,14 +54,14 @@ export function archetypeImageUrl(kind: "lineage" | "role", name: string, descri
     ? "Fantasy race archetype character portrait, atmospheric bust illustration"
     : "Fantasy adventurer profession illustration, iconic pose with tools of the trade";
   const prompt = `${style}: ${name}. ${description}. Dark moody painted background, rich detail, no text`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=192&height=192&nologo=true&model=flux&seed=${nameHash(kind + name) % 100000}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=384&nologo=true&model=flux&seed=${nameHash(kind + name) % 100000}`;
 }
 
 // Arte de mundo para las cards del lobby: paisaje/mapa pintado que caracteriza al
 // mundo. Seed por id → misma imagen siempre, cacheada como cualquier retrato.
 export function worldCardImageUrl(worldId: string, name: string, era: string, tagline: string): string {
   const prompt = `Epic fantasy illustrated world vista and map of ${name} (${era}): ${tagline}. Painted atlas style, dramatic light, rich detail, atmospheric, no text, no letters`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=252&nologo=true&model=flux&seed=${nameHash(worldId) % 100000}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=896&height=504&nologo=true&model=flux&seed=${nameHash(worldId) % 100000}`;
 }
 
 // Ilustración de escena de la historia forjada: el mundo elegido CON los personajes
@@ -66,7 +70,7 @@ export function worldCardImageUrl(worldId: string, name: string, era: string, ta
 // título. Cero uso de Gemini — las imágenes van siempre por Pollinations.
 export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, castLine: string): string {
   const prompt = `Epic fantasy story illustration, cinematic wide shot in the world of ${worldName} (${era}): the tale "${storyTitle}". Characters together in a tense scene: ${castLine}. Painted, dramatic light, rich detail, no text`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=560&height=240&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
 }
 
 // Imagen de escena VIVA durante la partida: se genera con la historia real y se
@@ -80,14 +84,14 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
       : `Fantasy environment concept art, atmospheric wide view of "${sceneTitle}". ${objective}.`;
   const prompt = `${base} World: ${worldName} (${era}). Tale: ${campaignTitle}. Painted, dramatic light, rich detail, no text`;
   const seed = nameHash(campaignTitle + sceneTitle + mode) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=288&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
 // de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
 export function petPortraitUrl(name: string, description: string): string {
   const prompt = `Fantasy RPG magical creature companion portrait, adorable but epic, full body, dark moody lighting, detailed illustration: ${name}, ${description}. Dark blurred background`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=256&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
 }
 
 export function isGeneratedPortraitUrl(url: string | undefined): url is string {

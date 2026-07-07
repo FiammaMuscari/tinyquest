@@ -1010,10 +1010,9 @@ export function App() {
       setSelectedCampaignId(world.authoredCampaignId);
     } else if (improvisedWorldId === world.id && improvisedCampaign) {
       setSelectedCampaignId(improvisedCampaign.id);
-    } else {
-      // Mundo sin historia madre: se forja apenas lo elegís, mientras armás tu héroe.
-      void forgeStory("", world);
     }
+    // Mundo sin historia: NO se forja nada acá — el jugador primero elige entrada,
+    // recorrido e ideas, y recién entonces forja con el botón (o con el CTA final).
   }
 
   function startColumnDrag(side: "left" | "right", event: React.PointerEvent<HTMLDivElement>) {
@@ -1064,8 +1063,7 @@ export function App() {
   function choosePerspective(next: StoryPerspective) {
     setPerspective(next);
     localStorage.setItem(perspectiveStorageKey, next);
-    // La historia improvisada nace del punto de entrada: cambiarlo re-forja el mundo.
-    if (!selectedWorld.authoredCampaignId) void forgeStory("", selectedWorld, next);
+    // Cambiar la entrada NO re-forja solo: la forja es siempre un click explícito.
   }
 
   function startMultiplayerHost() {
@@ -1286,7 +1284,7 @@ export function App() {
         startSolo={startSolo}
         onMultiplayerHost={startMultiplayerHost}
         onMultiplayerJoin={openMultiplayerJoin}
-        improvisedCampaign={improvisedCampaign}
+        improvisedCampaign={improvisedWorldId === selectedWorldId ? improvisedCampaign : null}
         forgingStory={forgingStory}
         forgeError={forgeError}
         onForgeStory={(wish) => { void forgeStory(wish); }}
@@ -1370,7 +1368,9 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   // El temple de la quest: la historia elegida sube una stat y baja otra en la partida.
   const questTemper = getQuestTemper(selectedCampaign);
   const improvisedSelected = improvisedCampaign !== null && selectedCampaign.id === improvisedCampaign.id;
-  const canForge = forgePrompt.trim().length >= 12 && !forgingStory;
+  // La forja es SIEMPRE un click explícito, con las ideas como aporte opcional:
+  // primero se elige mundo/entrada/recorrido, después se forja.
+  const canForge = !forgingStory;
   const mpBlocked = improvisedSelected || !selectedWorld.authoredCampaignId;
   return (
     <main className="appShell lobbyShell">
@@ -1449,7 +1449,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               aria-label="Ideas para la historia del mundo"
             />
             <button type="button" className="soloButton forgeButton" disabled={!canForge} onClick={() => onForgeStory(forgePrompt.trim())}>
-              {forgingStory ? "Forjando…" : <><img className="uiIcon" src={uiIcon("forjar_historia")} alt="" /> Reforjar historia</>}
+              {forgingStory ? "Forjando…" : <><img className="uiIcon" src={uiIcon("forjar_historia")} alt="" /> {improvisedSelected ? "Reforjar historia" : "Forjar historia"}</>}
             </button>
           </div>
           {forgingStory && <ForgeRitual />}

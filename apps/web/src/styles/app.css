@@ -3653,9 +3653,10 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .lobbyStepTitle .stepDiamond { position: absolute; left: -55px; top: -3px; z-index: 2; }
 .lobbyStepTitle h2 { font-size: 16.5px; letter-spacing: .12em; font-weight: 600; }
 .heroSpecial { overflow: visible !important; }
-/* Retrato del héroe protagonista y nombre grande, como el mockup. */
-.heroSpecial .heroSummaryRow { grid-template-columns: 190px minmax(0, 1fr) auto !important; }
-.heroSpecial .heroSummaryRow img.summaryShot { width: 190px; height: 172px; }
+/* Retrato del héroe protagonista y nombre grande, como el mockup. El ancho
+   escala con el viewport (responsive en desktop) manteniendo el aspecto. */
+.heroSpecial .heroSummaryRow { grid-template-columns: clamp(160px, 14vw, 245px) minmax(0, 1fr) auto !important; }
+.heroSpecial .heroSummaryRow img.summaryShot { width: clamp(160px, 14vw, 245px); height: auto; aspect-ratio: 1.1 / 1; }
 .heroSummaryInfo strong { font-size: 32px; }
 .heroSummaryInfo > span { font-size: 15px; color: rgba(234,223,198,.85); }
 /* Mundo seleccionado: borde grueso luminoso. */
@@ -3714,7 +3715,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* Retrato del héroe: UN solo marco para las dos tomas (cambiar Frente/Cuerpo no
    salta de tamaño). El recorte lo absorbe cover: la cara (1:1) pierde un poco
    de los lados, el cuerpo (2:3) casi nada y queda anclado a la cabeza. */
-.heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 104px; height: 140px; aspect-ratio: auto; }
+.heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: clamp(104px, 9vw, 150px); height: auto; aspect-ratio: 3 / 4; }
 .heroPortraitFrame.fullbodyFrame .heroPortrait { object-position: top; }
 @media (max-width: 620px) {
   .heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 76px; height: 102px; }
