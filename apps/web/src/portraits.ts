@@ -45,7 +45,10 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
 // diverge del prompt de characterPortraitUrl, flux pinta OTRO personaje.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // 512×768: a 256×384 flux deformaba los cuerpos (figuras elongadas).
-  const prompt = `Fantasy RPG book character portrait, dark moody lighting, full body standing, head to toe visible, natural proportions, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
+  // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
+  // empuja al encuadre de busto.
+  const prompt = `Fantasy RPG book character illustration, dark moody lighting, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, standing pose, natural proportions, detailed painting: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }

@@ -582,41 +582,38 @@ export function App() {
   const [draft, setDraft] = useState<Character>(() => readStoredDraft());
   const draftRef = useRef(draft);
   useEffect(() => { draftRef.current = draft; }, [draft]);
-  // Retrato del héroe generado automáticamente: mientras no fijes un retrato clásico
-  // del picker, la cara se imagina (y re-imagina, con debounce) según nombre +
-  // linaje + oficio + concepto. Elegir un retrato clásico corta la auto-generación;
-  // "Reimaginar" en la forja la vuelve a encender.
+  // RETRATOS CONGELADOS: el par frente/cuerpo se genera UNA vez (al completar el
+  // look) y después solo cambia con "Reimaginar héroe". Editar identidad, stats o
+  // rasgos NO regenera nada — el par fijado en look.faceUrl/fullBodyUrl es la
+  // verdad y el toggle Frente/Cuerpo solo alterna entre esas dos variables.
   const manualAvatarRef = useRef(false);
+  function forgeHeroPortraitPair(seedNonce: number) {
+    const urls = heroImageUrls(draftRef.current, seedNonce);
+    // Se cachean las DOS imágenes ya mismo para que alternar sea instantáneo.
+    void loadPortrait(urls.face, { priority: true }).catch(() => undefined);
+    void loadPortrait(urls.fullbody, { priority: true }).catch(() => undefined);
+    const shot = draftRef.current.look?.avatarShot ?? "face";
+    setDraft(createCharacter({
+      ...draftRef.current,
+      look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody },
+      avatarUrl: urls[shot]
+    }));
+  }
   useEffect(() => {
     const current = draftRef.current.avatarUrl;
     if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
     if (manualAvatarRef.current) return;
-    // La primera selección (género/piel/ojos) es obligatoria: sin ella no se forja imagen.
+    // La primera selección (género/piel/ojos/pelo) es obligatoria; y si ya existe
+    // un retrato generado, acá no se toca nada (solo Reimaginar lo cambia).
     if (!lookComplete(draftRef.current)) return;
-    const timer = setTimeout(() => {
-      const urls = heroImageUrls(draftRef.current);
-      const shot = draftRef.current.look?.avatarShot ?? "face";
-      const nextUrl = urls[shot];
-      const currentUrl = draftRef.current.avatarUrl;
-      // Misma identidad con otra seed = retrato reimaginado a propósito: se respeta.
-      const sameIdentity = isGeneratedPortraitUrl(currentUrl) && currentUrl.replace(/seed=\d+$/, "") === nextUrl.replace(/seed=\d+$/, "");
-      if (!sameIdentity && currentUrl !== nextUrl) {
-        // Se piden las DOS imágenes (frente y cuerpo entero) para poder alternar al instante.
-        void loadPortrait(urls.face, { priority: true }).catch(() => undefined);
-        void loadPortrait(urls.fullbody, { priority: true }).catch(() => undefined);
-        setDraft(createCharacter({ ...draftRef.current, avatarUrl: nextUrl }));
-      }
-    }, 800);
+    if (isGeneratedPortraitUrl(draftRef.current.avatarUrl)) return;
+    const timer = setTimeout(() => forgeHeroPortraitPair(0), 400);
     return () => clearTimeout(timer);
-  }, [draft.name, draft.species, draft.role, draft.concept, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor, topStat(draft.stats)]);
+  }, [draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor]);
   function reimagineHeroPortrait(seedNonce: number) {
     if (!lookComplete(draftRef.current)) return;
     manualAvatarRef.current = false;
-    const urls = heroImageUrls(draftRef.current, seedNonce);
-    void loadPortrait(urls.face, { priority: true }).catch(() => undefined);
-    void loadPortrait(urls.fullbody, { priority: true }).catch(() => undefined);
-    const shot = draftRef.current.look?.avatarShot ?? "face";
-    setDraft(createCharacter({ ...draftRef.current, avatarUrl: urls[shot] }));
+    forgeHeroPortraitPair(seedNonce);
   }
   // Elegir un rasgo del retrato implica querer el retrato generado: sale del modo
   // manual (retrato clásico fijo) para que el efecto auto-regenere con el rasgo.
@@ -2677,18 +2674,25 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   // Alterna entre retrato de frente y cuerpo entero SIN regenerar: conserva la seed
   // actual (mismo rostro en ambas tomas) reescribiéndola en la URL de la otra toma.
   function chooseShot(shot: "face" | "fullbody") {
-    const urls = heroImageUrls(draft);
+    // El toggle alterna entre el par FIJADO al generar/reimaginar: mismo personaje
+    // garantizado (el frente es el frente real de ese cuerpo). Solo si un draft
+    // viejo no tiene par guardado se reconstruye por seed (legacy).
+    const stored = shot === "face" ? draft.look?.faceUrl : draft.look?.fullBodyUrl;
     const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
-    const nextUrl = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl) ? urls[shot].replace(/seed=\d+$/, `seed=${currentSeed}`) : urls[shot];
+    const legacy = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl)
+      ? heroImageUrls(draft)[shot].replace(/seed=\d+$/, `seed=${currentSeed}`)
+      : heroImageUrls(draft)[shot];
     onUnlockAutoPortrait?.();
-    setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: nextUrl }));
+    setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: stored ?? legacy }));
   }
-  // Descarga la toma pedida (frente o cuerpo) como archivo, con el seed elegido.
+  // Descarga la toma pedida (frente o cuerpo) como archivo — siempre del par fijado.
   async function downloadShot(shot: "face" | "fullbody") {
-    const urls = heroImageUrls(draft);
+    const stored = shot === "face" ? draft.look?.faceUrl : draft.look?.fullBodyUrl;
     const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
-    const url = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl) ? urls[shot].replace(/seed=\d+$/, `seed=${currentSeed}`) : urls[shot];
-    const src = await loadPortrait(url, { priority: true });
+    const legacy = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl)
+      ? heroImageUrls(draft)[shot].replace(/seed=\d+$/, `seed=${currentSeed}`)
+      : heroImageUrls(draft)[shot];
+    const src = await loadPortrait(stored ?? legacy, { priority: true });
     const link = document.createElement("a");
     link.href = src;
     link.download = `${(draft.name || "heroe").toLowerCase().replace(/\s+/g, "-")}-${shot === "face" ? "frente" : "cuerpo"}.jpg`;

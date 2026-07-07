@@ -67,6 +67,10 @@ export type CharacterLook = {
   hairColor?: string;
   /** Qué imagen usa de avatar: retrato de frente o cuerpo entero. */
   avatarShot?: "face" | "fullbody";
+  /** Par de imágenes FIJADO al generar/reimaginar: el toggle Frente/Cuerpo alterna
+   * entre estas dos variables (mismo personaje garantizado), jamás regenera. */
+  faceUrl?: string;
+  fullBodyUrl?: string;
 };
 
 export type Character = {
