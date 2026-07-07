@@ -3650,7 +3650,12 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* ── Marco contenedor del lobby según mockup (2026-07-07) ───────────────────
    Un solo marco envuelve los pasos; los rombos numerados viven en un gutter
    izquierdo unidos por una línea vertical dorada. */
-.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.26); border-radius: 18px; padding: 16px 18px 18px 62px; background: linear-gradient(180deg, rgba(10,18,30,.3), rgba(4,8,16,.45)); }
+.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.26); border-radius: 18px; padding: clamp(14px, 1.6vw, 24px) clamp(14px, 1.8vw, 26px) clamp(16px, 2vw, 28px) clamp(52px, 5vw, 72px); background: linear-gradient(180deg, rgba(10,18,30,.3), rgba(4,8,16,.45)); display: grid; gap: clamp(18px, 2.2vw, 30px); }
+/* UN solo nivel de caja: los paneles internos se aplanan (el marco lo pone
+   lobbyLayout; los bordes con contenido son el card del héroe y las world cards). */
+.lobbyShell .lobbyLayout > .panel { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; display: grid; gap: 13px; }
+/* El retrato sobresale hacia ESTE espacio, no sobre el título. */
+.heroSpecial .heroSummaryRow { margin-top: 26px; }
 .lobbyShell .lobbyLayout::before { content: ""; position: absolute; left: 38px; top: 74px; bottom: 70px; width: 1px; background: linear-gradient(180deg, rgba(212,175,55,.4), rgba(212,175,55,.06)); }
 .lobbyStepTitle { position: relative; }
 .lobbyStepTitle .stepDiamond { position: absolute; left: -55px; top: -3px; z-index: 2; }
@@ -3704,10 +3709,11 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .forgeButton:disabled { opacity: .55; }
 .lobbyShell .startCta { border-radius: 14px; }
 .lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
-/* Descarga de tomas: dos mini-botones bajo el toggle Frente/Cuerpo. */
-.shotDownloads { display: flex; gap: 6px; }
-.shotDownloads button { padding: 4px 10px; font-size: 11px; font-family: Georgia, serif; color: var(--tq-cream); border: 1px solid rgba(212,175,55,.35); border-radius: 999px; background: rgba(5,10,18,.7); transition: border-color .15s ease, color .15s ease; }
-.shotDownloads button:hover:not(:disabled) { border-color: var(--tq-gold); color: var(--tq-gold-hi); }
+/* Descarga de tomas: solo el icono de descarga, sin texto ni borde, uno bajo
+   cada botón del toggle Frente/Cuerpo. */
+.shotDownloads { display: flex; gap: 26px; justify-content: center; }
+.shotDownloads button { padding: 3px; border: 0 !important; background: none !important; color: rgba(212,175,55,.75); display: grid; place-items: center; transition: color .15s ease, transform .15s ease; }
+.shotDownloads button:hover:not(:disabled) { color: var(--tq-gold-hi); transform: translateY(1px); }
 /* Cards de linaje/oficio/compañero: retrato con aro, serif y selección dorada. */
 .lobbyShell .builderCard { border-radius: 12px; border-color: rgba(212,175,55,.22); background: linear-gradient(180deg, rgba(13,27,42,.72), rgba(5,10,18,.9)); padding: 12px 13px; gap: 7px; }
 .lobbyShell .builderCard:hover:not(:disabled) { border-color: rgba(212,175,55,.55); }

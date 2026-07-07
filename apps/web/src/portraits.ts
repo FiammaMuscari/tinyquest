@@ -38,11 +38,14 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
-// Imagen de cuerpo entero del héroe: template propio (de pies a cabeza, pose de
-// aventura). Convive con el retrato de frente: dos URLs, dos cachés, un avatar a elección.
+// Imagen de cuerpo entero del héroe: MISMO personaje que el retrato de frente.
+// La receta de consistencia es seed idéntica + prompt idéntico palabra por palabra
+// (mismo estilo, misma descripción, mismo fondo) cambiando SOLO el encuadre:
+// "half body" → "full body standing, head to toe". No tocar el estilo acá — si
+// diverge del prompt de characterPortraitUrl, flux pinta OTRO personaje.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // 512×768: a 256×384 flux deformaba los cuerpos (figuras elongadas).
-  const prompt = `Fantasy RPG full body character concept art, standing heroic pose, head to toe visible, natural body proportions, correct anatomy, dark moody lighting, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  const prompt = `Fantasy RPG book character portrait, dark moody lighting, full body standing, head to toe visible, natural proportions, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }

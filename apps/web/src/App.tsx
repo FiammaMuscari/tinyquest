@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Brain, Dices, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
+import { Bot, Brain, Dices, Download, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
 import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
@@ -2712,8 +2712,8 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             )}
             {heroLookDone && (
               <div className="shotDownloads" role="group" aria-label="Descargar imágenes del héroe">
-                <button type="button" onClick={() => void downloadShot("face")} disabled={disabled} title="Descargar la imagen de frente">⬇ Frente</button>
-                <button type="button" onClick={() => void downloadShot("fullbody")} disabled={disabled} title="Descargar la imagen de cuerpo entero">⬇ Cuerpo</button>
+                <button type="button" onClick={() => void downloadShot("face")} disabled={disabled} title="Descargar la imagen de frente" aria-label="Descargar frente"><Download size={15} /></button>
+                <button type="button" onClick={() => void downloadShot("fullbody")} disabled={disabled} title="Descargar la imagen de cuerpo entero" aria-label="Descargar cuerpo entero"><Download size={15} /></button>
               </div>
             )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
