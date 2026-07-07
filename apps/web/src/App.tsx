@@ -1701,7 +1701,7 @@ function ForgedStoryBanner({ campaign, world, hero }: { campaign: Campaign; worl
   const heroLine = heroPortraitSpec(hero).appearance;
   const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine, heroLine));
   const avatarUrl: string = hero.avatarUrl;
-  const heroShotUrl = hero.look?.fullBodyUrl ?? (isGeneratedPortraitUrl(avatarUrl) || avatarUrl.startsWith("/") ? avatarUrl : null);
+  const heroShotUrl = hero.look?.fullBodyUrl ?? (avatarUrl.startsWith("/") || isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : null);
   const [composed, setComposed] = useState<string | null>(null);
   useEffect(() => {
     if (!src || !heroShotUrl) { setComposed(null); return; }
