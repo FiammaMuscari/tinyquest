@@ -3643,12 +3643,16 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* Talentos: un solo aro (el del medallón) — el botón contenedor no dibuja
    borde/glow propio ni se levanta; eso duplicaba los bordes. */
 .talentPicker button.talentOption, .talentPicker button.talentOption:hover:not(:disabled), .talentPicker button.talentOption.selected { border-color: transparent !important; box-shadow: none !important; transform: none !important; filter: none !important; background: transparent !important; }
-/* Retrato del designer: la toma de cuerpo entero es 256×384 → marco 2:3 exacto. */
-.heroPortraitFrame.fullbodyFrame { height: auto; aspect-ratio: 2 / 3; }
-/* Retrato del lobby: mismo aspecto que la fuente — cara 1:1, cuerpo entero 2:3
-   (la caja fija 112×140 recortaba las dos tomas). */
-.heroSpecial .heroSummaryRow img.summaryShot { width: 112px; height: 112px; }
-.heroSpecial .heroSummaryRow img.summaryShot.fullShot { height: 168px; }
+/* Retrato del héroe: UN solo marco para las dos tomas (cambiar Frente/Cuerpo no
+   salta de tamaño). El recorte lo absorbe cover: la cara (1:1) pierde un poco
+   de los lados, el cuerpo (2:3) casi nada y queda anclado a la cabeza. */
+.heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 104px; height: 140px; aspect-ratio: auto; }
+.heroPortraitFrame.fullbodyFrame .heroPortrait { object-position: top; }
+@media (max-width: 620px) {
+  .heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 76px; height: 102px; }
+}
+.heroSpecial .heroSummaryRow img.summaryShot { width: 112px; height: 150px; object-position: center; }
+.heroSpecial .heroSummaryRow img.summaryShot.fullShot { object-position: top; }
 .worldCard { animation: portraitIn .5s ease; }
 
 /* El héroe es el paso 1: sección con marco dorado protagonista. */
