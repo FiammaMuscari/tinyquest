@@ -3483,6 +3483,10 @@ h1 {
 .againstYou ul { margin: 3px 0 0; padding-left: 16px; display: grid; gap: 2px; }
 .againstYou li { color: #ffd9c9; font-size: 12px; line-height: 1.4; }
 .firstPaths li i.statChip { margin-left: 7px; font-size: 9px; vertical-align: 1px; font-style: normal; }
+/* Portada con botón de descarga superpuesto en la esquina superior derecha. */
+.forgedBannerWrap { position: relative; }
+.bannerDownload { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(212,175,55,.5); background: rgba(9,7,4,.78); color: var(--tq-gold-hi); transition: background .15s ease, transform .15s ease; }
+.bannerDownload:hover { background: rgba(30,24,14,.95); transform: translateY(1px); }
 /* La escena generada se aprecia ENTERA: el marco usa el aspecto exacto de la
    imagen (1120×480 = 7:3), sin max-height que la recorte. */
 .forgedBanner { width: 100%; height: auto; aspect-ratio: 1120 / 480; object-fit: cover; border-radius: 12px; border: 1px solid rgba(212,175,55,.35); box-shadow: 0 6px 24px rgba(0,0,0,.45); }
@@ -3540,6 +3544,9 @@ h1 {
    gold #D4AF37, blue_deep #0D1B2A, black_panel #050A12, parchment #EADFC6). */
 /* Fondo azul marino profundo del mockup (blue_deep→black_panel) + header limpio. */
 .appShell.lobbyShell { background: radial-gradient(1100px 520px at 18% -8%, rgba(212,175,55,.09), transparent 62%), linear-gradient(180deg, #171209 0%, #0d0a06 48%, #070503 100%) !important; }
+/* Aire a los costados: el contenido no toca los bordes de la pantalla — se lee
+   como con un poco de zoom-out, centrado y con respiración lateral. */
+.appShell.lobbyShell { width: min(1360px, calc(100% - clamp(28px, 7vw, 120px))) !important; margin: 0 auto !important; padding: clamp(18px, 2vw, 32px) 0 40px !important; }
 .lobbyShell .lobbyHeader { background: transparent !important; border: 0 !important; box-shadow: none !important; }
 .lobbyShell .panel { background: linear-gradient(180deg, rgba(30,24,14,.72), rgba(11,9,5,.9)); border: 1px solid rgba(212,175,55,.26); border-radius: 14px; }
 /* Botones dorados brillantes (CTA y forja) como la referencia. */
@@ -3601,7 +3608,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .stepDiamond { width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; transform: rotate(45deg); border: 1.5px solid rgba(255,203,112,.75); border-radius: 7px; background: linear-gradient(160deg, rgba(56,36,10,.85), rgba(10,8,4,.95)); box-shadow: 0 0 12px rgba(255,183,69,.28); font-style: normal; }
 .stepDiamond span { transform: rotate(-45deg); color: #ffda8a; font-weight: 900; font-size: 14px; font-family: 'Cinzel', Georgia, serif; }
 .lobbyStepTitle h2 { margin: 0; font-family: 'Cinzel', Georgia, serif; font-size: 19px; letter-spacing: .14em; text-transform: uppercase; color: #ffda8a; font-weight: 700; text-shadow: 0 1px 8px rgba(255,183,69,.25); }
-.stepRule { flex: 1 1 auto; height: 1px; background: linear-gradient(90deg, rgba(255,203,112,.5), rgba(255,203,112,.05)); position: relative; }
+.stepRule { flex: 0 1 150px; height: 1px; background: linear-gradient(90deg, rgba(255,203,112,.45), rgba(255,203,112,0)); position: relative; }
 .stepRule::before { content: "◈"; position: absolute; left: 0; top: -8px; color: rgba(255,203,112,.7); font-size: 11px; }
 /* Mundos: cards grandes con emblema y tilde de selección. */
 .worldCard { position: relative; }
@@ -3663,14 +3670,16 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 /* ── Marco contenedor del lobby según mockup (2026-07-07) ───────────────────
    Un solo marco envuelve los pasos; los rombos numerados viven en un gutter
    izquierdo unidos por una línea vertical dorada. */
-.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.26); border-radius: 18px; padding: clamp(14px, 1.6vw, 24px) clamp(14px, 1.8vw, 26px) clamp(16px, 2vw, 28px) clamp(52px, 5vw, 72px); background: linear-gradient(180deg, rgba(24,19,11,.3), rgba(10,8,5,.45)); display: grid; gap: clamp(18px, 2.2vw, 30px); }
+.lobbyShell .lobbyLayout { position: relative; border: 1px solid rgba(212,175,55,.22); border-radius: 20px; padding: clamp(16px, 1.8vw, 26px) clamp(16px, 2vw, 30px) clamp(18px, 2.2vw, 32px) clamp(54px, 5vw, 74px); background: linear-gradient(180deg, rgba(24,19,11,.34), rgba(9,7,4,.5)); display: grid; gap: clamp(20px, 2.4vw, 34px); box-shadow: 0 24px 70px rgba(0,0,0,.4), inset 0 1px rgba(242,210,124,.06); }
 /* UN solo nivel de caja: los paneles internos se aplanan (el marco lo pone
    lobbyLayout; los bordes con contenido son el card del héroe y las world cards). */
 .lobbyShell .lobbyLayout > .panel { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; display: grid; gap: 13px; }
 /* El retrato sobresale hacia ESTE espacio, no sobre el título. */
 .heroSpecial .heroSummaryRow { margin-top: 26px; }
-.lobbyShell .lobbyLayout::before { content: ""; position: absolute; left: 38px; top: 74px; bottom: 70px; width: 1px; background: linear-gradient(180deg, rgba(212,175,55,.4), rgba(212,175,55,.06)); }
+/* El flujo entre pasos lo marcan flechas (chevrones) en el gutter, no una línea
+   recta eterna. */
 .lobbyStepTitle { position: relative; }
+.stepFlowArrow { position: absolute; left: -46px; top: -28px; width: 13px !important; height: 20px !important; color: rgba(212,175,55,.45); }
 .lobbyStepTitle .stepDiamond { position: absolute; left: -55px; top: -3px; z-index: 2; }
 .lobbyStepTitle h2 { font-size: 16.5px; letter-spacing: .12em; font-weight: 600; }
 .heroSpecial { overflow: visible !important; }
@@ -3722,11 +3731,10 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .forgeButton:disabled { opacity: .55; }
 .lobbyShell .startCta { border-radius: 14px; }
 .lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(30,24,14,.9), rgba(11,9,5,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
-/* Descarga de tomas: solo el icono de descarga, sin texto ni borde, uno bajo
-   cada botón del toggle Frente/Cuerpo. */
-.shotDownloads { display: flex; gap: 26px; justify-content: center; }
-.shotDownloads button { padding: 3px; border: 0 !important; background: none !important; color: rgba(212,175,55,.75); display: grid; place-items: center; transition: color .15s ease, transform .15s ease; }
-.shotDownloads button:hover:not(:disabled) { color: var(--tq-gold-hi); transform: translateY(1px); }
+/* Descarga de la toma: flechita superpuesta en la esquina del retrato (mismo
+   estilo que la portada); el marco necesita position para anclarla. */
+.heroPortraitFrame { position: relative; }
+.heroPortraitFrame .bannerDownload { top: 6px; right: 6px; width: 27px; height: 27px; z-index: 2; }
 /* Cards de linaje/oficio/compañero: retrato con aro, serif y selección dorada. */
 .lobbyShell .builderCard { border-radius: 12px; border-color: rgba(212,175,55,.22); background: linear-gradient(180deg, rgba(30,24,14,.72), rgba(11,9,5,.9)); padding: 12px 13px; gap: 7px; }
 .lobbyShell .builderCard:hover:not(:disabled) { border-color: rgba(212,175,55,.55); }

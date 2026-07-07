@@ -1775,13 +1775,34 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
   // Generando (escena o composición): spinner + frases que laten.
   if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
   if (!src) return null;
-  return <img className="forgedBanner portraitFade" src={composed ?? src} alt={`Escena de ${campaign.title} con tu héroe`} />;
+  const cover = composed ?? src;
+  const downloadCover = () => {
+    const link = document.createElement("a");
+    link.href = cover;
+    link.download = `portada-${campaign.title.toLowerCase().replace(/\s+/g, "-").slice(0, 48)}.jpg`;
+    link.click();
+  };
+  return (
+    <div className="forgedBannerWrap">
+      <img className="forgedBanner portraitFade" src={cover} alt={`Escena de ${campaign.title} con tu héroe`} />
+      <button className="bannerDownload" type="button" onClick={downloadCover} title="Descargar la portada" aria-label="Descargar la portada">
+        <Download size={15} />
+      </button>
+    </div>
+  );
 }
 
-// Título de paso del lobby según el mockup: rombo numerado + serif dorada + filete.
+// Título de paso del lobby: rombo numerado + serif dorada + filete CORTO.
+// El flujo entre pasos lo marca una flecha en el gutter (ver .stepFlowArrow en CSS),
+// no una línea recta eterna.
 function LobbyStepTitle({ number, title }: { number: number; title: string }) {
   return (
     <div className="lobbyStepTitle">
+      {number > 1 && (
+        <svg className="stepFlowArrow" viewBox="0 0 16 20" aria-hidden="true">
+          <path d="M8 2v13M3 10l5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
       <i className="stepDiamond" aria-hidden="true"><span>{number}</span></i>
       <h2>{title}</h2>
       <span className="stepRule" aria-hidden="true" />
@@ -2821,17 +2842,16 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           <div className="heroPortraitColumn">
             <div className={`heroPortraitFrame ${currentShot === "fullbody" ? "fullbodyFrame" : ""}`}>
               <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
+              {heroLookDone && (
+                <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled} title={currentShot === "face" ? "Descargar la imagen de frente" : "Descargar la imagen de cuerpo entero"} aria-label="Descargar esta toma">
+                  <Download size={14} />
+                </button>
+              )}
             </div>
             {heroLookDone && (
               <div className="shotToggle" role="group" aria-label="Tipo de imagen del avatar">
                 <button type="button" className={currentShot === "face" ? "selected" : ""} onClick={() => chooseShot("face")} disabled={disabled}>Frente</button>
                 <button type="button" className={currentShot === "fullbody" ? "selected" : ""} onClick={() => chooseShot("fullbody")} disabled={disabled}>Cuerpo</button>
-              </div>
-            )}
-            {heroLookDone && (
-              <div className="shotDownloads" role="group" aria-label="Descargar imágenes del héroe">
-                <button type="button" onClick={() => void downloadShot("face")} disabled={disabled} title="Descargar la imagen de frente" aria-label="Descargar frente"><Download size={15} /></button>
-                <button type="button" onClick={() => void downloadShot("fullbody")} disabled={disabled} title="Descargar la imagen de cuerpo entero" aria-label="Descargar cuerpo entero"><Download size={15} /></button>
               </div>
             )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
