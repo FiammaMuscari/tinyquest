@@ -1,5 +1,6 @@
 import type { DungeonMasterProvider, FinalRecapRequest, FinalRecapResponse, ImprovisedStoryContent, ImprovisedStoryRequest, NarrationRequest, NarrationResponse, OpeningSceneRequest, OpeningSceneResponse } from "@tiny-quest/game-engine";
 import { buildNarrativeIngredientBundle } from "@tiny-quest/game-engine";
+import { storyCoherenceIssues } from "./story-coherence";
 import { improvisedStorySchema, narrationResponseSchema } from "./schemas";
 import { repairLooseJson } from "./json-repair";
 import { buildDungeonMasterSystemPrompt } from "./prompt-builder";
@@ -441,7 +442,10 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       "La acusación o conflicto necesita EVIDENCIA inicial concreta (evidence: 2-3 pruebas físicas, pueden ser falsas o plantadas: 'el mapa apareció doblado en tu capa'). Sin evidencia la acusación se siente arbitraria; con evidencia se siente misterio.",
       "CADA idea del pedido debe convertirse en una FUNCIÓN JUGABLE (personaje, pista, amenaza, objeto, lugar, vínculo emocional, giro, consecuencia o ventaja mecánica) — nunca decoración estética. Si piden 'un perro llamado Firulais', el perro es aliado emocional Y pista móvil Y posible riesgo, no un cameo. En keywordsUsed.how nombrá la función ('Firulais → pista móvil: fue el único que olió al culpable').",
       "hiddenTwists = 3 giros SECRETOS que REINTERPRETAN la evidencia inicial sin contradecirla (la prueba plantada tiene segunda lectura, el testigo vio otra cosa, el objeto robado eligió aparecer). Son capa de motor: JAMÁS los insinúes en premise, summary ni descripciones visibles.",
-      "Si el pedido incluye una duración ('3 meses', 'un año'), convertila en ESCALA NARRATIVA: las 4 escenas son saltos temporales con marca en el título ('Semana 2 — el rastro', 'Mes 3 — el juicio'). No la trates como keyword literal.",
+      "Si el pedido incluye una duración ('3 meses', 'un año'), es ESCALA DE CAMPAÑA: las 4 escenas son saltos temporales con marca en el título ('Semana 2 — el rastro', 'Mes 3 — el juicio'), pero summary.timeLimit es el reloj CORTO de la primera escena ('antes del próximo anochecer'), NUNCA la duración total.",
+      "ENTIDADES SEPARADAS: el compañero del héroe (petName del payload) es SUYO y ya existe — jamás lo fusiones con mascotas o personajes del pedido. Si piden 'perro Firulais' y el héroe tiene 'Alma Dracónica', existen LOS DOS por separado, cada uno con su nombre y su rol — y el bond de un NPC JAMÁS puede decir que ese NPC es el compañero del héroe ni nombrarlo. Respetá TODOS los nombres propios del pedido letra por letra. Si el pedido incluye una mascota o criatura con nombre ('perro Firulais'), DEBE ser pieza jugable de la historia: agregala como NPC propio (appearance de animal, bond 'tu perro') Y hacela aparecer en la premise y en al menos una escena o pista — mencionarla al pasar NO cuenta.",
+      "Si el pedido incluye una identidad para el héroe ('elfo oscuro', 'vampiro'), aplicásela AL HÉROE: su linaje, su condición social o el prejuicio del mundo contra él forman parte del conflicto — no la conviertas en un NPC suelto.",
+      "AUTO-REVISIÓN antes de responder: ¿los nombres propios del pedido están intactos? ¿ninguna entidad quedó fusionada? ¿el reloj inicial no contradice la duración pedida? ¿el héroe quedó atado al conflicto (heroBond)? ¿las 3 primeras acciones permiten investigar la evidencia, confrontar a un NPC y usar un rasgo propio del héroe? Corregí lo que falle ANTES de responder.",
       "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal, MÁXIMO 20 palabras, frase COMPLETA), risk (qué PERDÉS si fallás — cosas con nombre: tu linaje, tu perro, un juramento; máximo 20 palabras), firstMystery (la primera pregunta que pica), timeLimit (el reloj: 'antes del anochecer', corto). keywordsUsed = por CADA idea del pedido, cómo se usó y con qué función.",
       "PROHIBIDO el tono de sinopsis genérica: nada de 'la única forma de limpiar tu nombre', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo'. Escribí como novelista: premise de MÁXIMO 3 frases con al menos UN detalle sensorial concreto (un olor, un objeto en una mano, un gesto) y UNA imagen memorable. Todo texto visible debe poder leerse en voz alta sin vergüenza.",
       'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[2-3 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"]}. appearance = cómo se VE el personaje en 1 frase dibujable que SIEMPRE dice: especie o etnia (humana de piel oscura, elfo pálido, vampiro, mestizo animal, lo que sea), género, edad aparente (niño, adulta, anciano), rasgos de cara/cuerpo, ropa y una marca distintiva. Variá MUCHO los cuerpos entre personajes: niños, ancianas, pieles oscuras y claras, criaturas — el elenco no puede ser todo adultos iguales. bond = relación dramática con el héroe en 3-8 palabras ("padre de la víctima · quiere sangre"). whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
@@ -452,6 +456,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     ];
     // El LLM a veces devuelve JSON malformado o truncado por límite de tokens:
     // se intenta crudo → reparado, y si nada sirve se pide la historia de nuevo una vez.
+    // (la revisión de coherencia corre después de cada intento; ver storyCoherenceIssues)
     const attempt = async (): Promise<ImprovisedStoryContent | null> => {
       // Los bloques nuevos (summary/keywords/evidence/bonds) piden más espacio de salida.
       const json = await this.callGroqWithFailover(messages, { forceJson: true, maxTokens: 3400 }, "story-forge");
@@ -466,7 +471,21 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       }
       return null;
     };
-    const story = (await attempt()) ?? (await attempt());
+    // Revisión de coherencia post-generación: si la primera salida rompe nombres,
+    // fusiona entidades o confunde el reloj, se regenera una vez y gana la salida
+    // con menos problemas (regenerar "solo una parte" no es posible sin otra llamada).
+    const first = await attempt();
+    const firstIssues = first ? storyCoherenceIssues(first, input) : ["no-parse"];
+    let story = first;
+    if (!first || firstIssues.length > 0) {
+      if (first) logDmEvent("story-forge", { ok: false, coherence: firstIssues });
+      const second = await attempt();
+      if (second) {
+        const secondIssues = storyCoherenceIssues(second, input);
+        story = !first || secondIssues.length < firstIssues.length ? second : first;
+        if (secondIssues.length > 0) logDmEvent("story-forge", { ok: false, coherenceRetry: secondIssues });
+      }
+    }
     if (!story) {
       throw new Error("El narrador se trabó escribiendo la historia. Tocá Reintentar — suele salir a la segunda.");
     }

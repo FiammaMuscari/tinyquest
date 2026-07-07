@@ -1,0 +1,109 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import ts from "typescript";
+
+async function transpile(src, out) {
+  const source = await readFile(new URL(src, import.meta.url), "utf8");
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } });
+  await writeFile(out, outputText);
+}
+
+const dir = join(tmpdir(), `tinyquest-story-coherence-${process.pid}`);
+await mkdir(dir, { recursive: true });
+await transpile("../packages/ai-master/src/story-coherence.ts", join(dir, "story-coherence.mjs"));
+const { storyCoherenceIssues } = await import(`file://${join(dir, "story-coherence.mjs")}`);
+
+const hero = { name: "Nyra", species: "elfa", role: "cazadora", petName: "Alma Dracónica", concept: "busca a su hermana" };
+
+function baseStory(overrides = {}) {
+  return {
+    title: "El Rastro de Ceniza",
+    premise: "El perro Firulais gime junto al cuerpo; el olor a ceniza no es del incendio.",
+    npcs: [
+      { name: "Firulais", role: "aliado", bond: "tu perro", description: "perro rastreador" },
+      { name: "Marga", role: "testigo", bond: "vecina de la víctima", description: "anciana" }
+    ],
+    scenes: [{ title: "La casa quemada", objective: "Seguir a Firulais" }],
+    clues: [{ title: "El collar", text: "Firulais olfatea un guante ajeno", sceneIndex: 1 }],
+    threat: { name: "El Encapuchado", description: "prende fuegos" },
+    summary: { objective: "Encontrá al culpable", risk: "Tu perro", firstMystery: "¿De quién es el guante?", timeLimit: "antes del anochecer" },
+    heroBond: "El incendio fue en la casa de tu hermana.",
+    ...overrides
+  };
+}
+
+test("historia sana con pedido y héroe pasa sin problemas", () => {
+  const issues = storyCoherenceIssues(baseStory(), { userPrompt: "un perro llamado Firulais", hero });
+  assert.deepEqual(issues, []);
+});
+
+test("nombre pedido ausente en toda la salida se detecta", () => {
+  const story = baseStory({
+    premise: "Un incendio sin testigos.",
+    npcs: [{ name: "Marga", role: "testigo", bond: "vecina", description: "anciana" }],
+    scenes: [{ title: "La casa quemada", objective: "Investigar" }],
+    clues: [{ title: "El guante", text: "un guante ajeno", sceneIndex: 1 }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
+  assert.ok(issues.includes("nombre-perdido:firulais"));
+});
+
+test("nombre solo decorativo (fuera de campos jugables) se detecta", () => {
+  const story = baseStory({
+    premise: "Un incendio sin testigos.",
+    npcs: [{ name: "Marga", role: "testigo", bond: "vecina", description: "anciana" }],
+    scenes: [{ title: "La casa quemada", objective: "Investigar" }],
+    clues: [{ title: "El guante", text: "un guante ajeno", sceneIndex: 1 }],
+    heroBond: "Firulais te acompaña desde niña."
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
+  assert.ok(issues.includes("nombre-sin-rol-jugable:firulais"));
+});
+
+test("compañero del héroe fusionado con la mascota pedida se detecta", () => {
+  const story = baseStory({
+    premise: "Tu perro Alma Dracónica olfatea el cuerpo.",
+    npcs: [{ name: "Marga", role: "testigo", bond: "vecina", description: "anciana" }],
+    scenes: [{ title: "La casa", objective: "Seguir al perro firulais" }],
+    clues: [{ title: "El collar", text: "firulais halló un guante", sceneIndex: 1 }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
+  assert.ok(issues.includes("compañero-fusionado-con-mascota"));
+});
+
+test("NPC cuyo bond nombra al compañero del héroe se detecta", () => {
+  const story = baseStory({
+    npcs: [
+      { name: "Firulais", role: "aliado", bond: "tu perro", description: "perro rastreador" },
+      { name: "Sombra", role: "guía", bond: "es Alma Dracónica, tu compañera", description: "criatura" }
+    ]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
+  assert.ok(issues.some((i) => i.startsWith("npc-fusionado-con-compañero:")));
+});
+
+test("duración larga pedida no puede ser el reloj inicial", () => {
+  const story = baseStory({ summary: { objective: "Encontrá al culpable", risk: "Tu perro", firstMystery: "¿Quién?", timeLimit: "tres meses" } });
+  const issues = storyCoherenceIssues(story, { userPrompt: "una campaña de tres meses con un perro llamado Firulais", hero });
+  assert.ok(issues.includes("reloj-inicial-es-duracion-total"));
+});
+
+test("héroe presente exige heroBond", () => {
+  const story = baseStory({ heroBond: undefined });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
+  assert.ok(issues.includes("hero-sin-vinculo"));
+});
+
+test("palabras descriptivas tras sustantivo de mascota no cuentan como nombre", () => {
+  const story = baseStory({ premise: "Un incendio sin testigos y un perro negro suelto." });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro negro gigante llamado Firulais", hero });
+  assert.ok(!issues.some((i) => i.includes("negro") || i.includes("gigante")));
+});
+
+test("sin pedido ni héroe no hay problemas", () => {
+  const issues = storyCoherenceIssues(baseStory({ heroBond: undefined }), {});
+  assert.deepEqual(issues, []);
+});
