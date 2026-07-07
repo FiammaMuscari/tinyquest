@@ -3832,6 +3832,7 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
    raros ni estirones, imagen grande y nítida. */
 .heroIdentity { grid-template-columns: clamp(120px, 11vw, 170px) minmax(0, 1fr); }
 .heroPortraitFrame { width: 100%; height: auto; aspect-ratio: 4 / 5; }
+.heroPortraitFrame .heroPortrait { object-position: top; }
 .heroPortraitFrame.fullbodyFrame { width: 100%; height: auto; aspect-ratio: 2 / 3; }
 .heroPortraitFrame.fullbodyFrame .heroPortrait { object-position: top; }
 @media (max-width: 620px) {

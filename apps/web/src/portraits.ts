@@ -40,9 +40,12 @@ const heroPromptTail = (name: string, appearance: string | undefined, styleHint:
   `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  const prompt = `${heroPromptRoot}, three-quarter shot from the waist up, face clearly visible${heroPromptTail(name, appearance, styleHint)}`;
+  // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
+  // mayor consistencia de personaje posible sin img2img (kontext es de pago).
+  // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
+  const prompt = `${heroPromptRoot}, three-quarter shot from the waist up, face clearly visible, closer camera${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=640&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Imagen de cuerpo entero del héroe: MISMO personaje que el retrato de frente.

@@ -1544,19 +1544,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   </button>
                 )}
               </div>
-              {(improvisedCampaign.scenes[0]?.multipleChoiceOptions?.length ?? 0) > 0 && (
-                <div className="firstPaths">
-                  <em>🧭 ¿Por dónde empezás?</em>
-                  <ol>
-                    {improvisedCampaign.scenes[0].multipleChoiceOptions.slice(0, 3).map((option, index) => (
-                      <li key={`path-${index}`}>
-                        <span className="pathLabel">{normalizeUiText(option.label)}</span>
-                        {option.recommendedStat && <i className={`statChip stat-${option.recommendedStat}`}>{statLabels[option.recommendedStat]}</i>}
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              )}
+              {/* Los primeros caminos se descubren JUGANDO — mostrarlos acá era ruido. */}
               <em className="teaserHint">👆 Tocá un personaje para conocerlo. El resto —secretos, giros, verdades— se descubre jugando.</em>
             </div>
           )}
@@ -1699,14 +1687,63 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
 
 // Banner de la historia forjada: el mundo elegido con el elenco creado en escena.
 // URL determinística desde el contenido de la campaña → cacheado, cero re-cómputo.
+function loadImg(src: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = src;
+  return image.decode().then(() => image);
+}
+
+// Portada de la historia: la escena generada + TU AVATAR compositado encima con
+// bordes fundidos — la promesa es dura: sea cual sea tu imagen (IA o clásica),
+// aparece en la portada. El prompt además describe al héroe por si flux lo pinta.
 function ForgedStoryBanner({ campaign, world, hero }: { campaign: Campaign; world: WorldEra; hero: Character }) {
   const castLine = campaign.npcs.slice(0, 3).map((npc) => npc.appearance ?? npc.name).join("; ");
-  // El héroe entra a la escena con el MISMO descriptor de su retrato: coherente.
   const heroLine = heroPortraitSpec(hero).appearance;
   const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine, heroLine));
+  const avatarUrl: string = hero.avatarUrl;
+  const heroShotUrl = hero.look?.fullBodyUrl ?? (isGeneratedPortraitUrl(avatarUrl) || avatarUrl.startsWith("/") ? avatarUrl : null);
+  const [composed, setComposed] = useState<string | null>(null);
+  useEffect(() => {
+    if (!src || !heroShotUrl) { setComposed(null); return; }
+    let alive = true;
+    void (async () => {
+      try {
+        const heroSrc = isGeneratedPortraitUrl(heroShotUrl) ? await loadPortrait(heroShotUrl) : heroShotUrl;
+        const [scene, heroImg] = await Promise.all([loadImg(src), loadImg(heroSrc)]);
+        const canvas = document.createElement("canvas");
+        canvas.width = 1120; canvas.height = 480;
+        const ctx2d = canvas.getContext("2d");
+        if (!ctx2d) return;
+        ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
+        // Recorte suave del héroe: bordes fundidos por los cuatro lados.
+        const heroH = canvas.height * 0.96;
+        const heroW = heroImg.naturalWidth * (heroH / heroImg.naturalHeight);
+        const cut = document.createElement("canvas");
+        cut.width = Math.round(heroW); cut.height = Math.round(heroH);
+        const cutCtx = cut.getContext("2d");
+        if (!cutCtx) return;
+        cutCtx.drawImage(heroImg, 0, 0, cut.width, cut.height);
+        cutCtx.globalCompositeOperation = "destination-in";
+        const fadeX = cut.width * 0.22;
+        const gx = cutCtx.createLinearGradient(0, 0, cut.width, 0);
+        gx.addColorStop(0, "rgba(0,0,0,0)"); gx.addColorStop(fadeX / cut.width, "rgba(0,0,0,1)");
+        gx.addColorStop(1 - fadeX / cut.width, "rgba(0,0,0,1)"); gx.addColorStop(1, "rgba(0,0,0,0)");
+        cutCtx.fillStyle = gx; cutCtx.fillRect(0, 0, cut.width, cut.height);
+        const gy = cutCtx.createLinearGradient(0, 0, 0, cut.height);
+        gy.addColorStop(0, "rgba(0,0,0,0)"); gy.addColorStop(0.14, "rgba(0,0,0,1)"); gy.addColorStop(1, "rgba(0,0,0,1)");
+        cutCtx.fillStyle = gy; cutCtx.fillRect(0, 0, cut.width, cut.height);
+        // El héroe pisa el tercio derecho de la portada, apoyado en el piso.
+        ctx2d.drawImage(cut, canvas.width * 0.66 - cut.width / 2, canvas.height - cut.height);
+        if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
+      } catch {
+        if (alive) setComposed(null); // sin héroe listo: queda la escena sola
+      }
+    })();
+    return () => { alive = false; };
+  }, [src, heroShotUrl]);
   if (!src && status === "loading") return <div className="forgedBanner bannerLoading" role="status" aria-label="Generando escena"><span className="spin" /></div>;
   if (!src) return null;
-  return <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title}`} />;
+  return <img className="forgedBanner portraitFade" src={composed ?? src} alt={`Escena de ${campaign.title} con tu héroe`} />;
 }
 
 // Título de paso del lobby según el mockup: rombo numerado + serif dorada + filete.
