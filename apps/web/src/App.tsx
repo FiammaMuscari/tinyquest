@@ -1298,6 +1298,8 @@ export function App() {
         onChoosePartyMode={choosePartyMode}
         onReimagineHero={reimagineHeroPortrait}
         onUnlockAutoPortrait={unlockAutoPortrait}
+        sceneImageMode={sceneImageMode}
+        onSceneImageMode={chooseSceneImageMode}
       />
     );
   }
@@ -1355,7 +1357,7 @@ export function App() {
   );
 }
 
-function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, partyMode, onChoosePartyMode, onReimagineHero, onUnlockAutoPortrait }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; partyMode: "alone" | "companions"; onChoosePartyMode: (mode: "alone" | "companions") => void; onReimagineHero: (seedNonce: number) => void; onUnlockAutoPortrait: () => void }) {
+function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, partyMode, onChoosePartyMode, onReimagineHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; partyMode: "alone" | "companions"; onChoosePartyMode: (mode: "alone" | "companions") => void; onReimagineHero: (seedNonce: number) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
@@ -1373,6 +1375,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   return (
     <main className="appShell lobbyShell">
       <HelpButton open={showHelp} setOpen={setShowHelp} />
+      <SettingsButton mode={sceneImageMode} onMode={onSceneImageMode} />
       <header className="lobbyHeader">
         <div>
           <img className="brandLogo" src="/assets/brand/tiny-quest-logo.png" alt="Tiny Quest" />
@@ -1955,6 +1958,30 @@ function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcI
   );
 }
 
+
+// Ajustes del lobby: el engranaje del mockup, con las preferencias reales que
+// hoy viven en localStorage (encuadre de la imagen de escena en partida).
+function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode: SceneImageMode) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="helpButton settingsButton" type="button" onClick={() => setOpen((v) => !v)} aria-label="Ajustes" title="Ajustes" aria-expanded={open}>
+        <img className="uiIcon" src={uiIcon("ajustes")} alt="" />
+      </button>
+      {open && (
+        <div className="settingsPop" role="dialog" aria-label="Ajustes de Tiny Quest">
+          <strong>Imagen de escena en partida</strong>
+          <p>Qué pinta la IA mientras jugás cada escena.</p>
+          {sceneImageModeOptions.map((option) => (
+            <button key={option.id} type="button" className={mode === option.id ? "selected" : ""} onClick={() => { onMode(option.id); setOpen(false); }}>
+              <span aria-hidden="true">{option.icon}</span> {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
 
 const sceneImageModeOptions: Array<{ id: SceneImageMode; icon: string; label: string }> = [
   { id: "place", icon: "🏞️", label: "El lugar de la escena" },
