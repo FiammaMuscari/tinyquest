@@ -3564,8 +3564,11 @@ body:has(.lobbyShell)::before {
 @media (prefers-reduced-motion: reduce) { body:has(.lobbyShell)::before { animation: none; } }
 .appShell.lobbyShell { position: relative; z-index: 1; }
 /* Botones dorados METÁLICOS (oro cepillado con brillo y borde profundo, no amarillo plano). */
-.forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(158deg, #f4dd97 0%, #ddb857 36%, #c69c3b 62%, #a67c26 100%) !important; color: #2e2007 !important; font-weight: 800; border: 1px solid #7d5e22 !important; box-shadow: inset 0 1px 0 rgba(255,248,220,.55), inset 0 -2px 7px rgba(120,86,20,.4), 0 6px 18px rgba(0,0,0,.38) !important; }
+.forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(158deg, #ffe9a8 0%, #e6c065 34%, #cda23f 60%, #a8801f 100%) !important; color: #241703 !important; font-weight: 900 !important; letter-spacing: .02em; border: 1px solid #6f5216 !important; text-shadow: 0 1px 0 rgba(255,248,220,.45); box-shadow: inset 0 1px 0 rgba(255,251,230,.7), inset 0 -3px 8px rgba(110,78,16,.45), 0 6px 20px rgba(0,0,0,.4) !important; }
 .forgeButton:hover:not(:disabled), .lobbyShell .startCta:not(:disabled):hover { filter: brightness(1.06); }
+/* El icono dorado del asset NO se lee sobre botón dorado → medallón oscuro detrás. */
+.forgeButton .uiIcon, .lobbyShell .startCta:not(:disabled) svg { background: radial-gradient(circle, #3a2a0c, #241703) !important; border-radius: 50% !important; padding: 4px; width: 26px !important; height: 26px !important; box-shadow: inset 0 0 0 1px rgba(255,230,160,.4); }
+.lobbyShell .startCta:not(:disabled) svg { color: #ffe9a8; }
 /* !important: reglas de retrato como `.heroSummaryRow img` pisan a los iconos. */
 .uiIcon { width: 18px !important; height: 18px !important; object-fit: contain !important; vertical-align: -4px; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: none !important; }
 .helpButton .uiIcon { width: 24px !important; height: 24px !important; }
@@ -3748,9 +3751,10 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .storyForgeRow input::placeholder { color: rgba(234,223,198,.55); }
 .forgeButton:disabled { opacity: .55; }
 .lobbyShell .startCta { border-radius: 14px; }
-/* CTA de empezar deshabilitado: NO una caja oscura vacía — pergamino cálido con
-   borde dorado punteado, se lee como "todavía en preparación". */
-.lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(58,44,20,.5), rgba(24,18,9,.7)) !important; border: 1px dashed rgba(212,175,55,.45) !important; color: rgba(234,223,198,.75) !important; box-shadow: inset 0 0 30px rgba(212,175,55,.05) !important; }
+/* CTA de empezar deshabilitado: bronce macizo (NO caja vacía), texto e icono
+   legibles — se lee como botón "aún no listo", no como hueco oscuro. */
+.lobbyShell .startCta:disabled { background: linear-gradient(160deg, #6a5220, #43310f) !important; border: 1px solid rgba(212,175,55,.5) !important; color: #f0dfb0 !important; opacity: 1 !important; animation: none !important; box-shadow: inset 0 1px 0 rgba(255,240,200,.18), 0 4px 16px rgba(0,0,0,.4) !important; }
+.lobbyShell .startCta:disabled svg { color: #f0dfb0; opacity: .9; }
 /* Descarga de la toma: flechita superpuesta en la esquina del retrato (mismo
    estilo que la portada); el marco necesita position para anclarla. */
 .heroPortraitFrame { position: relative; }
