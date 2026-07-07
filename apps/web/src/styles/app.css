@@ -3535,6 +3535,48 @@ h1 {
 .sceneForging::after { content: ""; position: absolute; top: 10px; left: 10px; width: 20px; height: 20px; border-radius: 50%; border: 3px solid rgba(255,255,255,.22); border-top-color: #fff; animation: spinRot .8s linear infinite; z-index: 2; }
 
 /* ── Reskin del lobby según el mockup de Fiamy (2026-07-06) ─────────────────── */
+/* Assets del pack de diseño en /assets/ui|worlds|companions (palette.json:
+   gold #D4AF37, blue_deep #0D1B2A, black_panel #050A12, parchment #EADFC6). */
+/* Fondo azul marino profundo del mockup (blue_deep→black_panel) + header limpio. */
+.appShell.lobbyShell { background: radial-gradient(1100px 520px at 18% -8%, rgba(27,54,86,.5), transparent 62%), linear-gradient(180deg, #0D1B2A 0%, #070f1b 48%, #04070d 100%) !important; }
+.lobbyShell .lobbyHeader { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+.lobbyShell .panel { background: linear-gradient(180deg, rgba(13,27,42,.72), rgba(5,10,18,.9)); border: 1px solid rgba(212,175,55,.26); border-radius: 14px; }
+/* Botones dorados brillantes (CTA y forja) como la referencia. */
+.forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(180deg, #F2D27C 0%, #D4AF37 55%, #b98e22 100%) !important; color: #241703 !important; font-weight: 800; border: 1px solid rgba(255,230,160,.8) !important; box-shadow: 0 0 18px rgba(212,175,55,.35); }
+/* !important: reglas de retrato como `.heroSummaryRow img` pisan a los iconos. */
+.uiIcon { width: 18px !important; height: 18px !important; object-fit: contain; vertical-align: -4px; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; background: none !important; }
+.lobbyHeaderActions .ghostButton { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(212,175,55,.45); border-radius: 10px; background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95)); padding: 10px 16px; font-family: Georgia, serif; font-size: 14px; color: #EADFC6; }
+.lobbyHeaderActions .ghostButton .uiIcon { width: 20px; height: 20px; }
+/* Panel del héroe: marco fino dorado con esquinas ornamentadas + rosa de los
+   vientos de marca de agua (como el mockup). Las esquinas son 4 pseudo-marcos:
+   dos pseudo-elementos con gradientes en las 4 puntas. */
+.heroSpecial { position: relative; background: linear-gradient(180deg, rgba(13,27,42,.55), rgba(5,10,18,.85)); border: 1px solid rgba(212,175,55,.28); overflow: hidden; }
+.heroSpecial::before { content: ""; position: absolute; inset: 0; background: url("/assets/ui/compass-rose.webp") no-repeat right 12% center / 190px; opacity: .1; pointer-events: none; }
+/* Card interna del héroe con marco fino y esquinas ornamentadas (como el mockup). */
+.heroSpecial .heroSummaryRow { position: relative; border: 1px solid rgba(212,175,55,.32); border-radius: 12px; padding: 16px 18px; }
+.heroSpecial .heroSummaryRow::after {
+  content: ""; position: absolute; inset: 4px; pointer-events: none; border-radius: 9px;
+  background:
+    linear-gradient(#D4AF37, #D4AF37) top left / 22px 1.5px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) top left / 1.5px 22px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) top right / 22px 1.5px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) top right / 1.5px 22px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) bottom left / 22px 1.5px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) bottom left / 1.5px 22px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) bottom right / 22px 1.5px no-repeat,
+    linear-gradient(#D4AF37, #D4AF37) bottom right / 1.5px 22px no-repeat;
+  opacity: .8;
+}
+/* Fondo global azul profundo solo cuando el lobby está en pantalla. */
+body:has(.lobbyShell) { background: radial-gradient(circle at 16% 6%, rgba(27,54,86,.5), transparent 34%), linear-gradient(160deg, #0D1B2A, #070f1b 52%, #04070d); }
+/* Los logos de compañeros son teal/oro sobre transparente: backdrop claro para leerse. */
+img[src^="/assets/companions/"] { background: radial-gradient(circle, #EADFC6 0%, #d9cbaa 100%); border-radius: 50%; }
+/* Botones enmarcados del héroe (navy + borde dorado, como la referencia). */
+.framedButton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(212,175,55,.5) !important; border-radius: 10px; background: linear-gradient(180deg, rgba(13,27,42,.92), rgba(5,10,18,.96)) !important; color: #F2D27C !important; font-family: Georgia, serif; padding: 10px 18px; }
+.framedButton:disabled { opacity: .55; }
+/* Hint del héroe sin cara: franja de pergamino. */
+.heroSpecial .startHint { position: relative; background: linear-gradient(180deg, #EADFC6, #dccfae); color: #3c2f18; border-radius: 8px; padding: 8px 12px; font-weight: 600; }
+.heroSpecial .startHint strong { color: #241703; }
 .lobbyStepTitle { display: flex; align-items: center; gap: 13px; margin-bottom: 12px; }
 .stepDiamond { width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; transform: rotate(45deg); border: 1.5px solid rgba(255,203,112,.75); border-radius: 7px; background: linear-gradient(160deg, rgba(56,36,10,.85), rgba(10,8,4,.95)); box-shadow: 0 0 12px rgba(255,183,69,.28); font-style: normal; }
 .stepDiamond span { transform: rotate(-45deg); color: #ffda8a; font-weight: 900; font-size: 14px; font-family: Georgia, serif; }
@@ -3544,8 +3586,10 @@ h1 {
 /* Mundos: cards grandes con emblema y tilde de selección. */
 .worldCard { position: relative; }
 .worldCard.hasArt { min-height: 205px; }
-.worldEmblem { position: absolute; top: 10px; left: 10px; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid rgba(255,203,112,.55); background: rgba(8,8,14,.85); font-size: 16px; box-shadow: 0 2px 10px rgba(0,0,0,.55); }
-.worldCheck { position: absolute; top: 10px; right: 10px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: #ffbf35; color: #241703; font-weight: 900; font-size: 14px; box-shadow: 0 0 14px rgba(255,191,53,.6); }
+.worldEmblem { position: absolute; top: 10px; left: 10px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid rgba(212,175,55,.6); background: rgba(5,10,18,.88); box-shadow: 0 2px 10px rgba(0,0,0,.55); }
+.worldEmblem img { width: 26px; height: 26px; object-fit: contain; }
+.worldCheck { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: rgba(5,10,18,.88); border: 1.5px solid #D4AF37; box-shadow: 0 0 14px rgba(212,175,55,.55); }
+.worldCheck img { width: 18px; height: 18px; object-fit: contain; }
 .worldCard.hasArt strong { font-family: Georgia, serif; font-size: 19px; }
 /* Héroe protagonista: retrato alto y nombre en serif grande. */
 .heroSpecial .heroSummaryRow { grid-template-columns: 112px minmax(0, 1fr) auto; }
@@ -3554,7 +3598,10 @@ h1 {
 .heroSummaryInfo .heroSummaryPet { padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid rgba(117,234,219,.35); background: rgba(4,20,25,.55); justify-self: start; }
 /* Paso 3: labels en caps, input alto, botón de yunque. */
 .quickChoiceGroup > span { text-transform: uppercase; letter-spacing: .07em; }
-.storyForgeRow input { padding: 12px 14px; border-radius: 12px; font-size: 13.5px; }
+.quickChoiceGroup .pillRow button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(212,175,55,.3); background: linear-gradient(180deg, rgba(13,27,42,.85), rgba(5,10,18,.92)); color: #EADFC6; font-family: Georgia, serif; }
+.quickChoiceGroup .pillRow button.selected { border-color: #D4AF37 !important; color: #F2D27C !important; background: linear-gradient(180deg, rgba(27,44,66,.95), rgba(8,14,24,.95)) !important; box-shadow: 0 0 10px rgba(212,175,55,.35); }
+.quickChoiceGroup .pillRow button .uiIcon { width: 16px; height: 16px; }
+.storyForgeRow input { padding: 12px 14px; border-radius: 12px; font-size: 13.5px; border: 1px solid rgba(212,175,55,.35); background: rgba(5,10,18,.75); }
 .forgeButton { border-radius: 12px; }
 .entryHint { font-style: italic; }
 .startCta { font-family: Georgia, serif; letter-spacing: .04em; }

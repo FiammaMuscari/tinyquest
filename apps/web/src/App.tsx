@@ -1378,8 +1378,8 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <img className="brandLogo" src="/assets/brand/tiny-quest-logo.png" alt="Tiny Quest" />
         </div>
         <div className="lobbyHeaderActions">
-          <button className="ghostButton" type="button" onClick={onMultiplayerHost} disabled={mpBlocked} title={mpBlocked ? "Las historias forjadas online llegan pronto — por ahora jugalas en solitario." : undefined}><Users size={16} /> Crear sala</button>
-          <button className="ghostButton" type="button" onClick={onMultiplayerJoin}><Users size={16} /> Unirse con código</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerHost} disabled={mpBlocked} title={mpBlocked ? "Las historias forjadas online llegan pronto — por ahora jugalas en solitario." : undefined}><img className="uiIcon" src={uiIcon("crear_sala")} alt="" /> Crear sala</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerJoin}><img className="uiIcon" src={uiIcon("unirse_codigo")} alt="" /> Unirse con código</button>
         </div>
       </header>
 
@@ -1397,12 +1397,12 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
-                <span className="heroSummaryPet"><NpcPortrait name={draft.pet.name} portraitUrl={petPortraitUrl(draft.pet.name, draft.pet.description)} size={22} /> {draft.pet.name}</span>
+                <span className="heroSummaryPet"><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={22} /> {draft.pet.name}</span>
               </div>
               <div className="heroSummaryActions">
-                <button className="ghostButton" type="button" onClick={() => setEditingHero(true)}>Editar héroe</button>
-                <button className="reimagineButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel, ojos y pelo en Editar héroe"}>
-                  <Sparkles size={13} /> Reimaginar héroe
+                <button className="ghostButton framedButton" type="button" onClick={() => setEditingHero(true)}><img className="uiIcon" src={uiIcon("editar_heroe")} alt="" /> Editar héroe</button>
+                <button className="reimagineButton framedButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel, ojos y pelo en Editar héroe"}>
+                  <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> Reimaginar héroe
                 </button>
               </div>
             </div>
@@ -1430,8 +1430,8 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
             <div className="quickChoiceGroup">
               <span>Recorrido:</span>
               <div className="pillRow">
-                <button type="button" className={partyMode === "alone" ? "selected" : ""} onClick={() => onChoosePartyMode("alone")}>👤 En solitario</button>
-                <button type="button" className={partyMode === "companions" ? "selected" : ""} onClick={() => onChoosePartyMode("companions")} title="Belo y Miri juegan sus propios turnos">👥 Con compañeros</button>
+                <button type="button" className={partyMode === "alone" ? "selected" : ""} onClick={() => onChoosePartyMode("alone")}><img className="uiIcon" src={uiIcon("solitario")} alt="" /> En solitario</button>
+                <button type="button" className={partyMode === "companions" ? "selected" : ""} onClick={() => onChoosePartyMode("companions")} title="Belo y Miri juegan sus propios turnos"><img className="uiIcon" src={uiIcon("companeros")} alt="" /> Con compañeros</button>
               </div>
             </div>
           </div>
@@ -1446,7 +1446,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               aria-label="Ideas para la historia del mundo"
             />
             <button type="button" className="soloButton forgeButton" disabled={!canForge} onClick={() => onForgeStory(forgePrompt.trim())}>
-              {forgingStory ? "Forjando…" : "⚒️ Reforjar historia"}
+              {forgingStory ? "Forjando…" : <><img className="uiIcon" src={uiIcon("forjar_historia")} alt="" /> Reforjar historia</>}
             </button>
           </div>
           {forgingStory && <ForgeRitual />}
@@ -1603,7 +1603,7 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
             <div className="avatar"><HeroAvatarImg url={player.type === "bot" ? characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía") : player.character.avatarUrl} name={player.name} priority={player.type === "human"} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
             <div><strong>{player.name}</strong><span>{player.character.species} · {player.character.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
-            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span><span><NpcPortrait name={player.character.pet.name} portraitUrl={petPortraitUrl(player.character.pet.name, player.character.pet.description)} size={14} /> {player.character.pet.name}</span></div>
+            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span><span><NpcPortrait name={player.character.pet.name} portraitUrl={petImage(player.character.pet)} size={14} /> {player.character.pet.name}</span></div>
           </article>
         );
       })}
@@ -1648,7 +1648,9 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
 // guarda el blob y reintenta solo si falla. Mientras se pinta muestra el medallón
 // procedural con pulso de forja; si el servicio muere, el medallón queda.
 function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; role?: string; portraitUrl?: string; size?: number }) {
-  const { src, status } = useGeneratedPortrait(isGeneratedPortraitUrl(portraitUrl) ? portraitUrl : undefined);
+  const { src: generated, status } = useGeneratedPortrait(isGeneratedPortraitUrl(portraitUrl) ? portraitUrl : undefined);
+  // Un asset local (p.ej. logo de compañero del pack) va directo, sin pipeline de caché.
+  const src = portraitUrl && !isGeneratedPortraitUrl(portraitUrl) ? portraitUrl : generated;
   if (src) {
     return <img className={`npcPortrait npcPortraitImg ${status === "loading" ? "portraitForging" : ""}`} src={src} alt="" width={size} height={size} style={{ width: size, height: size }} />;
   }
@@ -1701,12 +1703,20 @@ function LobbyStepTitle({ number, title }: { number: number; title: string }) {
   );
 }
 
-const worldEmblems: Record<string, string> = { veldaran: "🛡️", "marea-ceniza": "💀", "islas-juramento": "🔱" };
+// Assets del pack de diseño (apps/web/public/assets/ui|worlds|companions).
+const uiIcon = (name: string) => `/assets/ui/${name}.webp`;
+const worldArt: Record<string, string> = { veldaran: "/assets/worlds/veldaran.webp", "marea-ceniza": "/assets/worlds/marea-ceniza.webp", "islas-juramento": "/assets/worlds/islas-juramento.webp" };
+const worldEmblems: Record<string, string> = { veldaran: uiIcon("shield_medieval"), "marea-ceniza": uiIcon("skull_apocalyptic"), "islas-juramento": uiIcon("tridente_mitologico") };
+const companionLogos: Record<string, string> = { "Alma Dracónica": "/assets/companions/alma-draconica.webp", "Polilla de Cripta": "/assets/companions/polilla-de-cripta.webp", "Sabueso del Umbral": "/assets/companions/sabueso-del-umbral.webp" };
+// Los 3 compañeros base tienen su logo del pack de diseño; uno futuro cae al retrato IA.
+const petImage = (pet: { name: string; description: string }) => companionLogos[pet.name] ?? petPortraitUrl(pet.name, pet.description);
 
-// Card de mundo con arte generado: paisaje/mapa característico pintado por IA,
-// cacheado para siempre. Hasta que llega la imagen, queda el gradiente de base.
+// Card de mundo: los 3 mundos base usan el arte pintado del pack de diseño
+// (instantáneo); un mundo futuro sin asset cae al arte generado por IA.
 function WorldCard({ world, selected, disabled, onSelect }: { world: WorldEra; selected: boolean; disabled: boolean; onSelect: () => void }) {
-  const { src } = useGeneratedPortrait(worldCardImageUrl(world.id, world.name, world.era, world.tagline));
+  const packedArt = worldArt[world.id];
+  const { src: generated } = useGeneratedPortrait(packedArt ? undefined : worldCardImageUrl(world.id, world.name, world.era, world.tagline));
+  const src = packedArt ?? generated;
   return (
     <button
       type="button"
@@ -1716,8 +1726,8 @@ function WorldCard({ world, selected, disabled, onSelect }: { world: WorldEra; s
       disabled={disabled}
       title={world.authoredCampaignId ? "Historia madre lista · online disponible" : "La historia se forja al elegirlo"}
     >
-      <span className="worldEmblem" aria-hidden="true">{worldEmblems[world.id] ?? "🗺️"}</span>
-      {selected && <span className="worldCheck" aria-hidden="true">✓</span>}
+      {worldEmblems[world.id] && <span className="worldEmblem" aria-hidden="true"><img src={worldEmblems[world.id]} alt="" /></span>}
+      {selected && <span className="worldCheck" aria-hidden="true"><img src={uiIcon("check")} alt="" /></span>}
       <em>{world.era}</em>
       <strong>{world.name}</strong>
       <span>{world.tagline}</span>
@@ -2462,7 +2472,7 @@ function HelpButton({ open, setOpen }: { open: boolean; setOpen: (open: boolean)
   return (
     <>
       <button className="helpButton" type="button" onClick={() => setOpen(true)} aria-label="Ayuda de Tiny Quest" title="Ayuda">
-        <HelpCircle size={18} />
+        <img className="uiIcon" src="/assets/ui/ayuda.webp" alt="" />
       </button>
       {open && (
         <div className="helpOverlay" role="dialog" aria-modal="true" aria-label="Manual de Tiny Quest">
@@ -2714,7 +2724,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
               <div className="petPickerRow">
                 {legendaryPets.map((pet) => (
                   <button key={pet.id} type="button" className={draft.pet.id === pet.id ? "selected" : ""} onClick={() => setDraft(createCharacter({ ...draft, pet }))} disabled={disabled} title={`${pet.name} — ${pet.description}`}>
-                    <NpcPortrait name={pet.name} portraitUrl={petPortraitUrl(pet.name, pet.description)} size={44} />
+                    <NpcPortrait name={pet.name} portraitUrl={petImage(pet)} size={44} />
                     <small>{pet.name}</small>
                   </button>
                 ))}
@@ -2786,7 +2796,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
               {legendaryPets.map((pet) => (
                 <button key={pet.id} type="button" disabled={disabled} className={`builderCard ${draft.pet.id === pet.id ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, pet }))}>
                   <span className="builderCardHead">
-                    <NpcPortrait name={pet.name} portraitUrl={petPortraitUrl(pet.name, pet.description)} size={42} />
+                    <NpcPortrait name={pet.name} portraitUrl={petImage(pet)} size={42} />
                     <strong>{pet.name}</strong>
                   </span>
                   <span>{pet.description}</span>
@@ -2796,7 +2806,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             </div>
             <div className="builderDetail petDetail">
               {/* La compañera tiene SU retrato generado, separado del héroe. */}
-              <NpcPortrait name={selectedPet.name} portraitUrl={petPortraitUrl(selectedPet.name, selectedPet.description)} size={72} />
+              <NpcPortrait name={selectedPet.name} portraitUrl={petImage(selectedPet)} size={72} />
               <div className="petDetailText">
                 <p><strong>Pasiva</strong>{selectedPet.passiveAbility}</p>
                 <p><strong>Activa</strong>{selectedPet.activeAbility}</p>

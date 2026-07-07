@@ -119,6 +119,16 @@ section** — an outdated map costs more than no map.
   `node --test tests/foo.test.mjs`.
 - Dev server: see `.claude/skills/run` (vite on 127.0.0.1:5173; don't kill it if
   Fiamy is playing). App.tsx/CSS hot-reload; ai-master does NOT (rule 2).
+- Lobby screenshots: `node scripts/shot-lobby.mjs` (playwright-core + system
+  Chrome, dev server must be running) → `scripts/.shots/` (gitignored). Shoots
+  1672px (mockup width) and 1360×700 (Fiamy's viewport).
+- Design assets from Fiamy's pack live in `apps/web/public/assets/ui|worlds|companions`
+  (palette: gold #D4AF37, blue_deep #0D1B2A, black_panel #050A12, parchment #EADFC6).
+  `uiIcon()/worldArt/worldEmblems/companionLogos/petImage` helpers in App.tsx near
+  WorldCard. World cards use the packed art (Pollinations only for future worlds);
+  the 3 base pets use their companion logos everywhere via `petImage`. CSS reskin
+  block at END of app.css ("Reskin del lobby"); `body:has(.lobbyShell)` sets the
+  navy background; `.uiIcon` needs !important against portrait img rules.
 - Browser E2E: headless Chrome CDP — spawn
   `google-chrome --headless=new --remote-debugging-port=92XX --window-size=1360,700`,
   fetch `/json` for the ws URL, drive with native `WebSocket` (Node ≥22), click via
