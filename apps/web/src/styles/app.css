@@ -3558,7 +3558,10 @@ h1 {
    vientos de marca de agua (como el mockup). Las esquinas son 4 pseudo-marcos:
    dos pseudo-elementos con gradientes en las 4 puntas. */
 .heroSpecial { position: relative; background: linear-gradient(180deg, rgba(13,27,42,.55), rgba(5,10,18,.85)); border: 1px solid rgba(212,175,55,.28); overflow: hidden; }
-.heroSpecial::before { content: ""; position: absolute; inset: 0; background: url("/assets/ui/compass-rose.webp") no-repeat right 12% center / 190px; opacity: .1; pointer-events: none; }
+/* Detalle central del mockup: círculo arcano + espada de filigrana AL FONDO,
+   centrados; todo el contenido del panel queda por encima (z-index). */
+.heroSpecial::before { content: ""; position: absolute; inset: 0; background: url("/assets/ui/ornamento-espada.webp") no-repeat center / auto 86%, url("/assets/ui/ornamento-circulo.webp") no-repeat center / auto 96%; opacity: .3; pointer-events: none; z-index: 0; }
+.heroSpecial > * { position: relative; z-index: 1; }
 /* Card interna del héroe con marco fino y esquinas ornamentadas (como el mockup). */
 .heroSpecial .heroSummaryRow { position: relative; border: 1px solid rgba(212,175,55,.32); border-radius: 12px; padding: 16px 18px; }
 .heroSpecial .heroSummaryRow::after {
@@ -3655,8 +3658,17 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .heroSpecial { overflow: visible !important; }
 /* Retrato del héroe protagonista y nombre grande, como el mockup. El ancho
    escala con el viewport (responsive en desktop) manteniendo el aspecto. */
-.heroSpecial .heroSummaryRow { grid-template-columns: clamp(160px, 14vw, 245px) minmax(0, 1fr) auto !important; }
-.heroSpecial .heroSummaryRow img.summaryShot { width: clamp(160px, 14vw, 245px); height: auto; aspect-ratio: 1.1 / 1; }
+.heroSpecial .heroSummaryRow { grid-template-columns: clamp(190px, 17vw, 280px) minmax(0, 1fr) auto !important; }
+/* Retrato ancho (5:4) que SOBRESALE del marco por arriba: se levanta con margen
+   negativo y la parte superior se funde a translúcido con una máscara — la
+   cabeza queda flotando sobre el borde, estilo carta de juego. */
+.heroSpecial .heroSummaryRow img.summaryShot {
+  width: clamp(190px, 17vw, 280px); height: auto; aspect-ratio: 5 / 4;
+  margin-top: -34px; z-index: 2;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, rgba(0,0,0,.55) 30px, #000 64px);
+  mask-image: linear-gradient(180deg, transparent 0, rgba(0,0,0,.55) 30px, #000 64px);
+}
+.heroSpecial .heroSummaryRow img.summaryShot.fullShot { object-position: top; }
 .heroSummaryInfo strong { font-size: 32px; }
 .heroSummaryInfo > span { font-size: 15px; color: rgba(234,223,198,.85); }
 /* Mundo seleccionado: borde grueso luminoso. */
@@ -3720,8 +3732,6 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 @media (max-width: 620px) {
   .heroPortraitFrame, .heroPortraitFrame.fullbodyFrame { width: 76px; height: 102px; }
 }
-.heroSpecial .heroSummaryRow img.summaryShot { width: 112px; height: 150px; object-position: center; }
-.heroSpecial .heroSummaryRow img.summaryShot.fullShot { object-position: top; }
 .worldCard { animation: portraitIn .5s ease; }
 
 /* El héroe es el paso 1: sección con marco dorado protagonista. */
