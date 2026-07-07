@@ -66,13 +66,17 @@ section** — an outdated map costs more than no map.
   back to plain equality or reloads will clobber rerolled portraits.
 - NPC portraitUrl is stamped in `forgeStory` (App) from the LLM's `appearance`.
 
-## Lobby flow (4 steps, spec de Fiamy 2026-07-06)
+## Lobby flow (4 steps — HERO FIRST since 2026-07-06 night; order changed twice that day, confirm with Fiamy before moving it again)
 
-- LobbyScreen renders: `1 · Elegí mundo` (worldGrid) → `2 · Definí el conflicto`
-  (pills + ideas input + `ForgeRitual` + `forgedTeaser`) → `3 · Forjá tu héroe`
-  (summary o `CharacterDesigner`) → `4 · Revisá y empezá` (`finalStep`: questTemper + CTA).
-- CTA gating: disabled until `lookComplete(draft)` (género+piel+ojos obligatorios)
-  and hero saved (`!editingHero`). Without look, NO hero image is generated at all.
+- LobbyScreen renders: `1 · Forjá tu héroe` (`.heroSpecial` summary o
+  `CharacterDesigner`) → `2 · Elegí mundo` (worldGrid, `WorldCard` con arte IA +
+  `worldEmblems` + tilde) → `3 · Forjá tu historia` (pills + ideas input +
+  `ForgeRitual` + `forgedTeaser`) → `4 · Revisá y empezá` (`finalStep`:
+  questTemper + CTA). Step titles use `LobbyStepTitle` (rombo numerado + serif),
+  CSS block "Reskin del lobby" at the END of app.css.
+- CTA gating: disabled until `lookComplete(draft)` (género+piel+ojos+pelo, los 4
+  obligatorios) and hero saved (`!editingHero`). Without look, NO hero image is
+  generated at all.
 - Two hero images: face (`characterPortraitUrl`) + fullbody (`fullBodyPortraitUrl`),
   same seed; `shotToggle` switches preserving the seed (regex replace on the URL).
   `avatarShot` lives in `Character.look`.
@@ -84,6 +88,13 @@ section** — an outdated map costs more than no map.
   heroBond, evidence[]; NPCs carry bond + whyMightLie (public, no spoilers).
   Forge input now includes `hero` and forbids NPCs reusing the hero's name
   unless bond explains it. maxTokens 3400.
+- Forge coherence gate: `storyCoherenceIssues` in
+  `packages/ai-master/src/story-coherence.ts` (pure, tested in
+  `tests/story-coherence.test.mjs`) runs after each forge attempt in
+  `generateImprovisedStory`; if the first output loses requested names, fuses
+  the hero's companion with a requested pet, or turns a requested duration into
+  `summary.timeLimit`, it regenerates once and keeps the output with fewer
+  issues. Issues are logged via `logDmEvent("story-forge", { coherence })`.
 
 ## CSS zones (apps/web/src/styles/app.css)
 

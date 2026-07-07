@@ -1391,7 +1391,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           </section>
         ) : (
           <section className="panel heroSummary heroSpecial">
-            <PanelTitle title="1 · Forjá tu héroe" icon={<Wand2 size={17} />} />
+            <LobbyStepTitle number={1} title="Forjá tu héroe" />
             <div className="heroSummaryRow">
               <HeroAvatarImg url={draft.avatarUrl} name={draft.name} priority />
               <div className="heroSummaryInfo">
@@ -1412,30 +1412,30 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
         )}
 
         <section className="panel lobbyThemesPanel storyBuilder">
-          <PanelTitle title="2 · Elegí mundo" icon={<Sparkles size={17} />} />
+          <LobbyStepTitle number={2} title="Elegí mundo" />
           <div className="worldGrid">
             {worldEras.map((world) => (
               <WorldCard key={world.id} world={world} selected={world.id === selectedWorld.id} disabled={forgingStory && world.id !== selectedWorld.id} onSelect={() => onSelectWorld(world.id)} />
             ))}
           </div>
-          <div className="stepDivider"><PanelTitle title="3 · Forjá tu historia" icon={<Zap size={17} />} /></div>
+          <div className="stepDivider"><LobbyStepTitle number={3} title="Forjá tu historia" /></div>
           <div className="quickChoices">
             <div className="quickChoiceGroup">
-              <span>Entrás</span>
+              <span>Entrás:</span>
               <div className="pillRow">
-                <button type="button" className={perspective === "exterior" ? "selected" : ""} onClick={() => onChoosePerspective("exterior")} disabled={forgingStory}>Desde afuera</button>
-                <button type="button" className={perspective === "interior" ? "selected" : ""} onClick={() => onChoosePerspective("interior")} disabled={forgingStory}>Desde adentro</button>
+                <button type="button" className={perspective === "exterior" ? "selected" : ""} onClick={() => onChoosePerspective("exterior")} disabled={forgingStory}>🌒 Desde afuera</button>
+                <button type="button" className={perspective === "interior" ? "selected" : ""} onClick={() => onChoosePerspective("interior")} disabled={forgingStory}>👤 Desde adentro</button>
               </div>
             </div>
             <div className="quickChoiceGroup">
-              <span>Recorrido</span>
+              <span>Recorrido:</span>
               <div className="pillRow">
-                <button type="button" className={partyMode === "alone" ? "selected" : ""} onClick={() => onChoosePartyMode("alone")}>En solitario</button>
-                <button type="button" className={partyMode === "companions" ? "selected" : ""} onClick={() => onChoosePartyMode("companions")} title="Belo y Miri juegan sus propios turnos">Con compañeros</button>
+                <button type="button" className={partyMode === "alone" ? "selected" : ""} onClick={() => onChoosePartyMode("alone")}>👤 En solitario</button>
+                <button type="button" className={partyMode === "companions" ? "selected" : ""} onClick={() => onChoosePartyMode("companions")} title="Belo y Miri juegan sus propios turnos">👥 Con compañeros</button>
               </div>
             </div>
           </div>
-          <p className="entryHint">{perspectiveEntryLine(selectedWorld, perspective)}</p>
+          <p className="entryHint">🪶 {perspectiveEntryLine(selectedWorld, perspective)}</p>
           <div className="storyForgeRow">
             <input
               value={forgePrompt}
@@ -1446,7 +1446,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               aria-label="Ideas para la historia del mundo"
             />
             <button type="button" className="soloButton forgeButton" disabled={!canForge} onClick={() => onForgeStory(forgePrompt.trim())}>
-              {forgingStory ? "Forjando…" : "Reforjar historia"}
+              {forgingStory ? "Forjando…" : "⚒️ Reforjar historia"}
             </button>
           </div>
           {forgingStory && <ForgeRitual />}
@@ -1549,7 +1549,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
         </section>
 
         <section className="panel finalStep">
-          <PanelTitle title="4 · Revisá y empezá" icon={<Play size={17} />} />
+          <LobbyStepTitle number={4} title="Revisá y empezá" />
           <div className="questTemper">
             Esta historia templa tu <em className={`statChip stat-${questTemper.blessed}`}>{statLabels[questTemper.blessed]} +1</em> y descuida tu <em className={`statChip stat-${questTemper.strained} strained`}>{statLabels[questTemper.strained]} −1</em> durante la partida.
           </div>
@@ -1690,6 +1690,19 @@ function ForgedStoryBanner({ campaign, world }: { campaign: Campaign; world: Wor
   return <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title}`} />;
 }
 
+// Título de paso del lobby según el mockup: rombo numerado + serif dorada + filete.
+function LobbyStepTitle({ number, title }: { number: number; title: string }) {
+  return (
+    <div className="lobbyStepTitle">
+      <i className="stepDiamond" aria-hidden="true"><span>{number}</span></i>
+      <h2>{title}</h2>
+      <span className="stepRule" aria-hidden="true" />
+    </div>
+  );
+}
+
+const worldEmblems: Record<string, string> = { veldaran: "🛡️", "marea-ceniza": "💀", "islas-juramento": "🔱" };
+
 // Card de mundo con arte generado: paisaje/mapa característico pintado por IA,
 // cacheado para siempre. Hasta que llega la imagen, queda el gradiente de base.
 function WorldCard({ world, selected, disabled, onSelect }: { world: WorldEra; selected: boolean; disabled: boolean; onSelect: () => void }) {
@@ -1703,6 +1716,8 @@ function WorldCard({ world, selected, disabled, onSelect }: { world: WorldEra; s
       disabled={disabled}
       title={world.authoredCampaignId ? "Historia madre lista · online disponible" : "La historia se forja al elegirlo"}
     >
+      <span className="worldEmblem" aria-hidden="true">{worldEmblems[world.id] ?? "🗺️"}</span>
+      {selected && <span className="worldCheck" aria-hidden="true">✓</span>}
       <em>{world.era}</em>
       <strong>{world.name}</strong>
       <span>{world.tagline}</span>
