@@ -3665,6 +3665,19 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .forgeButton:disabled { opacity: .55; }
 .lobbyShell .startCta { border-radius: 14px; }
 .lobbyShell .startCta:disabled { background: linear-gradient(180deg, rgba(13,27,42,.9), rgba(5,10,18,.95)); border: 1px solid rgba(212,175,55,.35); color: rgba(234,223,198,.7); box-shadow: none; }
+/* Descarga de tomas: dos mini-botones bajo el toggle Frente/Cuerpo. */
+.shotDownloads { display: flex; gap: 6px; }
+.shotDownloads button { padding: 4px 10px; font-size: 11px; font-family: Georgia, serif; color: var(--tq-cream); border: 1px solid rgba(212,175,55,.35); border-radius: 999px; background: rgba(5,10,18,.7); transition: border-color .15s ease, color .15s ease; }
+.shotDownloads button:hover:not(:disabled) { border-color: var(--tq-gold); color: var(--tq-gold-hi); }
+/* Cards de linaje/oficio/compañero: retrato con aro, serif y selección dorada. */
+.lobbyShell .builderCard { border-radius: 12px; border-color: rgba(212,175,55,.22); background: linear-gradient(180deg, rgba(13,27,42,.72), rgba(5,10,18,.9)); padding: 12px 13px; gap: 7px; }
+.lobbyShell .builderCard:hover:not(:disabled) { border-color: rgba(212,175,55,.55); }
+.lobbyShell .builderCard.selected { border-color: var(--tq-gold); background: linear-gradient(170deg, rgba(56,40,12,.55), rgba(6,10,22,.92)); box-shadow: 0 0 0 1px rgba(212,175,55,.3), 0 0 22px rgba(212,175,55,.18); }
+.lobbyShell .builderCard strong { font-family: Georgia, serif; font-size: 15px; color: var(--tq-gold-hi); }
+.lobbyShell .builderCard > span { color: rgba(234,223,198,.82); }
+.lobbyShell .builderCardHead { gap: 10px; }
+.lobbyShell .builderCardHead img:not([src^="/assets/companions/"]) { width: 48px !important; height: 48px !important; border-radius: 50% !important; border: 2px solid rgba(212,175,55,.45) !important; object-fit: cover; }
+.lobbyShell .builderCardHead img[src^="/assets/companions/"] { width: 48px !important; height: 48px !important; }
 /* ── Dimensiones fieles de imágenes (2026-07-07) ────────────────────────────── */
 /* Mundos: el arte es 1024×576 — la card mantiene 16:9 para que el encuadre del
    cuadro sea el mismo a cualquier ancho/zoom (antes quedaba una franja de ~3:1). */

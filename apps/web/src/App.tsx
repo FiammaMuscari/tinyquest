@@ -2656,6 +2656,17 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: nextUrl }));
   }
+  // Descarga la toma pedida (frente o cuerpo) como archivo, con el seed elegido.
+  async function downloadShot(shot: "face" | "fullbody") {
+    const urls = heroImageUrls(draft);
+    const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
+    const url = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl) ? urls[shot].replace(/seed=\d+$/, `seed=${currentSeed}`) : urls[shot];
+    const src = await loadPortrait(url, { priority: true });
+    const link = document.createElement("a");
+    link.href = src;
+    link.download = `${(draft.name || "heroe").toLowerCase().replace(/\s+/g, "-")}-${shot === "face" ? "frente" : "cuerpo"}.jpg`;
+    link.click();
+  }
   return (
     <section className="panel designer designerForge">
       <PanelTitle title="Forjá tu héroe" icon={<Wand2 size={17} />} />
@@ -2672,6 +2683,12 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 <button type="button" className={currentShot === "fullbody" ? "selected" : ""} onClick={() => chooseShot("fullbody")} disabled={disabled}>Cuerpo</button>
               </div>
             )}
+            {heroLookDone && (
+              <div className="shotDownloads" role="group" aria-label="Descargar imágenes del héroe">
+                <button type="button" onClick={() => void downloadShot("face")} disabled={disabled} title="Descargar la imagen de frente">⬇ Frente</button>
+                <button type="button" onClick={() => void downloadShot("fullbody")} disabled={disabled} title="Descargar la imagen de cuerpo entero">⬇ Cuerpo</button>
+              </div>
+            )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
               <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled || !heroLookDone} title={heroLookDone ? "La IA imagina otra cara para la misma identidad" : "Elegí género, piel, ojos y pelo primero"}>
@@ -2683,7 +2700,6 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           </div>
           <div className="heroIdentityFields">
             <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
-            <label>Concepto<input value={draft.concept} onChange={(event) => setDraft(createCharacter({ ...draft, concept: event.target.value }))} disabled={disabled} /></label>
             <div className="lookPicker">
               <div className="lookGroup">
                 <span>Género</span>

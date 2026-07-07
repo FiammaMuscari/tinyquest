@@ -37,9 +37,10 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
 // Imagen de cuerpo entero del héroe: template propio (de pies a cabeza, pose de
 // aventura). Convive con el retrato de frente: dos URLs, dos cachés, un avatar a elección.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  const prompt = `Fantasy RPG full body character concept art, standing heroic pose, head to toe visible, dark moody lighting, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  // 512×768: a 256×384 flux deformaba los cuerpos (figuras elongadas).
+  const prompt = `Fantasy RPG full body character concept art, standing heroic pose, head to toe visible, natural body proportions, correct anatomy, dark moody lighting, detailed illustration: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=256&height=384&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Imagen de arquetipo para las cards de linaje/oficio del designer: un vistazo
