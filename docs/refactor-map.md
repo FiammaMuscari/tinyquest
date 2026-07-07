@@ -122,6 +122,10 @@ section** — an outdated map costs more than no map.
 - Lobby screenshots: `node scripts/shot-lobby.mjs` (playwright-core + system
   Chrome, dev server must be running) → `scripts/.shots/` (gitignored). Shoots
   1672px (mockup width) and 1360×700 (Fiamy's viewport).
+- ALL external assets are self-hosted under `apps/web/public/media/`: fonts
+  (`media/fonts/fonts.css` + woff2, loaded from index.html — do NOT re-add the
+  Google Fonts @import) and UI audio (`media/audio/ui-click.wav`, played by
+  `src/ui-sound.ts`). Pollinations stays remote (runtime generation).
 - Design assets from Fiamy's pack live in `apps/web/public/assets/ui|worlds|companions`
   (palette: gold #D4AF37, blue_deep #0D1B2A, black_panel #050A12, parchment #EADFC6).
   `uiIcon()/worldArt/worldEmblems/companionLogos/petImage` helpers in App.tsx near
