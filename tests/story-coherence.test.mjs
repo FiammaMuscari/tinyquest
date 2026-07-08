@@ -113,3 +113,38 @@ test("sin pedido ni héroe no hay problemas", () => {
   const issues = storyCoherenceIssues(baseStory({ heroBond: undefined }), {});
   assert.deepEqual(issues, []);
 });
+
+test("apellidos con epíteto-guion se detectan (Ojos-de-Humo, Susurro-Gris)", () => {
+  const story = baseStory({
+    npcs: [
+      { name: "Lyra Ojos-de-Humo", role: "aliada", bond: "amiga", description: "x" },
+      { name: "Kaelen Susurro-Gris", role: "anciano", bond: "linaje", description: "x" }
+    ]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "aventura", hero });
+  assert.ok(issues.filter((i) => i.startsWith("apellido-epiteto-guion")).length === 2);
+});
+
+test("apellido con el nombre del mundo se detecta (Theron de Ceniza)", () => {
+  const story = baseStory({
+    npcs: [{ name: "Theron de Ceniza", role: "acusador", bond: "consejo", description: "x" }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "aventura", hero, worldContext: { worldName: "La Marea de Ceniza", era: "", ambience: "", rules: [], seasoning: "", perspective: "exterior", entryLine: "" } });
+  assert.ok(issues.some((i) => i.startsWith("apellido-nombre-del-mundo")));
+});
+
+test("apellido propio eufónico NO se penaliza (Lyra Valdren)", () => {
+  const story = baseStory({
+    npcs: [{ name: "Lyra Valdren", role: "aliada", bond: "amiga", description: "x" }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "aventura", hero });
+  assert.ok(!issues.some((i) => i.startsWith("apellido")));
+});
+
+test("el nombre del jugador con guion NO se penaliza", () => {
+  const story = baseStory({
+    npcs: [{ name: "Firulais", role: "compañero", bond: "tu perro", description: "x" }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
+  assert.ok(!issues.some((i) => i.startsWith("apellido")));
+});

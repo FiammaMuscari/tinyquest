@@ -380,7 +380,9 @@ textarea, select, input { width: 100%; border: 1px solid #41345f; border-radius:
 .heroSummaryInfo strong { color: #ffda8a; font-size: 15px; }
 .heroSummaryInfo span { color: #d8c9f5; font-size: 12px; }
 .heroSummaryInfo .heroSummaryPet { color: #9ff7ec; }
-.heroEditWrap { display: grid; gap: 10px; }
+/* Sección 'Editar héroe' abierta: esquinas redondeadas como el resto y padding
+   para que 'Guardar héroe y continuar' no quede pegado al borde. */
+.heroEditWrap { display: grid; gap: 14px; border-radius: 18px; padding: clamp(14px, 1.4vw, 22px); }
 .heroDone { justify-self: end; padding: 8px 16px; }
 .lobbyHeroGrid.soloHero { grid-template-columns: 1fr !important; }
 
@@ -3563,8 +3565,8 @@ body:has(.lobbyShell)::before {
 @media (prefers-reduced-motion: reduce) { body:has(.lobbyShell)::before { animation: none; } }
 .appShell.lobbyShell { position: relative; z-index: 1; }
 /* Botones dorados METÁLICOS (oro cepillado con brillo y borde profundo, no amarillo plano). */
-.forgeButton, .lobbyShell .startCta:not(:disabled) { background: linear-gradient(158deg, #ffe9a8 0%, #e6c065 34%, #cda23f 60%, #a8801f 100%) !important; color: #241703 !important; font-weight: 900 !important; letter-spacing: .02em; border: 1px solid #6f5216 !important; text-shadow: 0 1px 0 rgba(255,248,220,.45); box-shadow: inset 0 1px 0 rgba(255,251,230,.7), inset 0 -3px 8px rgba(110,78,16,.45), 0 6px 20px rgba(0,0,0,.4) !important; }
-.forgeButton:hover:not(:disabled), .lobbyShell .startCta:not(:disabled):hover { filter: brightness(1.06); }
+.forgeButton, .lobbyShell .startCta:not(:disabled), .lobbyShell .heroDone { background: linear-gradient(158deg, #ffe9a8 0%, #e6c065 34%, #cda23f 60%, #a8801f 100%) !important; color: #241703 !important; font-weight: 900 !important; letter-spacing: .02em; border: 1px solid #6f5216 !important; text-shadow: 0 1px 0 rgba(255,248,220,.45); box-shadow: inset 0 1px 0 rgba(255,251,230,.7), inset 0 -3px 8px rgba(110,78,16,.45), 0 6px 20px rgba(0,0,0,.4) !important; }
+.forgeButton:hover:not(:disabled), .lobbyShell .startCta:not(:disabled):hover, .lobbyShell .heroDone:hover { filter: brightness(1.06); }
 /* El icono dorado del asset NO se lee sobre botón dorado → medallón oscuro detrás. */
 .forgeButton .uiIcon, .lobbyShell .startCta:not(:disabled) svg { background: radial-gradient(circle, #3a2a0c, #241703) !important; border-radius: 50% !important; padding: 4px; width: 26px !important; height: 26px !important; box-shadow: inset 0 0 0 1px rgba(255,230,160,.4); }
 .lobbyShell .startCta:not(:disabled) svg { color: #ffe9a8; }

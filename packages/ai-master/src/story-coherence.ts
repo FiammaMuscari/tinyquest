@@ -40,5 +40,15 @@ export function storyCoherenceIssues(content: ImprovisedStoryContent, input: Imp
   const shortClock = /(anochecer|amanecer|medianoche|esta noche|antes del alba|en horas|una noche|hoy mismo)/i.test(content.summary?.timeLimit ?? "");
   if (longDuration && shortClock) issues.push("reloj-ignora-escala-larga");
   if (input.hero && !content.heroBond) issues.push("hero-sin-vinculo");
+  // Apellidos que se leen mal: epíteto-guion descriptivo ('Ojos-de-Humo',
+  // 'Susurro-Gris') o el nombre del mundo pegado como apellido ('de Ceniza').
+  const requested = new Set(nameMatches.map((m) => m[1].toLowerCase()));
+  const worldWords = (input.worldContext?.worldName ?? "").toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  for (const npc of content.npcs ?? []) {
+    const name = npc?.name ?? "";
+    if (requested.has(name.toLowerCase())) continue; // nombre del jugador: intacto
+    if (/[A-Za-zÁÉÍÓÚÑáéíóúñ]+-[A-Za-zÁÉÍÓÚÑáéíóúñ]+/.test(name)) issues.push(`apellido-epiteto-guion:${name}`);
+    else if (worldWords.some((w) => name.toLowerCase().includes(w))) issues.push(`apellido-nombre-del-mundo:${name}`);
+  }
   return issues;
 }
