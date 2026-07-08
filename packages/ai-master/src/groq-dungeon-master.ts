@@ -526,7 +526,13 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       ...(useGemini ? { reasoning_effort: "none" } : {}),
       ...(options.forceJson || !isQwen ? { response_format: { type: "json_object" } } : {})
     };
-    if (JSON.stringify(body).length > MAX_GROQ_BODY_CHARS) {
+    // compactGroqMessages está diseñada para la NARRACIÓN de turno (reconstruye el
+    // payload desde engineResolution/narrationInput). La FORJA tiene otra forma:
+    // compactarla borra el prompt entero y el LLM responde basura ("narrador se
+    // trabó"). La forja se exime — sus prompts grandes van tal cual (el 413 abajo
+    // cubre el caso extremo de que el proveedor los rechace).
+    const isForge = debugLabel.startsWith("story-forge");
+    if (!isForge && JSON.stringify(body).length > MAX_GROQ_BODY_CHARS) {
       body = { ...body, messages: compactGroqMessages(messages) };
     }
     const debugBase: LlmDebugEntry = { label: debugLabel, at: new Date().toISOString(), endpoint, model, request: { messages, body } };
