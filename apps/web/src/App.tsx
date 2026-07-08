@@ -1723,15 +1723,39 @@ function AssetForging() {
 // Portada de la historia: la escena generada + TU AVATAR compositado encima con
 // bordes fundidos — la promesa es dura: sea cual sea tu imagen (IA o clásica),
 // aparece en la portada. El prompt además describe al héroe por si flux lo pinta.
+// Recorta una figura con bordes fundidos por los 4 lados y la apoya en el piso
+// de la portada, en la posición/escala pedidas. Devuelve el canvas recortado.
+function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, centerXRatio: number, heightRatio: number, canvasW: number, canvasH: number) {
+  const h = canvasH * heightRatio;
+  const w = img.naturalWidth * (h / img.naturalHeight);
+  const cut = document.createElement("canvas");
+  cut.width = Math.max(1, Math.round(w)); cut.height = Math.max(1, Math.round(h));
+  const cc = cut.getContext("2d");
+  if (!cc) return;
+  cc.drawImage(img, 0, 0, cut.width, cut.height);
+  cc.globalCompositeOperation = "destination-in";
+  const fadeX = cut.width * 0.2;
+  const gx = cc.createLinearGradient(0, 0, cut.width, 0);
+  gx.addColorStop(0, "rgba(0,0,0,0)"); gx.addColorStop(fadeX / cut.width, "rgba(0,0,0,1)");
+  gx.addColorStop(1 - fadeX / cut.width, "rgba(0,0,0,1)"); gx.addColorStop(1, "rgba(0,0,0,0)");
+  cc.fillStyle = gx; cc.fillRect(0, 0, cut.width, cut.height);
+  const gy = cc.createLinearGradient(0, 0, 0, cut.height);
+  gy.addColorStop(0, "rgba(0,0,0,0)"); gy.addColorStop(0.14, "rgba(0,0,0,1)"); gy.addColorStop(1, "rgba(0,0,0,1)");
+  cc.fillStyle = gy; cc.fillRect(0, 0, cut.width, cut.height);
+  ctx.drawImage(cut, canvasW * centerXRatio - cut.width / 2, canvasH - cut.height);
+}
+
+// Portada de la historia: fondo de LUGAR (sin personajes inventados) + los
+// retratos REALES compositados — el héroe y hasta 2 NPCs clave (los mismos que
+// tiene la historia, ej. Firulais), para que la portada coincida con el elenco.
 function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
-  const castLine = campaign.npcs.slice(0, 3).map((npc) => npc.appearance ?? npc.name).join("; ");
-  const heroLine = heroPortraitSpec(hero).appearance;
-  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, castLine, heroLine));
+  const sceneHint = campaign.scenes[0]?.title;
+  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint));
   const avatarUrl: string = hero.avatarUrl;
   const heroShotUrl = hero.look?.fullBodyUrl ?? (avatarUrl.startsWith("/") || isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : null);
+  // Hasta 2 NPCs con retrato generado (los reales de la historia) van a la portada.
+  const npcShots = campaign.npcs.filter((npc) => isGeneratedPortraitUrl(npc.portraitUrl)).slice(0, 2).map((npc) => npc.portraitUrl as string);
   const [composed, setComposed] = useState<string | null>(null);
-  // La portada está lista cuando la composición terminó (o cuando hay escena y
-  // no hay héroe que montar): recién ahí se habilita Empezar.
   const ready = composed !== null || (!!src && !heroShotUrl);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
   useEffect(() => {
@@ -1739,39 +1763,35 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
     let alive = true;
     void (async () => {
       try {
-        const heroSrc = isGeneratedPortraitUrl(heroShotUrl) ? await loadPortrait(heroShotUrl) : heroShotUrl;
-        const [scene, heroImg] = await Promise.all([loadImg(src), loadImg(heroSrc)]);
+        const scene = await loadImg(src);
         const canvas = document.createElement("canvas");
         canvas.width = 1120; canvas.height = 480;
         const ctx2d = canvas.getContext("2d");
         if (!ctx2d) return;
         ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
-        // Recorte suave del héroe: bordes fundidos por los cuatro lados.
-        const heroH = canvas.height * 0.96;
-        const heroW = heroImg.naturalWidth * (heroH / heroImg.naturalHeight);
-        const cut = document.createElement("canvas");
-        cut.width = Math.round(heroW); cut.height = Math.round(heroH);
-        const cutCtx = cut.getContext("2d");
-        if (!cutCtx) return;
-        cutCtx.drawImage(heroImg, 0, 0, cut.width, cut.height);
-        cutCtx.globalCompositeOperation = "destination-in";
-        const fadeX = cut.width * 0.22;
-        const gx = cutCtx.createLinearGradient(0, 0, cut.width, 0);
-        gx.addColorStop(0, "rgba(0,0,0,0)"); gx.addColorStop(fadeX / cut.width, "rgba(0,0,0,1)");
-        gx.addColorStop(1 - fadeX / cut.width, "rgba(0,0,0,1)"); gx.addColorStop(1, "rgba(0,0,0,0)");
-        cutCtx.fillStyle = gx; cutCtx.fillRect(0, 0, cut.width, cut.height);
-        const gy = cutCtx.createLinearGradient(0, 0, 0, cut.height);
-        gy.addColorStop(0, "rgba(0,0,0,0)"); gy.addColorStop(0.14, "rgba(0,0,0,1)"); gy.addColorStop(1, "rgba(0,0,0,1)");
-        cutCtx.fillStyle = gy; cutCtx.fillRect(0, 0, cut.width, cut.height);
-        // El héroe pisa el tercio derecho de la portada, apoyado en el piso.
-        ctx2d.drawImage(cut, canvas.width * 0.66 - cut.width / 2, canvas.height - cut.height);
+        // NPCs primero (detrás), a la izquierda y centro, un poco más chicos. Cada
+        // uno con un race corto: Pollinations tarda 20-90s por retrato — NO bloquear
+        // la portada ni el botón Empezar por ellos; entran solo si están prontos.
+        const raceLoad = (url: string, ms: number) => Promise.race([
+          loadPortrait(url).then(loadImg),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
+        ]);
+        const npcPos = [{ x: 0.18, h: 0.8 }, { x: 0.4, h: 0.74 }];
+        const npcImgs = await Promise.all(npcShots.map((u) => raceLoad(u, 5000).catch(() => null)));
+        npcImgs.forEach((npcImg, i) => { if (npcImg) drawFadedFigure(ctx2d, npcImg, npcPos[i].x, npcPos[i].h, canvas.width, canvas.height); });
+        // El héroe adelante, a la derecha, el más grande (prioritario, ya cacheado).
+        // Con race de 10s: si no está listo, la portada igual se arma (no cuelga Empezar).
+        const heroImg = isGeneratedPortraitUrl(heroShotUrl)
+          ? await raceLoad(heroShotUrl, 10000).catch(() => null)
+          : await loadImg(heroShotUrl).catch(() => null);
+        if (heroImg) drawFadedFigure(ctx2d, heroImg, 0.74, 0.96, canvas.width, canvas.height);
         if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
       } catch {
         if (alive) setComposed(null); // sin héroe listo: queda la escena sola
       }
     })();
     return () => { alive = false; };
-  }, [src, heroShotUrl]);
+  }, [src, heroShotUrl, npcShots.join(",")]);
   // Generando (escena o composición): spinner + frases que laten.
   if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
   if (!src) return null;

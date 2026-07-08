@@ -113,12 +113,12 @@ export function worldCardImageUrl(worldId: string, name: string, era: string, ta
 // creados interactuando. No es edición de la imagen del mundo (img2img no existe en
 // el tier gratis): es una generación nueva que hereda mundo + elenco, cacheada por
 // título. Cero uso de Gemini — las imágenes van siempre por Pollinations.
-export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, castLine: string, heroLine?: string): string {
-  // heroLine = el MISMO descriptor con el que se pintó el retrato del héroe
-  // (género/raza/piel/ojos/pelo): tu personaje aparece EN la escena, coherente
-  // con su avatar, en el centro de la acción.
-  const hero = heroLine?.trim() ? ` The protagonist stands at the center of the action: ${heroLine}.` : "";
-  const prompt = `Epic fantasy story illustration, cinematic wide shot in the world of ${worldName} (${era}): the tale "${storyTitle}".${hero} Characters together in a tense scene: ${castLine}. Painted, dramatic light, rich detail, no text`;
+export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, sceneHint?: string): string {
+  // Fondo de PAISAJE/AMBIENTE, SIN personajes: los personajes reales (héroe + NPCs)
+  // se compositan encima desde sus retratos generados, para que coincidan con el
+  // elenco de la historia (antes flux inventaba caras/perros que no cerraban).
+  const where = sceneHint?.trim() ? ` Setting detail: ${sceneHint}.` : "";
+  const prompt = `Epic fantasy environment concept art, cinematic wide establishing shot of an empty dramatic location for the tale "${storyTitle}" in ${worldName} (${era}).${where} No people, no characters, no creatures — only the place: architecture, terrain, sky, atmosphere. Painted, dramatic light, rich detail, no text`;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
 }
 
