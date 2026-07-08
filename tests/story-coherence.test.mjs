@@ -85,10 +85,16 @@ test("NPC cuyo bond nombra al compañero del héroe se detecta", () => {
   assert.ok(issues.some((i) => i.startsWith("npc-fusionado-con-compañero:")));
 });
 
-test("duración larga pedida no puede ser el reloj inicial", () => {
-  const story = baseStory({ summary: { objective: "Encontrá al culpable", risk: "Tu perro", firstMystery: "¿Quién?", timeLimit: "tres meses" } });
-  const issues = storyCoherenceIssues(story, { userPrompt: "una campaña de tres meses con un perro llamado Firulais", hero });
-  assert.ok(issues.includes("reloj-inicial-es-duracion-total"));
+test("duración larga pedida: un reloj coherente (meses/semanas) NO se penaliza", () => {
+  const story = baseStory({ summary: { objective: "Encontrá al culpable", risk: "Tu perro", firstMystery: "¿Quién?", timeLimit: "quedan seis semanas antes de la luna nueva" } });
+  const issues = storyCoherenceIssues(story, { userPrompt: "una búsqueda de tres meses con un perro llamado Firulais", hero });
+  assert.ok(!issues.some((i) => i.startsWith("reloj")));
+});
+
+test("duración larga pedida pero reloj de una noche SE penaliza (ignora la escala)", () => {
+  const story = baseStory({ summary: { objective: "Encontrá al culpable", risk: "Tu perro", firstMystery: "¿Quién?", timeLimit: "antes del anochecer" } });
+  const issues = storyCoherenceIssues(story, { userPrompt: "una búsqueda de tres meses con un perro llamado Firulais", hero });
+  assert.ok(issues.includes("reloj-ignora-escala-larga"));
 });
 
 test("héroe presente exige heroBond", () => {

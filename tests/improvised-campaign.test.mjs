@@ -135,3 +135,19 @@ test("la pista marcada isFalse viaja a la campaña como pista plantada", () => {
   assert.equal(campaign.clues[1].isFalse, true);
   assert.equal(campaign.clues[2].isFalse, undefined);
 });
+
+test("el elenco admite hasta 5 NPCs (no se capa en 3)", () => {
+  const campaign = buildImprovisedCampaign({
+    ...fullContent,
+    npcs: [
+      { name: "Firulais", role: "compañero", description: "Tu perro rastreador.", motive: "Proteger.", secret: "Olió al culpable." },
+      { name: "Brisa Salobre", role: "aliada", description: "Mejor amiga.", motive: "Pagar un favor.", secret: "Te debe la vida." },
+      { name: "El Práctico Mudo", role: "testigo", description: "Guía callado.", motive: "No hablar.", secret: "Vio todo." },
+      { name: "Lord Kaelen", role: "rival", description: "Te acusa.", motive: "Poder.", secret: "Miente." },
+      { name: "La Bestia de la Niebla", role: "amenaza sembrada", description: "Un aullido lejano.", motive: "Cazar.", secret: "Aparece más adelante." }
+    ]
+  });
+  assert.equal(campaign.npcs.length, 5);
+  assert.ok(campaign.npcs.some((n) => n.name === "Firulais"));
+  assert.ok(campaign.npcs.some((n) => /Bestia de la Niebla/.test(n.name)));
+});

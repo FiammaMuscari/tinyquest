@@ -33,8 +33,12 @@ export function storyCoherenceIssues(content: ImprovisedStoryContent, input: Imp
       if (npc?.bond?.toLowerCase().includes(petName)) issues.push(`npc-fusionado-con-compañero:${npc.name}`);
     }
   }
+  // Escala temporal: si el jugador pidió una duración LARGA (meses/años), la
+  // historia NO debe arrancar como si todo pasara en una noche/día — antes se
+  // penalizaba lo contrario (regla vieja). Ahora el reloj debe respetar la escala.
   const longDuration = /(\d+|un|dos|tres|cuatro|seis)\s*(mes|meses|año|años)/i.test(wish);
-  if (longDuration && /(mes|meses|año|años)/i.test(content.summary?.timeLimit ?? "")) issues.push("reloj-inicial-es-duracion-total");
+  const shortClock = /(anochecer|amanecer|medianoche|esta noche|antes del alba|en horas|una noche|hoy mismo)/i.test(content.summary?.timeLimit ?? "");
+  if (longDuration && shortClock) issues.push("reloj-ignora-escala-larga");
   if (input.hero && !content.heroBond) issues.push("hero-sin-vinculo");
   return issues;
 }

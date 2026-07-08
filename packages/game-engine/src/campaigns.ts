@@ -622,7 +622,9 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     escapeRoute: clampText(content.scenes?.[index]?.escapeRoute, "una ruta lateral peligrosa", 70)
   }));
 
-  const npcSource = Array.isArray(content.npcs) ? content.npcs.slice(0, 3) : [];
+  // Hasta 5 NPCs: el elenco lo define el input del jugador (cada persona, mascota
+  // y enemigo nombrado es su propio NPC), no un tope fijo de 3.
+  const npcSource = Array.isArray(content.npcs) ? content.npcs.slice(0, 5) : [];
   while (npcSource.length < 2) {
     npcSource.push(npcSource.length === 0
       ? { name: "Testigo de la verdad incómoda", role: "npc principal", description: "Sabe más de lo que admite y cambia con el peligro.", motive: "Sobrevivir sin entregar su secreto.", secret: "Protege una ruta o una culpa antigua." }
