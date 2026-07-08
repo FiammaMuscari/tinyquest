@@ -3543,7 +3543,6 @@ h1 {
 /* Assets del pack de diseño en /assets/ui|worlds|companions (palette.json:
    gold #D4AF37, blue_deep #0D1B2A, black_panel #050A12, parchment #EADFC6). */
 /* Fondo azul marino profundo del mockup (blue_deep→black_panel) + header limpio. */
-.appShell.lobbyShell { background: radial-gradient(1100px 520px at 18% -8%, rgba(212,175,55,.09), transparent 62%), linear-gradient(180deg, #171209 0%, #0d0a06 48%, #070503 100%) !important; }
 /* Aire a los costados: el contenido no toca los bordes de la pantalla — se lee
    como con un poco de zoom-out, centrado y con respiración lateral. */
 .appShell.lobbyShell { width: min(1360px, calc(100% - clamp(28px, 7vw, 120px))) !important; margin: 0 auto !important; padding: clamp(18px, 2vw, 32px) 0 40px !important; }
@@ -3721,7 +3720,9 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .heroSummaryInfo > span { font-size: 15px; color: rgba(234,223,198,.85); }
 /* Mundo seleccionado: borde grueso luminoso. */
 .worldCard.hasArt { border-radius: 14px; }
-.worldCard.hasArt.selected { border: 2px solid #F2D27C !important; box-shadow: 0 0 0 1px rgba(242,210,124,.35), 0 0 34px rgba(212,175,55,.4) !important; }
+/* Mundo elegido: se levanta un poco y crece — resalta sobre los otros. */
+.worldCard.hasArt.selected { border: 2px solid #F2D27C !important; box-shadow: 0 0 0 1px rgba(242,210,124,.35), 0 12px 34px rgba(212,175,55,.4) !important; transform: translateY(-8px) scale(1.02); z-index: 2; }
+.worldCard.hasArt { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
 .worldCard.hasArt strong { font-size: 19px !important; }
 /* ── Sistema de botones + paleta del pack (2026-07-07) ──────────────────────
    Paleta: gold #D4AF37 · gold claro #F2D27C · navy #0D1B2A · panel #050A12 ·

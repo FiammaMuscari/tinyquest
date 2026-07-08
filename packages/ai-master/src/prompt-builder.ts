@@ -90,7 +90,7 @@ export function buildDungeonMasterSystemPrompt(_narratorVoice?: NarratorVoice) {
     "NUNCA cambies resultado del dado. NUNCA uses forbidden de turn.",
     "Si optionsToLabel tiene entradas, generá enrichedOptions con una etiqueta narrativa concreta (que referencie objeto/persona de la escena) por cada id.",
     "Respondé SOLO con JSON válido. Sin Markdown. Sin texto fuera del JSON.",
-    "Formato exacto: {\"narration\":\"1-2 párrafos cortos (máx ~90 palabras)\",\"dialogue\":[{\"speakerId\":\"\",\"speakerName\":\"\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"\",\"intention\":\"\"}],\"consequence\":{\"summary\":\"igual a turn.consequence\",\"physicalChange\":\"\",\"emotionalChange\":\"\"},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"\"},\"clueReveals\":[],\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[],\"enrichedOptions\":[{\"id\":\"\",\"label\":\"\"}]}"
+    "Formato exacto: {\"narration\":\"2-4 párrafos ricos (130-240 palabras), la historia se despliega y nunca cierra en un turno\",\"dialogue\":[{\"speakerId\":\"\",\"speakerName\":\"\",\"speakerKind\":\"player|bot|npc|narrator\",\"line\":\"\",\"intention\":\"\"}],\"consequence\":{\"summary\":\"igual a turn.consequence\",\"physicalChange\":\"\",\"emotionalChange\":\"\"},\"dangerChange\":{\"before\":0,\"after\":0,\"manifestation\":\"\"},\"clueReveals\":[],\"memoryPatch\":{\"factsToRemember\":[],\"factsToUpdate\":[]},\"continuityWarnings\":[],\"enrichedOptions\":[{\"id\":\"\",\"label\":\"\"}]}"
   ].join(" ");
 }
 
@@ -424,7 +424,7 @@ export function buildDungeonMasterPayload(input: NarrationRequest, narrative: Na
       ? buildNarratorVoiceSection(input.selectedCampaign.narratorVoice)
       : undefined,
     responseContract: {
-      narration: "1 a 2 párrafos CORTOS (máximo ~90 palabras en total): 1) acción física concreta con un objeto o detalle sensorial de la escena, 2) tensión emocional o señal de giro. Cada frase tiene que ganarse su lugar; nada de relleno atmosférico.",
+      narration: "2 a 4 párrafos RICOS (130-240 palabras): 1) acción física concreta con objeto/detalle sensorial, 2) reacción de los personajes presentes (NPCs y compañeros) con su voz propia, 3) subtexto o giro que se insinúa, 4) un hilo que queda abierto y tenso para el próximo turno. La historia se despliega como un libro largo; JAMÁS la cierres ni cierres la escena en un solo turno.",
       npcDialogue: ["PNJ: una frase breve con deseo, amenaza o mentira."],
       consequence: "Una frase clara: que cambia ahora por el resultado del dado.",
       nextOptions: ["Accion concreta con persona/lugar/objeto", "Accion concreta con persona/lugar/objeto"],

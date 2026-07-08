@@ -201,7 +201,7 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     noRepeat: noRepeat.length ? noRepeat : undefined,
     optionsToLabel: optionsToLabel.length ? optionsToLabel : undefined,
     rules: [
-      "narration: 1-2 párrafos CORTOS, máximo ~90 palabras en total. Cada frase se gana su lugar; sin relleno atmosférico.",
+      "narration: 2-4 párrafos RICOS, entre 130 y 240 palabras — la historia se despliega como un libro, no se apura. Detalle sensorial, la reacción de los personajes presentes, el subtexto de la escena y un hilo que queda tenso para el próximo turno. Nunca cierres la historia ni la escena en un solo turno; cada turno es un capítulo que continúa.",
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
       ...(npcs.some((n) => "hiddenTies" in n && n.hiddenTies)

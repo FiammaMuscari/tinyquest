@@ -78,7 +78,8 @@ export function createScenesForCampaign(campaign: Campaign = defaultCampaign): S
       mysteryClue: clue?.text ?? campaign.storyHook,
       clueIds: campaignScene.clueIds,
       danger: campaignScene.hasCombat ? "La escena puede entrar en combate breve." : "La presión social o mágica aumenta.",
-      maxRounds: 4,
+      // Escenas más largas: historias que se despliegan, no que se cortan.
+      maxRounds: 7,
       atmosphere: {
         visualPrompt: `${campaign.imagePrompt} Escena: ${campaignScene.imagePrompt}.`,
         ambientSoundPrompt: `${campaign.ambientSoundPrompt} Escena: ${campaignScene.ambientSoundPrompt}.`,
@@ -103,7 +104,7 @@ export function createSessionForCampaign(campaign: Campaign = defaultCampaign): 
     title: campaign.title,
     maxMinutes: campaign.durationMinutes,
     maxScenes: campaign.scenes.length,
-    maxRoundsPerScene: 4,
+    maxRoundsPerScene: 7,
     selectedCampaign: campaign,
     selectedCampaignId: campaign.id,
     initialSceneId: campaign.scenes[0].id

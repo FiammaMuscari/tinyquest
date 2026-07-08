@@ -137,3 +137,18 @@ test("final scene with open final route resolves even before clue threshold", ()
   };
   assert.equal(shouldResolveEnding({ campaign, state, lastAction: { statePatch: {} } }), true);
 });
+
+test("escena final SIN progreso real (solo hay finales posibles) NO termina en el 1er turno", () => {
+  const state = {
+    currentSceneId: "juicio-luna-roja",
+    round: 1,
+    danger: 3,
+    discoveredClues: {},
+    routeStates: {},
+    availableEndings: ["good_truth_mercy", "secret_deep_truth"],
+    endingScore: {},
+    sceneClocks: { "juicio-luna-roja": { currentTicks: 0, maxTicks: 4 } },
+    inventory: {}
+  };
+  assert.equal(shouldResolveEnding({ campaign, state, lastAction: { statePatch: {} } }), false);
+});

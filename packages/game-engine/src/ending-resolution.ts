@@ -108,11 +108,13 @@ export function shouldResolveEnding(params: {
 
   const dangerBand = getDangerBand(params.state.danger);
   const routeStates = params.state.routeStates ?? {};
+  // OJO: NO contar "hay finales disponibles" como ruta final abierta — eso es
+  // SIEMPRE verdadero y hacía que la escena climática terminara en el 1er turno
+  // (la historia "se cortaba"). La ruta final se abre por PROGRESO real.
   const hasFinalRoute =
     routeStates["ruta_final"]?.status === "open" ||
     routeStates["secret_deep_truth"]?.status === "open" ||
-    Object.values(routeStates).some((route) => route.status === "open" && (route.id?.includes("secret") || route.id?.includes("final"))) ||
-    (params.state.availableEndings?.length ?? 0) > 0;
+    Object.values(routeStates).some((route) => route.status === "open" && (route.id?.includes("secret") || route.id?.includes("final")));
 
   const hasDecisiveClues = Object.values(params.state.discoveredClues ?? {})
     .filter((clue) => clue.status === "confirmed").length >= 3;
