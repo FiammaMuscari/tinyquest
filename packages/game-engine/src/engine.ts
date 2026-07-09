@@ -37,6 +37,8 @@ type CreateRoomInput = {
   id?: string;
   mode?: GameRoom["mode"];
   humanCharacter?: ReturnType<typeof createCharacter>;
+  humanId?: string;
+  humanName?: string;
   selectedTheme?: WorldTheme;
   selectedCampaign?: Campaign;
   botCount?: number;
@@ -49,8 +51,8 @@ export function createGameRoom(input: CreateRoomInput = {}): GameRoom {
   const sessionConfig = createSessionForCampaign(campaign);
   const humanCharacter = input.humanCharacter ?? createCharacter();
   const human: Player = {
-    id: "player-1",
-    name: humanCharacter.name,
+    id: input.humanId ?? "player-1",
+    name: input.humanName ?? humanCharacter.name,
     type: "human",
     character: humanCharacter,
     temporaryItems: ["mapa rasgado", "daga de plata vieja"]
@@ -136,6 +138,34 @@ export function createMultiplayerRoom(hostCharacter: Character, guestCharacter: 
     temporaryItems: []
   };
   return createGameRoom({ mode: "multiplayer", humanCharacter: hostCharacter, extraPlayers: [guest], botCount: 0, selectedCampaign });
+}
+
+// Un asiento de sala tal como lo reporta el servidor: id estable + héroe traído
+// por ese jugador. El id DEBE coincidir con el playerId del servidor para que el
+// ruteo de turnos (activePlayerId) case entre motor y sala.
+export type PartySeat = { id: string; name: string; character: Character };
+
+// createPartyRoom arma la partida multijugador con el host + N invitados, en el
+// mismo orden en que el servidor los lista. El host resuelve cada turno contra
+// este GameRoom y lo difunde; los ids permiten mapear activePlayerIndex ↔ activePlayerId.
+export function createPartyRoom(host: PartySeat, guests: PartySeat[], selectedCampaign: Campaign = defaultCampaign): GameRoom {
+  const extraPlayers: Player[] = guests.map((seat) => ({
+    id: seat.id,
+    name: seat.name,
+    type: "human",
+    status: "active",
+    character: seat.character,
+    temporaryItems: []
+  }));
+  return createGameRoom({
+    mode: "multiplayer",
+    humanCharacter: host.character,
+    humanId: host.id,
+    humanName: host.name,
+    extraPlayers,
+    botCount: 0,
+    selectedCampaign
+  });
 }
 
 function normalizeActionText(value: string): string {

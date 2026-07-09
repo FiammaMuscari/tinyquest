@@ -1,47 +1,57 @@
 import type { Character, GameRoom, StatKey } from "@tiny-quest/game-engine";
-import type { C2SMessage, S2CMessage, MultiplayerPhase } from "./protocol";
+import type { C2SMessage, GuestActionMsg, MultiplayerPhase, PlayerInfo, S2CMessage } from "./protocol";
+
+// Cliente de salas de Tiny Quest. Es transporte + estado; NO corre el juego.
+// El HOST usa startStory/broadcastState/signalNarrating tras resolver contra el
+// motor; los invitados usan submitAction. La app escucha "guest_action" (solo le
+// llega al host) para resolver la acción de un invitado y volver a difundir.
 
 export type MultiplayerState = {
   phase: MultiplayerPhase;
   roomCode: string | null;
   playerId: string | null;
+  isHost: boolean;
+  players: PlayerInfo[];
   gameRoom: GameRoom | null;
+  activePlayerId: string | null;
   yourTurn: boolean;
-  opponentName: string | null;
   errorMessage: string | null;
   lastEventSummary: string | null;
 };
 
 export type MultiplayerEventMap = {
   state_change: MultiplayerState;
+  guest_action: GuestActionMsg; // solo el host lo recibe
+  story_started: { state: GameRoom; activePlayerId: string; yourTurn: boolean };
+  state_update: { state: GameRoom; activePlayerId: string; yourTurn: boolean; eventSummary?: string };
   error: string;
 };
 
 type Handler<T> = (payload: T) => void;
 
-const DEFAULT_SERVER_URL = "ws://localhost:8787";
+const emptyState: MultiplayerState = {
+  phase: "idle",
+  roomCode: null,
+  playerId: null,
+  isHost: false,
+  players: [],
+  gameRoom: null,
+  activePlayerId: null,
+  yourTurn: false,
+  errorMessage: null,
+  lastEventSummary: null
+};
 
 export class MultiplayerClient {
   private ws: WebSocket | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private reconnectAttempts = 0;
   private serverUrl: string;
-
-  private _state: MultiplayerState = {
-    phase: "idle",
-    roomCode: null,
-    playerId: null,
-    gameRoom: null,
-    yourTurn: false,
-    opponentName: null,
-    errorMessage: null,
-    lastEventSummary: null
-  };
-
+  private _state: MultiplayerState = { ...emptyState };
   private listeners = new Map<string, Set<Handler<unknown>>>();
+  // Cola de mensajes a mandar apenas abra el socket.
+  private pending: C2SMessage[] = [];
 
-  constructor(serverUrl = DEFAULT_SERVER_URL) {
+  constructor(serverUrl = "ws://localhost:8787") {
     this.serverUrl = serverUrl;
   }
 
@@ -62,7 +72,7 @@ export class MultiplayerClient {
 
   private emit<K extends keyof MultiplayerEventMap>(event: K, payload: MultiplayerEventMap[K]): void {
     for (const handler of this.listeners.get(event) ?? []) {
-      try { handler(payload); } catch { /* ignore handler errors */ }
+      try { handler(payload); } catch { /* handler aislado */ }
     }
   }
 
@@ -71,127 +81,157 @@ export class MultiplayerClient {
     this.emit("state_change", this._state);
   }
 
-  // ─── Connection ─────────────────────────────────────────────────────────────
+  // ─── Conexión ─────────────────────────────────────────────────────────────
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
-    this.setState({ phase: "connecting", errorMessage: null });
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
+    this.setState({ phase: this._state.phase === "idle" ? "connecting" : this._state.phase, errorMessage: null });
     this.ws = new WebSocket(this.serverUrl);
 
     this.ws.onopen = () => {
-      this.reconnectAttempts = 0;
       this.startPing();
+      const queued = this.pending;
+      this.pending = [];
+      for (const msg of queued) this.rawSend(msg);
     };
 
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data as string) as S2CMessage;
         this.handleServerMessage(msg);
-      } catch { /* malformed message, ignore */ }
+      } catch { /* mensaje malformado */ }
     };
 
     this.ws.onclose = () => {
       this.stopPing();
-      if (this._state.phase !== "idle" && this._state.phase !== "ended") {
-        this.setState({ phase: "opponent_gone", errorMessage: "Conexión perdida con el servidor." });
+      const alive = ["waiting_room", "active", "watching", "narrating"];
+      if (alive.includes(this._state.phase)) {
+        this.setState({ phase: "host_gone", errorMessage: "Se perdió la conexión con la sala." });
       }
     };
 
     this.ws.onerror = () => {
-      this.setState({ errorMessage: "No se pudo conectar con el servidor." });
+      this.setState({ errorMessage: "No se pudo conectar con el servidor de salas." });
     };
   }
 
   disconnect(): void {
     this.stopPing();
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.ws?.close();
+    this.pending = [];
+    if (this.ws) {
+      this.ws.onclose = null; // salida limpia: no dispares "host_gone"
+      this.ws.close();
+    }
     this.ws = null;
-    this.setState({ phase: "idle", roomCode: null, playerId: null, gameRoom: null });
+    this._state = { ...emptyState };
+    this.emit("state_change", this._state);
   }
 
-  // ─── Actions ────────────────────────────────────────────────────────────────
+  // ─── Acciones (comunes) ─────────────────────────────────────────────────────
 
-  createRoom(playerName: string, character: Character, campaignId: string): void {
+  /** El invitado abre la pantalla de ingreso: conecta y habilita el formulario. */
+  beginJoin(): void {
+    this.setState({ phase: "lobby_guest", isHost: false });
     this.connect();
-    const send = () => {
-      this.send({ type: "create_room", playerName, character, campaignId });
-      this.setState({ phase: "waiting_guest" });
-    };
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      send();
-    } else {
-      this.ws!.addEventListener("open", send, { once: true });
-    }
+  }
+
+  createRoom(playerName: string, character: Character, opts: { worldId?: string; perspective?: string } = {}): void {
+    this.connect();
+    this.setState({ phase: "lobby_host", isHost: true });
+    this.send({ type: "create_room", playerName, character, worldId: opts.worldId, perspective: opts.perspective });
   }
 
   joinRoom(roomCode: string, playerName: string, character: Character): void {
     this.connect();
-    const send = () => {
-      this.send({ type: "join_room", roomCode: roomCode.toUpperCase(), playerName, character });
-    };
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      send();
-    } else {
-      this.ws!.addEventListener("open", send, { once: true });
-    }
+    this.setState({ phase: "lobby_guest", isHost: false });
+    this.send({ type: "join_room", roomCode: roomCode.toUpperCase(), playerName, character });
   }
+
+  // ─── Acciones (host) ────────────────────────────────────────────────────────
+
+  /** El host arranca la partida con el GameRoom ya forjado. */
+  startStory(state: GameRoom, activePlayerId: string): void {
+    if (!this._state.roomCode) return;
+    this.send({ type: "start_story", roomCode: this._state.roomCode, state, activePlayerId });
+  }
+
+  /** El host difunde el estado autoritativo tras resolver un turno. */
+  broadcastState(state: GameRoom, activePlayerId: string, eventSummary?: string): void {
+    if (!this._state.roomCode) return;
+    this.send({ type: "broadcast_game", roomCode: this._state.roomCode, state, activePlayerId, eventSummary });
+    // El host refleja su propio broadcast localmente.
+    this.setState({
+      gameRoom: state,
+      activePlayerId,
+      yourTurn: activePlayerId === this._state.playerId,
+      lastEventSummary: eventSummary ?? this._state.lastEventSummary,
+      phase: state.sessionComplete ? "ended" : activePlayerId === this._state.playerId ? "active" : "watching"
+    });
+  }
+
+  /** El host avisa a los invitados que está narrando (spinner). */
+  signalNarrating(): void {
+    if (!this._state.roomCode || !this._state.activePlayerId) return;
+    this.send({ type: "broadcast_game", roomCode: this._state.roomCode, narrating: true, activePlayerId: this._state.activePlayerId } as C2SMessage);
+  }
+
+  // ─── Acciones (invitado) ─────────────────────────────────────────────────────
 
   submitAction(action: string, stat: StatKey, usePet: boolean): void {
     if (!this._state.roomCode) return;
     this.send({ type: "submit_action", roomCode: this._state.roomCode, action, stat, usePet });
   }
 
-  // ─── Message routing ─────────────────────────────────────────────────────────
+  // ─── Ruteo de mensajes del servidor ──────────────────────────────────────────
 
   private handleServerMessage(msg: S2CMessage): void {
     switch (msg.type) {
       case "room_created":
-        this.setState({ roomCode: msg.roomCode, playerId: msg.playerId, phase: "waiting_guest" });
+        this.setState({ roomCode: msg.roomCode, playerId: msg.playerId, isHost: true, players: msg.players, phase: "lobby_host" });
         break;
 
       case "room_joined":
         this.setState({
-          roomCode: msg.roomCode,
-          playerId: msg.playerId,
-          gameRoom: msg.state,
-          phase: msg.yourTurn ? "active" : "watching",
-          yourTurn: msg.yourTurn
+          roomCode: msg.roomCode, playerId: msg.playerId, players: msg.players,
+          isHost: msg.players.find((p) => p.id === msg.playerId)?.isHost ?? this._state.isHost,
+          phase: this._state.phase === "lobby_host" ? "lobby_host" : "waiting_room"
         });
         break;
 
-      case "opponent_joined":
-        this.setState({
-          opponentName: msg.playerName,
-          gameRoom: msg.state,
-          phase: "active",  // host always goes first
-          yourTurn: true
-        });
+      case "player_joined":
+      case "player_left":
+      case "player_reconnected":
+        this.setState({ players: msg.players });
         break;
+
+      case "story_started": {
+        const state = msg.state as GameRoom;
+        this.setState({
+          gameRoom: state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn,
+          phase: state.sessionComplete ? "ended" : msg.yourTurn ? "active" : "watching"
+        });
+        this.emit("story_started", { state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn });
+        break;
+      }
+
+      case "state_update": {
+        const state = msg.state as GameRoom;
+        this.setState({
+          gameRoom: state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn,
+          lastEventSummary: msg.eventSummary ?? this._state.lastEventSummary,
+          phase: state.sessionComplete ? "ended" : msg.yourTurn ? "active" : "watching"
+        });
+        this.emit("state_update", { state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn, eventSummary: msg.eventSummary });
+        break;
+      }
 
       case "narrating":
-        this.setState({ phase: "narrating" });
+        if (!this._state.yourTurn) this.setState({ phase: "narrating" });
         break;
 
-      case "state_update":
-        this.setState({
-          gameRoom: msg.state,
-          lastEventSummary: msg.eventSummary,
-          yourTurn: msg.yourTurn,
-          phase: msg.state.sessionComplete ? "ended" : msg.yourTurn ? "active" : "watching"
-        });
-        break;
-
-      case "opponent_disconnected":
-        this.setState({ phase: "opponent_gone", errorMessage: "Tu oponente se desconectó." });
-        break;
-
-      case "opponent_reconnected":
-        this.setState({
-          opponentName: msg.playerName,
-          phase: this._state.yourTurn ? "active" : "watching",
-          errorMessage: null
-        });
+      case "guest_action":
+        // Solo le llega al host: resolvé esta acción contra el motor y difundí.
+        this.emit("guest_action", msg);
         break;
 
       case "error":
@@ -204,30 +244,30 @@ export class MultiplayerClient {
     }
   }
 
-  // ─── Internals ──────────────────────────────────────────────────────────────
+  // ─── Internos ─────────────────────────────────────────────────────────────
 
   private send(msg: C2SMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(msg));
+      this.rawSend(msg);
+    } else {
+      this.pending.push(msg);
     }
+  }
+
+  private rawSend(msg: C2SMessage): void {
+    this.ws?.send(JSON.stringify(msg));
   }
 
   private startPing(): void {
     this.stopPing();
-    this.pingTimer = setInterval(() => {
-      this.send({ type: "ping" });
-    }, 25_000);
+    this.pingTimer = setInterval(() => this.rawSend({ type: "ping" }), 25_000);
   }
 
   private stopPing(): void {
-    if (this.pingTimer) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
+    if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; }
   }
 }
 
-// Singleton para uso en App.tsx
-export const multiplayerClient = new MultiplayerClient(
-  import.meta.env.VITE_WS_URL ?? "ws://localhost:8787"
-);
+// Singleton para App.tsx.
+const wsUrl = (typeof import.meta !== "undefined" && (import.meta as { env?: Record<string, string> }).env?.VITE_WS_URL) || "ws://localhost:8787";
+export const multiplayerClient = new MultiplayerClient(wsUrl);

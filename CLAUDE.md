@@ -99,7 +99,8 @@ packages/ai-master/src/
 
 packages/atmosphere/src/          → Image (Bedrock/local SD) + Sound (ElevenLabs) providers
 
-server/                           → Reserved for multiplayer (currently empty)
+server-go/                        → Multiplayer room server (Go, host-authoritative relay) — see server-go/README.md
+server/                           → Legacy TS multiplayer stub (superseded by server-go)
 tests/                            → node:test files (*.test.mjs)
 scripts/                          → run-groq-narration-smoke.mjs
 docs/game-systems/                → Design docs: narrative-pacing.md, coherence-module.md, endings.md

@@ -1,12 +1,32 @@
-import type { Character, GameRoom, StatKey } from "@tiny-quest/game-engine";
+import type { Character, StatKey } from "@tiny-quest/game-engine";
 
-// ─── Client → Server ─────────────────────────────────────────────────────────
+// Protocolo de salas de Tiny Quest (JSON sobre WebSocket).
+//
+// ARQUITECTURA — host autoritativo:
+//   El motor y el narrador (LLM) son TypeScript y viven en el navegador. El
+//   servidor Go NO corre el juego: coordina la sala (membresía, orden de turnos,
+//   reconexión) y relaya. El HOST forja la historia, resuelve cada turno contra
+//   el motor y difunde el estado; los invitados mandan su acción y reciben el
+//   estado. `GameRoom` viaja como JSON opaco para el servidor.
+
+// ─── Vista pública de un jugador (la manda el servidor) ──────────────────────
+
+export type PlayerInfo = {
+  id: string;
+  name: string;
+  isHost: boolean;
+  connected: boolean;
+  character: Character;
+};
+
+// ─── Cliente → Servidor ──────────────────────────────────────────────────────
 
 export type CreateRoomMsg = {
   type: "create_room";
   playerName: string;
   character: Character;
-  campaignId: string;
+  worldId?: string;
+  perspective?: string;
 };
 
 export type JoinRoomMsg = {
@@ -16,6 +36,39 @@ export type JoinRoomMsg = {
   character: Character;
 };
 
+export type RejoinRoomMsg = {
+  type: "rejoin_room";
+  roomCode: string;
+  playerId: string;
+};
+
+// El host declara que la historia quedó forjada y arranca la partida.
+export type StartStoryMsg = {
+  type: "start_story";
+  roomCode: string;
+  state: unknown; // GameRoom serializado (opaco para el servidor)
+  activePlayerId: string;
+};
+
+// El host difunde el estado autoritativo tras resolver un turno.
+export type BroadcastGameMsg = {
+  type: "broadcast_game";
+  roomCode: string;
+  state: unknown; // GameRoom serializado
+  eventSummary?: string;
+  activePlayerId: string;
+  narrating?: boolean;
+};
+
+// El host avisa "estoy narrando" (spinner en los invitados), sin estado nuevo.
+export type NarratingSignalMsg = {
+  type: "broadcast_game";
+  roomCode: string;
+  narrating: true;
+  activePlayerId: string;
+};
+
+// Un invitado pide su acción de turno; el servidor la relaya al host.
 export type SubmitActionMsg = {
   type: "submit_action";
   roomCode: string;
@@ -24,35 +77,71 @@ export type SubmitActionMsg = {
   usePet: boolean;
 };
 
-export type C2SMessage = CreateRoomMsg | JoinRoomMsg | SubmitActionMsg | { type: "ping" };
+export type C2SMessage =
+  | CreateRoomMsg
+  | JoinRoomMsg
+  | RejoinRoomMsg
+  | StartStoryMsg
+  | BroadcastGameMsg
+  | SubmitActionMsg
+  | { type: "ping" };
 
-// ─── Server → Client ─────────────────────────────────────────────────────────
+// ─── Servidor → Cliente ──────────────────────────────────────────────────────
 
 export type RoomCreatedMsg = {
   type: "room_created";
   roomCode: string;
   playerId: string;
+  players: PlayerInfo[];
 };
 
 export type RoomJoinedMsg = {
   type: "room_joined";
   roomCode: string;
   playerId: string;
-  state: GameRoom;
-  yourTurn: boolean;
+  players: PlayerInfo[];
 };
 
-export type OpponentJoinedMsg = {
-  type: "opponent_joined";
-  playerName: string;
-  state: GameRoom;
+export type PlayerJoinedMsg = {
+  type: "player_joined";
+  player: PlayerInfo;
+  players: PlayerInfo[];
+};
+
+export type PlayerLeftMsg = {
+  type: "player_left";
+  playerId: string;
+  players: PlayerInfo[];
+};
+
+export type PlayerReconnectedMsg = {
+  type: "player_reconnected";
+  playerId: string;
+  players: PlayerInfo[];
+};
+
+export type StoryStartedMsg = {
+  type: "story_started";
+  state: unknown; // GameRoom serializado
+  activePlayerId: string;
+  yourTurn: boolean;
 };
 
 export type StateUpdateMsg = {
   type: "state_update";
-  state: GameRoom;
-  eventSummary: string;
+  state: unknown; // GameRoom serializado
+  eventSummary?: string;
+  activePlayerId: string;
   yourTurn: boolean;
+};
+
+// Solo llega al HOST: un invitado pidió esta acción, resolvela contra el motor.
+export type GuestActionMsg = {
+  type: "guest_action";
+  playerId: string;
+  action: string;
+  stat: StatKey;
+  usePet: boolean;
 };
 
 export type ErrorMsg = {
@@ -64,22 +153,24 @@ export type ErrorMsg = {
 export type S2CMessage =
   | RoomCreatedMsg
   | RoomJoinedMsg
-  | OpponentJoinedMsg
+  | PlayerJoinedMsg
+  | PlayerLeftMsg
+  | PlayerReconnectedMsg
+  | StoryStartedMsg
   | StateUpdateMsg
+  | GuestActionMsg
   | { type: "narrating" }
-  | { type: "opponent_disconnected" }
-  | { type: "opponent_reconnected"; playerName: string }
   | { type: "pong" }
   | ErrorMsg;
 
 export type MultiplayerPhase =
   | "idle"
   | "connecting"
-  | "lobby_host"     // created room, waiting for opponent
-  | "lobby_guest"    // entering room code
-  | "waiting_guest"  // opponent hasn't joined yet
-  | "active"         // game running, your turn
-  | "watching"       // game running, opponent's turn
-  | "narrating"      // LLM is generating narration
-  | "opponent_gone"  // opponent disconnected
-  | "ended";         // session complete
+  | "lobby_host" // creaste la sala, esperando que arranque la historia
+  | "lobby_guest" // ingresando código
+  | "waiting_room" // en la sala, esperando que el host forje y arranque
+  | "active" // partida en curso, tu turno
+  | "watching" // partida en curso, turno de otro
+  | "narrating" // el host está narrando
+  | "host_gone" // el anfitrión se cayó / abandonó
+  | "ended"; // sesión completa

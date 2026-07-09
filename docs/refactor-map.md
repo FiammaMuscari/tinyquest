@@ -147,3 +147,35 @@ section** — an outdated map costs more than no map.
 - Worlds: `packages/game-engine/src/worlds.ts` — `worldRules` are secret (never
   render them in lobby); tagline/entry are the only public texts.
 - Improvised campaigns live in App state, not in the campaign registry.
+
+## Multijugador — party host-autoritativo (2026-07-09)
+
+Peer local funcionando: servidor de salas en Go + cliente TS. El juego (motor +
+LLM) corre en el navegador; el server Go SOLO relaya. El HOST forja, resuelve
+cada turno contra su motor local y difunde `GameRoom`; los invitados mandan su
+acción y adoptan el estado.
+
+- **Servidor**: `server-go/` (ver su README). `npm run server:go` → ws://localhost:8787.
+  `npm run server:go:test`. Requiere Go (instalado en `~/.local/go` en esta máquina).
+- **Cliente**: `apps/web/src/multiplayer/ws-client.ts` (`MultiplayerClient`,
+  singleton `multiplayerClient`, URL de `VITE_WS_URL`) + `protocol.ts`. El cliente
+  es transporte + estado consciente de rol; emite `guest_action`/`story_started`/
+  `state_update` para que App.tsx resuelva y difunda.
+- **App.tsx anclas**: `startMultiplayerHost` / `openMultiplayerJoin` (→ `beginJoin`) /
+  `startMultiplayerParty` (host: forja + `createPartyRoom` + `startStory`) /
+  `runMultiplayerTurn` (invitado envía) / `launchMultiplayerRoom` (montar sala) /
+  `adoptRemoteRoom` (invitado adopta estado). Efectos que escuchan al cliente:
+  `story_started`, `state_update`, `guest_action`. `runTurn` toma `overrideUsePet`
+  y, si `mpRef.current.isHost`, llama `signalNarrating()` y `broadcastState()`.
+  `mpRef` evita capturar mpState viejo dentro de `runTurn`.
+- **Motor**: `createPartyRoom(host, guests, campaign)` + `PartySeat` en `engine.ts`.
+  Los ids de jugador vienen del SERVIDOR (deben casar para rutear turnos:
+  `activePlayerIndex` ↔ `activePlayerId`). `createGameRoom` acepta `humanId/humanName`.
+- **Fases** (`MultiplayerPhase`): idle→connecting→lobby_host/lobby_guest→
+  waiting_room→active/watching/narrating→ended (host_gone si se cae el host).
+  Renombradas desde el viejo modelo 2-jugadores (opponent_*/waiting_guest).
+- **Regla**: si tocás `protocol.ts` (TS) o `protocol.go`, mantené los nombres de
+  tipo/campo idénticos. `tests/multiplayer-e2e.test.mjs` levanta el binario Go y
+  maneja el cliente TS real contra él — es la prueba de que el protocolo case.
+- **Verificación de UI**: `scratchpad/mp-browser.mjs` abre un host crudo por ws,
+  maneja la UI de invitado real (CDP) uniéndose y confirma la sala de espera.

@@ -33,6 +33,8 @@ import {
   createCharacter,
   createScenesForCampaign,
   createSoloRoom,
+  createPartyRoom,
+  type PartySeat,
   defaultCampaign,
   getRoomScenes,
   canPayActionEnergy,
@@ -685,17 +687,42 @@ export function App() {
   const [mpState, setMpState] = useState<MultiplayerState>(() => multiplayerClient.state);
   const [mpLobbyMode, setMpLobbyMode] = useState<"host" | "guest" | null>(null);
   const [joinCodeInput, setJoinCodeInput] = useState("");
+  // Ref con el estado multijugador vivo: runTurn (una clausura) necesita saber si
+  // somos host y difundir, sin capturar un mpState viejo.
+  const mpRef = useRef(mpState);
+  useEffect(() => { mpRef.current = mpState; }, [mpState]);
 
   useEffect(() => {
     const handler = (s: MultiplayerState) => {
       setMpState({ ...s });
-      if (s.gameRoom && ["active", "watching", "narrating", "opponent_gone", "ended"].includes(s.phase)) {
-        setRoom(s.gameRoom);
-      }
-      if (s.lastEventSummary) setCurrentNarration(s.lastEventSummary);
     };
     multiplayerClient.on("state_change", handler);
     return () => multiplayerClient.off("state_change", handler);
+  }, []);
+
+  // Invitado: el host arrancó la historia. Adoptamos el GameRoom recibido y
+  // montamos la apertura local (misma que en solo, derivada de la campaña).
+  useEffect(() => {
+    const onStart = ({ state }: { state: GameRoom }) => { launchMultiplayerRoom(state); };
+    multiplayerClient.on("story_started", onStart);
+    return () => multiplayerClient.off("story_started", onStart);
+  }, []);
+
+  // Invitado: llegó un estado autoritativo nuevo del host tras resolver un turno.
+  useEffect(() => {
+    const onUpdate = ({ state }: { state: GameRoom }) => { adoptRemoteRoom(state); };
+    multiplayerClient.on("state_update", onUpdate);
+    return () => multiplayerClient.off("state_update", onUpdate);
+  }, []);
+
+  // Host: un invitado pidió su acción; la resolvemos contra el motor. El motor ya
+  // tiene activePlayerIndex apuntando a ese invitado (lo dejamos ahí al difundir).
+  useEffect(() => {
+    const onGuestAction = ({ action, stat, usePet: guestUsePet }: { action: string; stat: StatKey; usePet: boolean }) => {
+      void runTurn(action, stat, guestUsePet);
+    };
+    multiplayerClient.on("guest_action", onGuestAction);
+    return () => multiplayerClient.off("guest_action", onGuestAction);
   }, []);
 
   useEffect(() => {
@@ -931,6 +958,60 @@ export function App() {
     requestLlmOpening(nextRoom, firstScene, campaignToPlay);
   }
 
+  // Host + invitado: montar una sala multijugador ya construida. La apertura es
+  // estática (misma para todos, derivada de la campaña), así host e invitados
+  // arrancan sincronizados; el primer turno real ya dispara el LLM en el host.
+  function launchMultiplayerRoom(mpRoom: GameRoom) {
+    stopAmbient();
+    narrativeIndexRef.current = new NarrativeMemoryIndex({
+      embeddingProvider: new MockEmbeddingProvider(),
+      store: new InMemoryVectorStore()
+    });
+    setRoom(mpRoom);
+    const campaignToPlay = mpRoom.campaign;
+    const firstScene = getRoomScenes(mpRoom).find((candidate) => candidate.id === mpRoom.initialSceneId) ?? getRoomScenes(mpRoom)[0];
+    const active = mpRoom.players[mpRoom.activePlayerIndex];
+    if (active?.id === mpRef.current.playerId) {
+      setSelectedActionDraftId(firstScene.actionChoices[0].id);
+      setSelectedStat(firstScene.actionChoices[0].recommendedStats[0]);
+    }
+    setDmSections(undefined);
+    setPlotBeat(undefined);
+    setLatestTurnNarration(undefined);
+    const opening = buildOpeningBeat(campaignToPlay, firstScene.title, firstScene.objective);
+    setCurrentNarration(opening.sections.narration);
+    setNpcDialogue([opening.sections.dialogue]);
+    setNextOptions(opening.sections.options);
+    setDmSections(opening.sections);
+    setPlotBeat(opening.plotBeat);
+  }
+
+  // Invitado: adoptar el estado autoritativo que difundió el host tras un turno.
+  // El narrador rico no viaja por la red; lo derivamos del último evento del log.
+  function adoptRemoteRoom(mpRoom: GameRoom) {
+    setRoom(mpRoom);
+    const latest = mpRoom.sessionLog[0];
+    const scene = getRoomScenes(mpRoom)[mpRoom.currentSceneIndex];
+    const choices = getVisibleActionChoices(scene, mpRoom);
+    const labels = choices.map((choice) => choice.label).slice(0, 4);
+    if (latest) {
+      setCurrentNarration(latest.narration);
+      setDmSections({
+        narration: latest.narration,
+        dialogue: "",
+        consequence: latest.consequenceText ?? "La escena cambia de forma concreta.",
+        options: labels
+      });
+    }
+    setNextOptions(labels);
+    const active = mpRoom.players[mpRoom.activePlayerIndex];
+    if (active?.id === mpRef.current.playerId && !mpRoom.sessionComplete) {
+      const first = choices[0] ?? scene.actionChoices[0];
+      setSelectedActionDraftId(first.id);
+      setSelectedStat(first.recommendedStats[0]);
+    }
+  }
+
   // La apertura estática se muestra al instante; el LLM la reemplaza con la escena
   // narrada de verdad apenas responde (si un turno se resuelve antes, se descarta).
   // La campaña llega por parámetro: tras forjar, el estado todavía no está actualizado.
@@ -1080,11 +1161,11 @@ export function App() {
 
   function startMultiplayerHost() {
     setMpLobbyMode("host");
-    multiplayerClient.createRoom(draft.name, draft, selectedCampaignId);
+    multiplayerClient.createRoom(draft.name, draft, { worldId: selectedWorldId, perspective });
   }
 
   function openMultiplayerJoin() {
-    multiplayerClient.connect();
+    multiplayerClient.beginJoin();
     setMpLobbyMode("guest");
   }
 
@@ -1094,6 +1175,27 @@ export function App() {
     multiplayerClient.joinRoom(code, draft.name, draft);
   }
 
+  // Host: forja (si hace falta), arma la party con los asientos del servidor y
+  // arranca la historia para todos.
+  async function startMultiplayerParty() {
+    const mp = multiplayerClient.state;
+    if (!mp.roomCode || !mp.isHost || forgingStory) return;
+    let campaignToPlay = selectedCampaign;
+    if (!selectedWorld.authoredCampaignId && (improvisedWorldId !== selectedWorld.id || !improvisedCampaign)) {
+      const forged = await forgeStory("", selectedWorld);
+      if (!forged) return; // el error queda visible en la Forja
+      campaignToPlay = forged;
+    } else if (improvisedWorldId === selectedWorld.id && improvisedCampaign) {
+      campaignToPlay = improvisedCampaign;
+    }
+    const hostSeat = mp.players.find((p) => p.isHost);
+    if (!hostSeat) return;
+    const guests: PartySeat[] = mp.players.filter((p) => !p.isHost).map((p) => ({ id: p.id, name: p.name, character: p.character }));
+    const partyRoom = createPartyRoom({ id: hostSeat.id, name: hostSeat.name, character: hostSeat.character }, guests, campaignToPlay);
+    multiplayerClient.startStory(partyRoom, hostSeat.id);
+    launchMultiplayerRoom(partyRoom);
+  }
+
   function cancelMultiplayer() {
     multiplayerClient.disconnect();
     setMpLobbyMode(null);
@@ -1101,17 +1203,20 @@ export function App() {
     setRoom(null);
   }
 
+  // Invitado: manda su acción; el host la resuelve y difunde el resultado.
   function runMultiplayerTurn() {
     if (!selectedActionDraft || !mpState.yourTurn || mpState.phase !== "active") return;
     multiplayerClient.submitAction(selectedActionDraft.action, selectedStat, usePet);
   }
 
-  async function runTurn(botAction?: string, botStat?: StatKey) {
+  async function runTurn(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean) {
     if (!room || room.sessionComplete || busy || turnInFlightRef.current) return;
     turnInFlightRef.current = true;
     openingTokenRef.current += 1;
     setBusy(true);
     setTurnError(null);
+    // Host multijugador: avisar a los invitados que estamos resolviendo/narrando.
+    if (mpRef.current.isHost && mpRef.current.roomCode) multiplayerClient.signalNarrating();
     let resolution: ReturnType<typeof resolvePlayerAction> | null = null;
     let active = room.players[room.activePlayerIndex];
     try {
@@ -1122,7 +1227,7 @@ export function App() {
       const chosenChoice = scene.actionChoices.find((choice) => choice.action === chosenAction || chosenAction.includes(choice.action));
       const turnAction = chosenAction;
       const displayAction = chosenChoice?.label ?? cleanActionText(turnAction);
-      const petActive = usePet && active.type === "human";
+      const petActive = (overrideUsePet ?? usePet) && active.type === "human";
       const turnStat = botStat ?? selectedStat;
       const actionCountInScene = room.sessionLog.filter((event) =>
         event.sceneId === scene.id && (event.actionLabel === displayAction || cleanActionText(event.action) === displayAction)
@@ -1205,6 +1310,11 @@ export function App() {
       // nunca texto suelto del narrador mapeado por posición.
       const realOptionLabels = nextChoices.map((choice) => choice.label).slice(0, 4);
       setRoom(nextRoom);
+      // Host multijugador: difundir el estado autoritativo al resto de la party.
+      if (mpRef.current.isHost && mpRef.current.roomCode) {
+        const nextActiveId = nextRoom.players[nextRoom.activePlayerIndex]?.id ?? nextRoom.players[0].id;
+        multiplayerClient.broadcastState(nextRoom, nextActiveId, safeConsequence);
+      }
       setCurrentNarration(safeNarration);
       setNpcDialogue(narration.npcDialogue);
       setNextOptions(realOptionLabels);
@@ -1251,6 +1361,10 @@ export function App() {
         const fallbackScene = getRoomScenes(safeRoom)[safeRoom.currentSceneIndex];
         const fallbackOptionLabels = getVisibleActionChoices(fallbackScene, safeRoom).map((choice) => choice.label).slice(0, 4);
         setRoom(safeRoom);
+        if (mpRef.current.isHost && mpRef.current.roomCode) {
+          const nextActiveId = safeRoom.players[safeRoom.activePlayerIndex]?.id ?? safeRoom.players[0].id;
+          multiplayerClient.broadcastState(safeRoom, nextActiveId, safeConsequence);
+        }
         setCurrentNarration(safeNarration);
         setNpcDialogue(fallback.npcDialogue);
         setNextOptions(fallbackOptionLabels);
@@ -1273,7 +1387,7 @@ export function App() {
   }
 
 
-  const mpPreGamePhases: MultiplayerState["phase"][] = ["idle", "connecting", "lobby_host", "lobby_guest", "waiting_guest"];
+  const mpPreGamePhases: MultiplayerState["phase"][] = ["idle", "connecting", "lobby_host", "lobby_guest", "waiting_room"];
   if (mpLobbyMode !== null && mpPreGamePhases.includes(mpState.phase)) {
     return (
       <MultiplayerLobbyScreen
@@ -1282,6 +1396,8 @@ export function App() {
         joinCodeInput={joinCodeInput}
         setJoinCodeInput={setJoinCodeInput}
         onConfirmJoin={confirmJoinRoom}
+        onStartParty={() => { void startMultiplayerParty(); }}
+        forgingStory={forgingStory}
         onCancel={cancelMultiplayer}
       />
     );
@@ -1316,7 +1432,9 @@ export function App() {
 
   const isMultiplayer = mpLobbyMode !== null;
   const mpBlockActions = isMultiplayer && (mpState.phase !== "active" || !mpState.yourTurn);
-  const handleHumanTurn = isMultiplayer ? runMultiplayerTurn : () => runTurn();
+  // Host resuelve su propio turno contra el motor local y difunde; el invitado
+  // solo manda su acción y espera el estado autoritativo.
+  const handleHumanTurn = !isMultiplayer ? () => runTurn() : mpState.isHost ? () => runTurn() : runMultiplayerTurn;
 
   return (
     <main className="appShell">
@@ -1337,9 +1455,9 @@ export function App() {
           <span>{clueToast}</span>
         </div>
       )}
-      {isMultiplayer && mpState.phase === "opponent_gone" && (
+      {isMultiplayer && mpState.phase === "host_gone" && (
         <div className="mpDisconnectOverlay">
-          <p>Tu oponente se desconectó. La partida continúa si regresa en 5 minutos.</p>
+          <p>{mpState.errorMessage ?? "Se perdió la conexión con la sala."} La partida sigue si el anfitrión regresa en 5 minutos.</p>
           <button className="ghostButton" onClick={cancelMultiplayer}>Volver al menú</button>
         </div>
       )}
@@ -1387,7 +1505,9 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   // La forja es SIEMPRE un click explícito, con las ideas como aporte opcional:
   // primero se elige mundo/entrada/recorrido, después se forja.
   const canForge = !forgingStory;
-  const mpBlocked = improvisedSelected || !selectedWorld.authoredCampaignId;
+  // El anfitrión trae su héroe a la sala; solo pedimos que esté listo. La historia
+  // (autoral o forjada) se resuelve al arrancar la party, no al crear la sala.
+  const mpBlocked = !heroLookDone || editingHero;
   return (
     <main className="appShell lobbyShell">
       <HelpButton open={showHelp} setOpen={setShowHelp} />
@@ -1397,7 +1517,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <img className="brandLogo" src="/assets/brand/tiny-quest-logo.png" alt="Tiny Quest" />
         </div>
         <div className="lobbyHeaderActions">
-          <button className="ghostButton" type="button" onClick={onMultiplayerHost} disabled={mpBlocked} title={mpBlocked ? "Las historias forjadas online llegan pronto — por ahora jugalas en solitario." : undefined}><img className="uiIcon" src={uiIcon("crear_sala")} alt="" /> Crear sala</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerHost} disabled={mpBlocked} title={mpBlocked ? "Terminá de forjar tu héroe antes de abrir una sala." : undefined}><img className="uiIcon" src={uiIcon("crear_sala")} alt="" /> Crear sala</button>
           <button className="ghostButton" type="button" onClick={onMultiplayerJoin}><img className="uiIcon" src={uiIcon("unirse_codigo")} alt="" /> Unirse con código</button>
         </div>
       </header>
@@ -3079,17 +3199,34 @@ function translateOutcome(outcome: string) {
 
 // ─── Multiplayer components ───────────────────────────────────────────────────
 
-function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput, onConfirmJoin, onCancel }: {
+function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput, onConfirmJoin, onStartParty, forgingStory, onCancel }: {
   mode: "host" | "guest";
   mpState: MultiplayerState;
   joinCodeInput: string;
   setJoinCodeInput: (v: string) => void;
   onConfirmJoin: () => void;
+  onStartParty: () => void;
+  forgingStory: boolean;
   onCancel: () => void;
 }) {
   const isConnecting = mpState.phase === "connecting";
   const roomCode = mpState.roomCode;
   const error = mpState.errorMessage;
+  // Antes de tener código, el invitado todavía ve el formulario de ingreso.
+  const guestInRoom = mode === "guest" && Boolean(mpState.roomCode);
+
+  const playerList = mpState.players.length > 0 && (
+    <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px", textAlign: "left" }}>
+      {mpState.players.map((p) => (
+        <li key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 6, background: "rgba(255,255,255,0.04)", borderRadius: 8, opacity: p.connected ? 1 : 0.5 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.connected ? "#7fff90" : "#888", flexShrink: 0 }} />
+          <strong style={{ color: "#fff" }}>{p.name}</strong>
+          {p.isHost && <span style={{ color: "#ffd77b", fontSize: 12 }}>· anfitrión</span>}
+          {p.id === mpState.playerId && <span style={{ color: "#888", fontSize: 12 }}>· vos</span>}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <main className="appShell lobbyShell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh" }}>
@@ -3103,13 +3240,28 @@ function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput
                 <p style={{ color: "#aaa" }}>Conectando al servidor…</p>
               ) : (
                 <>
-                  <p style={{ color: "#ccc", marginBottom: 16 }}>Compartí este código con tu oponente:</p>
+                  <p style={{ color: "#ccc", marginBottom: 16 }}>Compartí este código con tu party:</p>
                   <div style={{ fontSize: 48, fontWeight: 900, letterSpacing: "0.15em", color: "#ffd77b", background: "rgba(255,215,123,0.08)", borderRadius: 12, padding: "16px 24px", marginBottom: 20 }}>
                     {roomCode}
                   </div>
-                  <p style={{ color: "#888", fontSize: 13 }}>Esperando que se una tu oponente…</p>
+                  {playerList}
+                  <button
+                    className="soloButton"
+                    style={{ width: "100%", marginBottom: 10 }}
+                    onClick={onStartParty}
+                    disabled={forgingStory || mpState.players.length < 1}
+                  >
+                    {forgingStory ? "Forjando historia…" : mpState.players.length < 2 ? "Empezar (sin invitados)" : `Empezar aventura (${mpState.players.length})`}
+                  </button>
+                  <p style={{ color: "#888", fontSize: 13 }}>Podés arrancar apenas se sumen; los que falten pueden entrar hasta que empieces.</p>
                 </>
               )}
+            </>
+          ) : guestInRoom ? (
+            <>
+              <h2 style={{ fontSize: 22, marginBottom: 8 }}>En la sala {roomCode}</h2>
+              {playerList}
+              <p style={{ color: "#888", fontSize: 13 }}>Esperando que el anfitrión forje la historia y arranque…</p>
             </>
           ) : (
             <>
@@ -3146,17 +3298,19 @@ function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput
 }
 
 function MultiplayerStatusBar({ mpState, onLeave }: { mpState: MultiplayerState; onLeave: () => void }) {
+  const activeName = mpState.players.find((p) => p.id === mpState.activePlayerId)?.name ?? "otro jugador";
   const phaseLabel: Record<MultiplayerState["phase"], string> = {
     idle: "", connecting: "Conectando…", lobby_host: "Lobby", lobby_guest: "Lobby",
-    waiting_guest: "Esperando oponente…", active: "Tu turno",
-    watching: `Turno de ${mpState.opponentName ?? "oponente"}…`,
-    narrating: "Narrando…", opponent_gone: "Oponente desconectado", ended: "Partida terminada"
+    waiting_room: "Esperando al anfitrión…", active: "Tu turno",
+    watching: `Turno de ${activeName}…`,
+    narrating: "Narrando…", host_gone: "Anfitrión desconectado", ended: "Partida terminada"
   };
+  const connectedCount = mpState.players.filter((p) => p.connected).length;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 16px", background: "rgba(255,215,123,0.08)", borderBottom: "1px solid rgba(255,215,123,0.2)", fontSize: 13 }}>
       <Users size={14} style={{ color: "#ffd77b", flexShrink: 0 }} />
-      <span style={{ color: "#ffd77b", fontWeight: 700 }}>Multijugador</span>
-      {mpState.roomCode && <span style={{ color: "#aaa" }}>Sala: <strong style={{ color: "#fff" }}>{mpState.roomCode}</strong></span>}
+      <span style={{ color: "#ffd77b", fontWeight: 700 }}>Party</span>
+      {mpState.roomCode && <span style={{ color: "#aaa" }}>Sala: <strong style={{ color: "#fff" }}>{mpState.roomCode}</strong> · {connectedCount} en línea</span>}
       <span style={{ color: mpState.yourTurn ? "#7fff90" : "#aaa", flexGrow: 1 }}>{phaseLabel[mpState.phase]}</span>
       <button onClick={onLeave} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 12, padding: "2px 6px" }}>Salir</button>
     </div>

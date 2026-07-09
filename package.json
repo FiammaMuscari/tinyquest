@@ -11,7 +11,9 @@
     "test": "node --test tests/*.test.mjs",
     "groq:smoke": "node scripts/run-groq-narration-smoke.mjs",
     "server:dev": "tsx --tsconfig tsconfig.server.json server/src/index.ts",
-    "server:install": "npm install --workspace @tiny-quest/server"
+    "server:install": "npm install --workspace @tiny-quest/server",
+    "server:go": "cd server-go && go run ./cmd/server",
+    "server:go:test": "cd server-go && go test ./..."
   },
   "workspaces": [
     "apps/web",
