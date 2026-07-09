@@ -3912,3 +3912,30 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .reimagineButton { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,191,53,.45); background: rgba(56,36,10,.5); color: #ffda8a; font-size: 11px; font-weight: 800; cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
 .reimagineButton:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 14px rgba(255,183,69,.35); }
 .reimagineButton:disabled { opacity: .5; cursor: default; }
+
+/* ── Imagen viva de escena en el panel del narrador (2026-07-09) ─────────────
+   La imagen generada de la escena vive ARRIBA de la narración (columna central),
+   se renueva por escena y encuadre (🏞️/🧝/🌫️) y usa .sceneForging para el spinner. */
+.dmSceneImage {
+  position: relative;
+  min-height: 200px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: inset 0 -60px 90px rgba(8,6,4,.55);
+  display: flex;
+  align-items: flex-end;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+.dmSceneCaption {
+  font-size: 12px;
+  color: rgba(255,255,255,.82);
+  text-shadow: 0 1px 6px rgba(0,0,0,.8);
+  letter-spacing: .04em;
+}
+@media (max-height: 760px) {
+  .dmSceneImage { min-height: 150px; }
+}

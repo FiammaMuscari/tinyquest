@@ -101,7 +101,6 @@ const campaignStorageKey = "tiny-quest:selected-campaign";
 const statStorageKey = "tiny-quest:selected-stat";
 const worldStorageKey = "tiny-quest:selected-world";
 const perspectiveStorageKey = "tiny-quest:perspective";
-const partyStorageKey = "tiny-quest:party-mode";
 const storageResetKey = "tiny-quest:storage-reset-version";
 const storageResetVersion = "causal-resolution-plan-2026-06-19-v5";
 
@@ -645,7 +644,6 @@ export function App() {
   const [perspective, setPerspective] = useState<StoryPerspective>(() => (localStorage.getItem(perspectiveStorageKey) === "interior" ? "interior" : "exterior"));
   const [improvisedWorldId, setImprovisedWorldId] = useState<string | null>(null);
   // "alone" = recorrido en solitario (sin bots): cada turno es del jugador.
-  const [partyMode, setPartyMode] = useState<"alone" | "companions">(() => (localStorage.getItem(partyStorageKey) === "companions" ? "companions" : "alone"));
   const selectedWorld = worldById(selectedWorldId);
   const selectedCampaign = improvisedCampaign && improvisedCampaign.id === selectedCampaignId ? improvisedCampaign : campaignById(selectedCampaignId);
   const [room, setRoom] = useState<GameRoom | null>(null);
@@ -940,7 +938,8 @@ export function App() {
       store: new InMemoryVectorStore()
     });
     // El temple de la quest: copia del héroe con +1/−1 según lo que exige ESTA historia.
-    const nextRoom = createSoloRoom(applyQuestTemper(draft, campaignToPlay), campaignToPlay, partyMode === "companions" ? 2 : 0);
+    // Sin bots: la campaña es en solitario, o en party real con gente por código.
+    const nextRoom = createSoloRoom(applyQuestTemper(draft, campaignToPlay), campaignToPlay, 0);
     setRoom(nextRoom);
     const firstScene = getRoomScenes(nextRoom).find((candidate) => candidate.id === nextRoom.initialSceneId) ?? getRoomScenes(nextRoom)[0];
     setSelectedActionDraftId(firstScene.actionChoices[0].id);
@@ -1146,11 +1145,6 @@ export function App() {
   function resetColumn(side: "left" | "right") {
     localStorage.removeItem(side === "left" ? "tiny-quest:col-left" : "tiny-quest:col-right");
     setGameCols((cols) => ({ ...cols, [side]: null }));
-  }
-
-  function choosePartyMode(next: "alone" | "companions") {
-    setPartyMode(next);
-    localStorage.setItem(partyStorageKey, next);
   }
 
   function choosePerspective(next: StoryPerspective) {
@@ -1420,8 +1414,6 @@ export function App() {
         onSelectWorld={selectWorld}
         perspective={perspective}
         onChoosePerspective={choosePerspective}
-        partyMode={partyMode}
-        onChoosePartyMode={choosePartyMode}
         onReimagineHero={reimagineHeroPortrait}
         onUnlockAutoPortrait={unlockAutoPortrait}
         sceneImageMode={sceneImageMode}
@@ -1471,9 +1463,9 @@ export function App() {
       >
         <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
         {/* La narración vive en la pista central ancha; elección y dados en la columna derecha. */}
-        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} />
+        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} sceneImage={liveSceneImage.src ?? sceneImageUrl} sceneForging={liveSceneImage.status === "loading"} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} />
         <section className="centerColumn actionColumn">
-          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={liveSceneImage.src ?? sceneImageUrl} imageForging={liveSceneImage.status === "loading"} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
+          {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
           {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} styleHint={`${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`} />}
           {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
@@ -1485,7 +1477,7 @@ export function App() {
   );
 }
 
-function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, partyMode, onChoosePartyMode, onReimagineHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; partyMode: "alone" | "companions"; onChoosePartyMode: (mode: "alone" | "companions") => void; onReimagineHero: (seedNonce: number) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
+function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, onReimagineHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; onReimagineHero: (seedNonce: number) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
@@ -1564,13 +1556,6 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               <div className="pillRow">
                 <button type="button" className={perspective === "exterior" ? "selected" : ""} onClick={() => onChoosePerspective("exterior")} disabled={forgingStory}>Desde afuera</button>
                 <button type="button" className={perspective === "interior" ? "selected" : ""} onClick={() => onChoosePerspective("interior")} disabled={forgingStory}><img className="uiIcon" src={uiIcon("solitario")} alt="" /> Desde adentro</button>
-              </div>
-            </div>
-            <div className="quickChoiceGroup">
-              <span>Recorrido:</span>
-              <div className="pillRow">
-                <button type="button" className={partyMode === "alone" ? "selected" : ""} onClick={() => onChoosePartyMode("alone")}><img className="uiIcon" src={uiIcon("solitario")} alt="" /> En solitario</button>
-                <button type="button" className={partyMode === "companions" ? "selected" : ""} onClick={() => onChoosePartyMode("companions")} title="Belo y Miri juegan sus propios turnos"><img className="uiIcon" src={uiIcon("companeros")} alt="" /> Con compañeros</button>
               </div>
             </div>
           </div>
@@ -2482,7 +2467,7 @@ function getTurnRoll(turn: CinematicTurn) {
   return { total, dc, result, label: `${translateOutcome(turn.event?.outcome ?? result)}: ${total}${dc ? ` vs ${dc}` : ""}` };
 }
 
-function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTurnPaused, onContinueBot, sections, plotBeat, dialogue, finalRecap, warnings }: { room: GameRoom; narration: string; latestTurnNarration?: NarrationResponse; dice: DiceSnapshot | null; botTurnPaused: boolean; onContinueBot: () => void; sections?: NarrationResponse["sections"]; plotBeat?: NarrationResponse["plotBeat"]; dialogue: string[]; finalRecap?: string; warnings: string[] }) {
+function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTurnPaused, onContinueBot, sections, plotBeat, dialogue, finalRecap, warnings, sceneImage, sceneForging = false, imageMode, onImageMode }: { room: GameRoom; narration: string; latestTurnNarration?: NarrationResponse; dice: DiceSnapshot | null; botTurnPaused: boolean; onContinueBot: () => void; sections?: NarrationResponse["sections"]; plotBeat?: NarrationResponse["plotBeat"]; dialogue: string[]; finalRecap?: string; warnings: string[]; sceneImage?: string; sceneForging?: boolean; imageMode?: SceneImageMode; onImageMode?: (mode: SceneImageMode) => void }) {
   const shownNarration = sections?.narration ?? cleanSection(narration, "Narracion");
   const shownDialogue = sections?.dialogue ?? dialogue.join(" ");
   const shownConsequence = sections?.consequence ?? extractConsequence(narration);
@@ -2499,6 +2484,20 @@ function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTur
     <aside className="panel dmPanel">
       <PanelTitle title="Dungeon Master IA" icon={<Sparkles size={17} />} />
       {warnings.map((warning) => <div className="warning" key={warning}>{warning}</div>)}
+      {/* Imagen viva de la escena narrada: se renueva por escena/encuadre para
+          ambientar la historia mientras se tiran los dados. */}
+      {sceneImage && (
+        <div className={`dmSceneImage ${sceneForging ? "sceneForging" : ""}`} style={{ backgroundImage: `url(${sceneImage})` }}>
+          {onImageMode && (
+            <div className="sceneImageModes" role="group" aria-label="Qué muestra la imagen de escena">
+              {sceneImageModeOptions.map((option) => (
+                <button key={option.id} type="button" className={imageMode === option.id ? "selected" : ""} title={option.label} onClick={() => onImageMode(option.id)}>{option.icon}</button>
+              ))}
+            </div>
+          )}
+          <span className="dmSceneCaption">{currentScene.title}</span>
+        </div>
+      )}
       {hasTurnHistory
         ? <TurnStoryCard turn={latestTurn} sceneTitle={currentScene.title} dice={dice} />
         : <>

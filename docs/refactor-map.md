@@ -24,9 +24,9 @@ section** — an outdated map costs more than no map.
 | `function LobbyScreen` | World cards, perspective/party pills, forge input, `ForgeRitual`, `forgedTeaser` (chips → `CharacterPeekModal`), hero summary |
 | `function CharacterDesigner` | Hero forge: identity + portrait + Reimaginar, tabs Linaje/Oficio/Compañero, stat bars, talents |
 | `function TurnQueue` | Left rail: player cards (avatars via `HeroAvatarImg`, bots get generated portraits here), audio, journeyPanel (map + world laws) |
-| `function ScenePanel` | Scene header, objective, choice cards |
+| `function ScenePanel` | Scene header, objective, choice cards (imagen estática de fondo, sin selector) |
 | `function ActionComposer` | Tirada: stat select, pet, roll button |
-| `function DungeonMasterPanel` | Center column: narration, dialogue, history |
+| `function DungeonMasterPanel` | Center column: `dmSceneImage` (imagen viva de escena + selector 🏞️🧝🌫️ ARRIBA de la narración, 2026-07-09), narration, dialogue, history |
 | `function CastPanel` | "Personajes" modal in-game (public NPC data only) |
 | `function NpcPortrait` | Round portrait: cached AI image or procedural SVG medallion |
 | `function HeroAvatarImg` | Square avatar `<img>`: cached AI image or medallion data-URI (inherits CSS of existing img selectors) |
@@ -179,3 +179,13 @@ acción y adoptan el estado.
   maneja el cliente TS real contra él — es la prueba de que el protocolo case.
 - **Verificación de UI**: `scratchpad/mp-browser.mjs` abre un host crudo por ws,
   maneja la UI de invitado real (CDP) uniéndose y confirma la sala de espera.
+
+## Sin bots (2026-07-09)
+
+- `launchSolo` crea SIEMPRE con `botCount 0`: la campaña es en solitario o party
+  real por código. El modo "Con compañeros" (Belo/Miri) y todo el plumbing
+  `partyMode`/`choosePartyMode`/`partyStorageKey` fueron ELIMINADOS de App.tsx.
+  Los bots siguen existiendo en el motor (bots.ts) por si vuelven como feature.
+- Imagen viva de escena: movida del ScenePanel (columna derecha) al
+  DungeonMasterPanel (`.dmSceneImage`, CSS al final de app.css). El ScenePanel
+  quedó con el asset estático de la campaña como fondo decorativo.
