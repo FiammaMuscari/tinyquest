@@ -149,7 +149,7 @@ func (h *Hub) joinRoom(c *Client, data []byte) {
 		return
 	}
 	if len(room.players) >= maxPlayers {
-		c.sendError(ErrRoomFull, "La sala está llena (máximo 6 aventureros).")
+		c.sendError(ErrRoomFull, "La sala está llena (anfitrión + 4 amigos como máximo).")
 		return
 	}
 	guest := &player{

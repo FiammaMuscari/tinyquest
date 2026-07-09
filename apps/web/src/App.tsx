@@ -3250,7 +3250,7 @@ function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput
                     onClick={onStartParty}
                     disabled={forgingStory || mpState.players.length < 1}
                   >
-                    {forgingStory ? "Forjando historia…" : mpState.players.length < 2 ? "Empezar (sin invitados)" : `Empezar aventura (${mpState.players.length})`}
+                    {forgingStory ? "Forjando historia…" : mpState.players.length < 2 ? "Empezar (sin invitados)" : `Empezar aventura (${mpState.players.length}/5)`}
                   </button>
                   <p style={{ color: "#888", fontSize: 13 }}>Podés arrancar apenas se sumen; los que falten pueden entrar hasta que empieces.</p>
                 </>

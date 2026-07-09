@@ -181,6 +181,30 @@ func TestInvalidStatRejected(t *testing.T) {
 	}
 }
 
+func TestRoomCapsAtHostPlusFour(t *testing.T) {
+	srv := newServer(t)
+	host := dial(t, srv)
+	defer host.Close()
+	send(t, host, map[string]any{"type": "create_room", "playerName": "H", "character": map[string]any{}})
+	created := waitFor(t, host, "room_created")
+	code := created["roomCode"].(string)
+
+	// 4 amigos entran bien; el 5.º rebota con room_full.
+	for i := 0; i < 4; i++ {
+		g := dial(t, srv)
+		defer g.Close()
+		send(t, g, map[string]any{"type": "join_room", "roomCode": code, "playerName": "G", "character": map[string]any{}})
+		waitFor(t, g, "room_joined")
+	}
+	extra := dial(t, srv)
+	defer extra.Close()
+	send(t, extra, map[string]any{"type": "join_room", "roomCode": code, "playerName": "X", "character": map[string]any{}})
+	e := waitFor(t, extra, "error")
+	if e["code"] != ErrRoomFull {
+		t.Fatalf("esperaba room_full para el 5.º invitado: %+v", e)
+	}
+}
+
 func TestGuestCannotStartStory(t *testing.T) {
 	srv := newServer(t)
 	host := dial(t, srv)

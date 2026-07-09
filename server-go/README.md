@@ -45,6 +45,7 @@ internal/hub/hub_test.go  → tests de integración del hub
 ## Reglas
 
 - Código de sala: 6 caracteres sin `I/O/0/1` (se dictan sin confusión).
-- Máximo 6 jugadores (host + 5). TTL de sala 2 h. Gracia de reconexión 5 min.
+- Máximo 5 jugadores (host + 4 amigos). TTL de sala 2 h. Gracia de reconexión 5 min.
+- Con invitados el motor alarga la historia (`scalePartySession`: ≥20 rondas totales).
 - Si el host se cae y no vuelve en la gracia, la sala se cierra.
 - El estado del juego (`GameRoom`) viaja como JSON opaco (≤ 1 MiB).

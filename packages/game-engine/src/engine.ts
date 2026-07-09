@@ -17,6 +17,7 @@ import { regenerateRoundEnergy } from "./energy";
 import { createSessionForCampaign } from "./scenes";
 import { campaignToWorldTheme, defaultCampaign } from "./campaigns";
 import { getActivePlayer, getCurrentScene, getVisibleActionChoices } from "./room-state";
+import { MAX_PARTY_GUESTS, scalePartySession } from "./party-scale";
 import { resolveAttack, resolveDefense } from "./combat";
 import {
   buildDmContext, buildVisibleOptionsForDm, createInitialNarrativeMemory, indexTurnResult,
@@ -148,8 +149,11 @@ export type PartySeat = { id: string; name: string; character: Character };
 // createPartyRoom arma la partida multijugador con el host + N invitados, en el
 // mismo orden en que el servidor los lista. El host resuelve cada turno contra
 // este GameRoom y lo difunde; los ids permiten mapear activePlayerIndex ↔ activePlayerId.
+// Con amigos la historia se alarga (scalePartySession: ≥20 rondas totales) y
+// se aceptan hasta MAX_PARTY_GUESTS invitados.
 export function createPartyRoom(host: PartySeat, guests: PartySeat[], selectedCampaign: Campaign = defaultCampaign): GameRoom {
-  const extraPlayers: Player[] = guests.map((seat) => ({
+  const seats = guests.slice(0, MAX_PARTY_GUESTS);
+  const extraPlayers: Player[] = seats.map((seat) => ({
     id: seat.id,
     name: seat.name,
     type: "human",
@@ -157,7 +161,7 @@ export function createPartyRoom(host: PartySeat, guests: PartySeat[], selectedCa
     character: seat.character,
     temporaryItems: []
   }));
-  return createGameRoom({
+  const room = createGameRoom({
     mode: "multiplayer",
     humanCharacter: host.character,
     humanId: host.id,
@@ -166,6 +170,7 @@ export function createPartyRoom(host: PartySeat, guests: PartySeat[], selectedCa
     botCount: 0,
     selectedCampaign
   });
+  return { ...room, sessionConfig: scalePartySession(room.sessionConfig, seats.length) };
 }
 
 function normalizeActionText(value: string): string {

@@ -30,6 +30,7 @@ export * from "./story-graph.compiler";
 export * from "./story-graph.runtime";
 export * from "./story-graph.choices";
 export * from "./engine";
+export * from "./party-scale";
 export * from "./game/memory";
 export * from "./game/campaigns/campaign.types";
 export * from "./game/campaigns/campaign.registry";

@@ -189,3 +189,8 @@ acción y adoptan el estado.
 - Imagen viva de escena: movida del ScenePanel (columna derecha) al
   DungeonMasterPanel (`.dmSceneImage`, CSS al final de app.css). El ScenePanel
   quedó con el asset estático de la campaña como fondo decorativo.
+- Guía de juego con amigos + túneles + cambio de proveedor de IA:
+  `docs/guia-multijugador.md`. Escalado de sesión con invitados:
+  `packages/game-engine/src/party-scale.ts` (≥20 rondas totales, host+4;
+  el pacing usa max(scene.maxRounds, sessionConfig.maxRoundsPerScene)).
+  Vite permite hosts de túnel (allowedHosts en vite.config.ts).

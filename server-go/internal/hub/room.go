@@ -12,7 +12,7 @@ const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 const (
 	codeLen     = 6
-	maxPlayers  = 6 // host + 5 invitados
+	maxPlayers  = 5 // host + 4 invitados (regla de Fiamy: 4 amigos máximo por host)
 	roomTTL     = 2 * time.Hour
 	gracePeriod = 5 * time.Minute // reconexión tras caída
 )

@@ -95,6 +95,9 @@ export default defineConfig({
   server: {
     fs: {
       allow: [path.resolve(__dirname, "../..")]
-    }
+    },
+    // Jugar con amigos por túnel: Vite rechaza Hosts desconocidos (protección
+    // DNS-rebind), así que se permiten los dominios de túnel habituales.
+    allowedHosts: [".devtunnels.ms", ".ngrok-free.app", ".ngrok.app", ".trycloudflare.com"]
   }
 });
