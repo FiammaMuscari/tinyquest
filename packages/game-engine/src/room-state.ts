@@ -1,5 +1,6 @@
 import { isFinalScene } from "./ending-resolution";
 import { createScenesForCampaign, toSceneActionChoice } from "./scenes";
+import { npcAnimalProfile } from "./campaigns";
 import type { Campaign, CampaignActionOutcome, CampaignActionType, CrisisOption, GameRoom, Player, Scene, SceneActionChoice } from "./types";
 
 const sceneCache = new Map<string, Scene[]>();
@@ -282,10 +283,16 @@ function followUpSceneChoices(scene: Scene, room: GameRoom): SceneActionChoice[]
     },
     {
       id: `${scene.id}-pressure-present-npc`,
-      label: primaryNpc ? `Presionar a ${primaryNpc.name.split(",")[0]} de otro modo` : "Presionar a otro testigo",
-      action: "Usar lo ocurrido para forzar una postura nueva, una duda o una ayuda concreta.",
+      // Un ANIMAL no se "presiona" con palabras: con criaturas la vía es leer su
+      // comportamiento (investigar), no la presión social.
+      label: primaryNpc && npcAnimalProfile(primaryNpc)
+        ? `Observar a ${primaryNpc.name.split(",")[0]} y seguir sus señales`
+        : primaryNpc ? `Presionar a ${primaryNpc.name.split(",")[0]} de otro modo` : "Presionar a otro testigo",
+      action: primaryNpc && npcAnimalProfile(primaryNpc)
+        ? "Leer el comportamiento de la criatura: qué evita, qué señala, qué carga."
+        : "Usar lo ocurrido para forzar una postura nueva, una duda o una ayuda concreta.",
       actionType: primaryNpcId ? "confrontar_npc" : "tomar_decision_moral",
-      recommendedStats: ["charm"],
+      recommendedStats: primaryNpc && npcAnimalProfile(primaryNpc) ? ["mind"] : ["charm"],
       skillTag: "talk",
       category: "talk",
       riskLevel: "medium",

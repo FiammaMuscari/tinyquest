@@ -181,6 +181,39 @@ func TestInvalidStatRejected(t *testing.T) {
 	}
 }
 
+func TestMidGameJoinNeedsOpenDoor(t *testing.T) {
+	srv := newServer(t)
+	host := dial(t, srv)
+	defer host.Close()
+	send(t, host, map[string]any{"type": "create_room", "playerName": "H", "character": map[string]any{}})
+	created := waitFor(t, host, "room_created")
+	code := created["roomCode"].(string)
+	hostID := created["playerId"].(string)
+	send(t, host, map[string]any{"type": "start_story", "roomCode": code, "state": map[string]any{"turn": 3}, "activePlayerId": hostID})
+	waitFor(t, host, "story_started")
+
+	// Puerta cerrada (default): el tardío rebota con story_started.
+	late := dial(t, srv)
+	defer late.Close()
+	send(t, late, map[string]any{"type": "join_room", "roomCode": code, "playerName": "Tarde", "character": map[string]any{}})
+	e := waitFor(t, late, "error")
+	if e["code"] != ErrStoryStarted {
+		t.Fatalf("esperaba story_started con puerta cerrada: %+v", e)
+	}
+
+	// El host abre la puerta → el tardío entra y recibe el estado vigente.
+	send(t, host, map[string]any{"type": "set_room_options", "roomCode": code, "allowMidJoin": true})
+	waitFor(t, host, "room_options")
+	late2 := dial(t, srv)
+	defer late2.Close()
+	send(t, late2, map[string]any{"type": "join_room", "roomCode": code, "playerName": "Tarde2", "character": map[string]any{}})
+	waitFor(t, late2, "room_joined")
+	su := waitFor(t, late2, "state_update")
+	if su["yourTurn"] != false {
+		t.Fatalf("el tardío no debería tener el turno: %+v", su)
+	}
+}
+
 func TestRoomCapsAtHostPlusFour(t *testing.T) {
 	srv := newServer(t)
 	host := dial(t, srv)

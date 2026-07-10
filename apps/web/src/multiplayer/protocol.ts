@@ -42,6 +42,13 @@ export type RejoinRoomMsg = {
   playerId: string;
 };
 
+// El host abre/cierra la puerta para que entren jugadores a mitad de partida.
+export type SetRoomOptionsMsg = {
+  type: "set_room_options";
+  roomCode: string;
+  allowMidJoin: boolean;
+};
+
 // El host declara que la historia quedó forjada y arranca la partida.
 export type StartStoryMsg = {
   type: "start_story";
@@ -81,6 +88,7 @@ export type C2SMessage =
   | CreateRoomMsg
   | JoinRoomMsg
   | RejoinRoomMsg
+  | SetRoomOptionsMsg
   | StartStoryMsg
   | BroadcastGameMsg
   | SubmitActionMsg
@@ -159,6 +167,7 @@ export type S2CMessage =
   | StoryStartedMsg
   | StateUpdateMsg
   | GuestActionMsg
+  | { type: "room_options"; allowMidJoin: boolean }
   | { type: "narrating" }
   | { type: "pong" }
   | ErrorMsg;

@@ -24,7 +24,8 @@ await transpile("../packages/game-engine/src/ending-resolution.ts", join(dir, "e
 });
 await transpile("../packages/game-engine/src/room-state.ts", join(dir, "room-state.mjs"), {
   'from "./ending-resolution"': 'from "./ending-resolution.mjs"',
-  'from "./scenes"': 'from "./scenes.mjs"'
+  'from "./scenes"': 'from "./scenes.mjs"',
+  'from "./campaigns"': 'from "./campaigns.mjs"'
 });
 
 const { campaigns } = await import(`file://${join(dir, "campaigns.mjs")}`);

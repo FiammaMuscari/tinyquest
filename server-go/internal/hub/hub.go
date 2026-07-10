@@ -94,6 +94,8 @@ func (h *Hub) handleMessage(c *Client, data []byte) {
 		h.joinRoom(c, data)
 	case CRejoinRoom:
 		h.rejoinRoom(c, data)
+	case CSetRoomOptions:
+		h.setRoomOptions(c, data)
 	case CStartStory:
 		h.startStory(c, data)
 	case CBroadcastGame, CTurnResult:
@@ -144,8 +146,8 @@ func (h *Hub) joinRoom(c *Client, data []byte) {
 		c.sendError(ErrGameEnded, "Esa partida ya terminó.")
 		return
 	}
-	if room.status == statusActive {
-		c.sendError(ErrStoryStarted, "La historia ya arrancó: pedile al anfitrión una sala nueva.")
+	if room.status == statusActive && !room.openDoor {
+		c.sendError(ErrStoryStarted, "La historia ya arrancó y la sala está cerrada: pedile al anfitrión que abra la puerta (o una sala nueva).")
 		return
 	}
 	if len(room.players) >= maxPlayers {
@@ -160,11 +162,38 @@ func (h *Hub) joinRoom(c *Client, data []byte) {
 	room.touch()
 	players := room.snapshot()
 	c.enqueue(mustJSON(RoomJoinedMsg{Type: SRoomJoined, RoomCode: room.code, PlayerID: guest.id, Players: players}))
+	// Llegada a mitad de partida (puerta abierta): el recién llegado recibe el
+	// estado vigente para mirar mientras el motor del host teje su entrada.
+	if room.status == statusActive && len(room.lastState) > 0 {
+		c.enqueue(mustJSON(StateUpdateMsg{
+			Type: SStateUpdate, State: room.lastState, EventSummary: room.lastSummary,
+			ActivePlayerID: room.activePlayerID, YourTurn: false,
+		}))
+	}
 	joined := mustJSON(PlayerJoinedMsg{Type: SPlayerJoined, Player: players[len(players)-1], Players: players})
 	for _, other := range room.connectedClients() {
 		if other != c {
 			other.enqueue(joined)
 		}
+	}
+}
+
+// setRoomOptions — el host abre o cierra la puerta a mitad de partida.
+func (h *Hub) setRoomOptions(c *Client, data []byte) {
+	var msg SetRoomOptionsMsg
+	if err := json.Unmarshal(data, &msg); err != nil {
+		c.sendError(ErrInvalidAction, "set_room_options malformado.")
+		return
+	}
+	room := h.roomOfHost(c, msg.RoomCode)
+	if room == nil {
+		return
+	}
+	room.openDoor = msg.AllowMidJoin
+	room.touch()
+	options := mustJSON(RoomOptionsMsg{Type: SRoomOptions, AllowMidJoin: room.openDoor})
+	for _, other := range room.connectedClients() {
+		other.enqueue(options)
 	}
 }
 

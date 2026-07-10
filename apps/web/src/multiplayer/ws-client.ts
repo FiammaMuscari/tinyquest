@@ -15,6 +15,7 @@ export type MultiplayerState = {
   gameRoom: GameRoom | null;
   activePlayerId: string | null;
   yourTurn: boolean;
+  allowMidJoin: boolean;
   errorMessage: string | null;
   lastEventSummary: string | null;
 };
@@ -38,6 +39,7 @@ const emptyState: MultiplayerState = {
   gameRoom: null,
   activePlayerId: null,
   yourTurn: false,
+  allowMidJoin: false,
   errorMessage: null,
   lastEventSummary: null
 };
@@ -169,6 +171,12 @@ export class MultiplayerClient {
     });
   }
 
+  /** El host abre/cierra la puerta para llegadas a mitad de partida. */
+  setRoomOptions(allowMidJoin: boolean): void {
+    if (!this._state.roomCode) return;
+    this.send({ type: "set_room_options", roomCode: this._state.roomCode, allowMidJoin });
+  }
+
   /** El host avisa a los invitados que está narrando (spinner). */
   signalNarrating(): void {
     if (!this._state.roomCode || !this._state.activePlayerId) return;
@@ -224,6 +232,10 @@ export class MultiplayerClient {
         this.emit("state_update", { state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn, eventSummary: msg.eventSummary });
         break;
       }
+
+      case "room_options":
+        this.setState({ allowMidJoin: msg.allowMidJoin });
+        break;
 
       case "narrating":
         if (!this._state.yourTurn) this.setState({ phase: "narrating" });

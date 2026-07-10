@@ -173,6 +173,38 @@ export function createPartyRoom(host: PartySeat, guests: PartySeat[], selectedCa
   return { ...room, sessionConfig: scalePartySession(room.sessionConfig, seats.length) };
 }
 
+// addPartyMember integra un héroe NUEVO a una partida YA EMPEZADA (llegada
+// tardía a la sala). El recién llegado entra al final de la rotación de turnos
+// y su llegada queda registrada como HECHO narrativo: el narrador la teje en la
+// próxima escena ("X aparece entre la multitud…") en vez de ignorarla.
+export function addPartyMember(room: GameRoom, seat: PartySeat): GameRoom {
+  if (room.players.some((player) => player.id === seat.id)) return room;
+  const joined: Player = {
+    id: seat.id,
+    name: seat.name,
+    type: "human",
+    status: "active",
+    character: seat.character,
+    temporaryItems: []
+  };
+  const arrivalFact = `${seat.name} (${seat.character.species} ${seat.character.role}) acaba de unirse al grupo en plena aventura: su llegada debe notarse en la escena.`;
+  return {
+    ...room,
+    players: [...room.players, joined],
+    // Escalado incremental (la sesión ya venía escalada): +2 rondas por escena
+    // y +10 min de reloj por el recién llegado.
+    sessionConfig: {
+      ...room.sessionConfig,
+      maxRoundsPerScene: room.sessionConfig.maxRoundsPerScene + 2,
+      maxMinutes: room.sessionConfig.maxMinutes + 10
+    },
+    memorySummary: {
+      ...room.memorySummary,
+      facts: [...room.memorySummary.facts, arrivalFact].slice(-24)
+    }
+  };
+}
+
 function normalizeActionText(value: string): string {
   return value
     .toLowerCase()

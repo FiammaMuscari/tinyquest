@@ -594,13 +594,28 @@ export const defaultCampaign = campaigns.find((item) => item.id === "luna-roja")
 
 export const IMPROVISED_CAMPAIGN_ID = "historia-improvisada";
 
+// Un NPC animal (gato, perro, cuervo…) no habla ni negocia: las opciones sociales
+// ("presionar", "interrogar") sobre él rompen la ficción. Se detecta por perfil.
+const animalProfileRegex = /(gat[oa]|perr[oa]|lob[oa]|caball[oa]|cuerv[oa]|zorr[oa]|halc[oó]n|serpiente|drag[oó]n|mascota|felin[oa]|canin[oa]|criatura|bestia)/i;
+export function looksLikeAnimal(profile: string): boolean {
+  return animalProfileRegex.test(profile);
+}
+export function npcAnimalProfile(npc: { name?: string; description?: string; appearance?: string }): boolean {
+  return looksLikeAnimal(`${npc.appearance ?? ""} ${npc.description ?? ""}`);
+}
+
 function clampText(value: unknown, fallback: string, max = 400): string {
   const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
   const chosen = text || fallback;
   if (chosen.length <= max) return chosen;
   const cut = chosen.slice(0, max);
+  // Cortar en el FIN DE ORACIÓN anterior: un texto que termina "…y una…" a mitad
+  // de frase rompe la inmersión. Solo si no hay ningún punto razonable se cae al
+  // corte por palabra (sin puntos suspensivos: frase corta antes que frase rota).
+  const lastSentence = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  if (lastSentence > max * 0.45) return cut.slice(0, lastSentence + 1).trimEnd();
   const lastSpace = cut.lastIndexOf(" ");
-  return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).trimEnd()}…`;
+  return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).trimEnd()}.`;
 }
 
 // "Examinar Un farol..." → "Examinar un farol...": baja solo artículos iniciales,
@@ -759,7 +774,17 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
       ambientSoundPrompt: `${scene.title}, tensión ambiental`,
       multipleChoiceOptions: [
         option(`${slug}-${index + 1}-object`, `Examinar ${asFragment(scene.keyObject)}`, "investigate", "mind", "low", "Confirmar o dañar una pista concreta.", { unlocksClues: [clueIdForScene(index)], memoryImpact: "El objeto examinado conserva una marca física comparable con testigos o heridas." }),
-        option(`${slug}-${index + 1}-npc`, `Presionar a ${npcs[index % npcs.length].name}`, "talk", "charm", "medium", "Obtener ayuda, mentira o traición con coste.", { memoryImpact: "El NPC cambia actitud y alguien toma nota." }),
+        // La opción social rota entre NPCs, pero un ANIMAL no se "presiona":
+        // con criaturas la vía es leer su comportamiento y dejarse guiar.
+        (() => {
+          const candidate = npcs[index % npcs.length];
+          const speaking = npcAnimalProfile(candidate) ? npcs.find((npc) => !npcAnimalProfile(npc)) : candidate;
+          return speaking && speaking === candidate
+            ? option(`${slug}-${index + 1}-npc`, `Presionar a ${candidate.name}`, "talk", "charm", "medium", "Obtener ayuda, mentira o traición con coste.", { memoryImpact: "El NPC cambia actitud y alguien toma nota." })
+            : speaking
+              ? option(`${slug}-${index + 1}-npc`, `Presionar a ${speaking.name}`, "talk", "charm", "medium", "Obtener ayuda, mentira o traición con coste.", { memoryImpact: "El NPC cambia actitud y alguien toma nota." })
+              : option(`${slug}-${index + 1}-npc`, `Seguir a ${candidate.name} y leer sus señales`, "investigate", "mind", "medium", "La criatura no habla: sus gestos apuntan a algo concreto.", { memoryImpact: "La criatura reacciona y marca una dirección, un miedo o un rastro." });
+        })(),
         option(`${slug}-${index + 1}-route`, `Forzar ${asFragment(scene.escapeRoute)}`, "defend", "courage", "high", "Abrir avance con peligro o pérdida de objeto.", { dangerOnFailure: 2, progressOnSuccess: 1 })
       ]
     }))

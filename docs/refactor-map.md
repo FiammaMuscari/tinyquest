@@ -210,3 +210,25 @@ acción y adoptan el estado.
 - Portada: `drawFadedFigure` usa máscara ELÍPTICA + recorte lateral 16% — los
   retratos ya no se ven como rectángulos pegados. Informe de modelos free:
   `docs/modelos-ia.md`.
+
+## Gameplay 2026-07-10 (noche)
+
+- Reloj POR TURNO (`turnStartedAt` en App): se resetea con cada turno; a cero se
+  sortea una opción visible al azar (solo actúa la máquina del jugador activo).
+- Galería de escena: `sceneGallery`/`galleryIndex` en App — cada imagen generada
+  se ACUMULA; nav ‹ › (`.dmSceneNav`) en `dmSceneImage`. Reset por room.id.
+- Animales: `npcAnimalProfile` (campaigns.ts) — el motor no genera "Presionar a
+  <gato>" (campaigns.ts opción social + room-state follow-up pasan a
+  observar/seguir señales, stat mente); prompts (apertura, turno, forja)
+  prohíben diálogo hablado de animales. `clampText` corta en fin de oración
+  (nunca más "…y una…").
+- Mid-join: sala con "puerta" (host la abre/cierra desde la barra Party,
+  `set_room_options`/`room_options` en ambos protocolos). El tardío entra,
+  recibe el estado y MIRA; el host lo integra tras ≥2 turnos con
+  `addPartyMember` (engine.ts: entra a la rotación + hecho narrativo de llegada
+  para que el narrador teja la entrada). `pendingSeatsRef`/`integrateArrivals`
+  en App; banner `.midJoinBanner` para el que espera.
+- Unirse con código exige héroe completo (mpBlocked también en ese botón) y la
+  pantalla de ingreso muestra tu héroe (`.mpHeroCard`).
+- OJO tests: room-state.ts ahora importa "./campaigns" — los tests que lo
+  transpilan necesitan el replacement 'from "./campaigns"' → campaigns.mjs.

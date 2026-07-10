@@ -22,14 +22,15 @@ type Envelope struct {
 // ─── Cliente → Servidor ──────────────────────────────────────────────────────
 
 const (
-	CCreateRoom    = "create_room"    // el host abre una sala y trae su héroe
-	CJoinRoom      = "join_room"      // un invitado entra con código + su héroe
-	CRejoinRoom    = "rejoin_room"    // un jugador vuelve a su asiento tras caerse
-	CStartStory    = "start_story"    // (host) la historia main está forjada; a jugar
-	CBroadcastGame = "broadcast_game" // (host) difunde el estado autoritativo del juego
-	CSubmitAction  = "submit_action"  // (invitado) manda su acción de turno al host
-	CTurnResult    = "turn_result"    // (host) resultado del turno + de quién es el próximo
-	CPing          = "ping"
+	CCreateRoom     = "create_room"      // el host abre una sala y trae su héroe
+	CJoinRoom       = "join_room"        // un invitado entra con código + su héroe
+	CRejoinRoom     = "rejoin_room"      // un jugador vuelve a su asiento tras caerse
+	CSetRoomOptions = "set_room_options" // (host) abre/cierra la puerta a mitad de partida
+	CStartStory     = "start_story"      // (host) la historia main está forjada; a jugar
+	CBroadcastGame  = "broadcast_game"   // (host) difunde el estado autoritativo del juego
+	CSubmitAction   = "submit_action"    // (invitado) manda su acción de turno al host
+	CTurnResult     = "turn_result"      // (host) resultado del turno + de quién es el próximo
+	CPing           = "ping"
 )
 
 // CreateRoomMsg — el host abre la sala trayendo su Character (JSON opaco: lo define
@@ -54,6 +55,12 @@ type JoinRoomMsg struct {
 type RejoinRoomMsg struct {
 	RoomCode string `json:"roomCode"`
 	PlayerID string `json:"playerId"`
+}
+
+// SetRoomOptionsMsg — el host configura la sala en caliente.
+type SetRoomOptionsMsg struct {
+	RoomCode     string `json:"roomCode"`
+	AllowMidJoin bool   `json:"allowMidJoin"`
 }
 
 // StartStoryMsg — el host avisa que la historia main quedó forjada; el server pasa
@@ -90,14 +97,15 @@ type TurnResultMsg = BroadcastGameMsg
 
 const (
 	SRoomCreated  = "room_created"
-	SRoomJoined   = "room_joined"    // al invitado: entraste, esperá el arranque
-	SPlayerJoined = "player_joined"  // a todos: fulano entró con su héroe
+	SRoomJoined   = "room_joined"   // al invitado: entraste, esperá el arranque
+	SPlayerJoined = "player_joined" // a todos: fulano entró con su héroe
 	SPlayerLeft   = "player_left"
 	SPlayerBack   = "player_reconnected"
-	SStoryStarted = "story_started"  // a todos: la historia arrancó, estado inicial
-	SStateUpdate  = "state_update"   // a todos: nuevo estado del juego
-	SNarrating    = "narrating"      // a todos: el host está narrando
-	SActionRelay  = "guest_action"   // AL HOST: un invitado pidió esta acción
+	SStoryStarted = "story_started" // a todos: la historia arrancó, estado inicial
+	SStateUpdate  = "state_update"  // a todos: nuevo estado del juego
+	SRoomOptions  = "room_options"  // a todos: la puerta se abrió/cerró
+	SNarrating    = "narrating"     // a todos: el host está narrando
+	SActionRelay  = "guest_action"  // AL HOST: un invitado pidió esta acción
 	SError        = "error"
 	SPong         = "pong"
 )
@@ -160,6 +168,11 @@ type StateUpdateMsg struct {
 
 type NarratingMsg struct {
 	Type string `json:"type"`
+}
+
+type RoomOptionsMsg struct {
+	Type         string `json:"type"`
+	AllowMidJoin bool   `json:"allowMidJoin"`
 }
 
 // GuestActionMsg — el server le entrega al HOST la acción pedida por un invitado,

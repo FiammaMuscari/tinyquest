@@ -34,6 +34,7 @@ import {
   createScenesForCampaign,
   createSoloRoom,
   createPartyRoom,
+  addPartyMember,
   type PartySeat,
   defaultCampaign,
   getRoomScenes,
@@ -723,6 +724,34 @@ export function App() {
     return () => multiplayerClient.off("guest_action", onGuestAction);
   }, []);
 
+  // Llegadas a MITAD de partida (puerta abierta): el host las anota y las integra
+  // recién después de ≥2 turnos — el narrador teje la entrada del recién llegado
+  // como hecho de la historia en vez de teletransportarlo.
+  const pendingSeatsRef = useRef<Array<{ seat: PartySeat; joinTurn: number }>>([]);
+  useEffect(() => {
+    if (!mpState.isHost || !mpState.roomCode || !room) return;
+    for (const player of mpState.players) {
+      if (player.isHost) continue;
+      const alreadyInRoom = room.players.some((seatIn) => seatIn.id === player.id);
+      const alreadyPending = pendingSeatsRef.current.some((entry) => entry.seat.id === player.id);
+      if (!alreadyInRoom && !alreadyPending) {
+        pendingSeatsRef.current.push({ seat: { id: player.id, name: player.name, character: player.character }, joinTurn: room.turn });
+      }
+    }
+  }, [mpState.players, room]);
+  function integrateArrivals(current: GameRoom): GameRoom {
+    if (!mpRef.current.isHost || pendingSeatsRef.current.length === 0) return current;
+    let result = current;
+    pendingSeatsRef.current = pendingSeatsRef.current.filter(({ seat, joinTurn }) => {
+      if (result.turn - joinTurn >= 2) {
+        result = addPartyMember(result, seat);
+        return false;
+      }
+      return true;
+    });
+    return result;
+  }
+
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
@@ -735,9 +764,28 @@ export function App() {
   const selectedActionDraft = isHumanTurn(room) || !room ? (visibleChoices.find((choice) => choice.id === selectedActionDraftId) ?? visibleChoices[0] ?? scene.actionChoices[0]) : undefined;
   const selectedChoice = selectedActionDraft ?? visibleChoices[0] ?? scene.actionChoices[0];
   const currentCharacter = activePlayer?.character ?? draft;
-  const elapsedSeconds = room ? Math.floor((now - room.sessionStartedAt) / 1000) : 0;
+  // Reloj POR TURNO: se resetea con cada turno/jugador. Si llega a cero, el
+  // destino decide — se sortea una opción al azar entre las visibles.
+  const [turnStartedAt, setTurnStartedAt] = useState(() => Date.now());
+  useEffect(() => { setTurnStartedAt(Date.now()); }, [room?.turn, room?.activePlayerIndex, room?.id]);
+  const elapsedSeconds = room ? Math.floor((now - turnStartedAt) / 1000) : 0;
   const totalSeconds = (room?.sessionConfig.maxMinutes ?? 15) * 60;
   const remainingSeconds = Math.max(0, totalSeconds - elapsedSeconds);
+  useEffect(() => {
+    if (!room || room.sessionComplete || busy || turnInFlightRef.current || remainingSeconds > 0) return;
+    const active = room.players[room.activePlayerIndex];
+    if (active?.type !== "human" || visibleChoices.length === 0) return;
+    // Solo actúa la máquina DEL jugador activo (en solitario siempre sos vos).
+    const mp = mpRef.current;
+    if (mp.roomCode && active.id !== mp.playerId) return;
+    const pick = visibleChoices[Math.floor(Math.random() * visibleChoices.length)];
+    setTurnStartedAt(Date.now());
+    if (mp.roomCode && !mp.isHost) {
+      multiplayerClient.submitAction(pick.action, pick.recommendedStats[0], false);
+      return;
+    }
+    void runTurn(pick.action, pick.recommendedStats[0]);
+  }, [remainingSeconds, room, busy]);
 
   const [sceneImageUrl, setSceneImageUrl] = useState(scene.atmosphere.fallbackImage);
   // Imagen de escena VIVA: generada desde la historia real, renovada por escena.
@@ -753,6 +801,29 @@ export function App() {
       ? liveSceneImageUrl(sceneImageMode, room.campaign.title, scene.title, scene.objective, selectedWorld.name, selectedWorld.era, heroPortraitSpec(draft).appearance)
       : undefined
   );
+  // Galería de la historia: cada imagen de escena generada se ACUMULA — se puede
+  // hojear hacia atrás (‹ ›) sin que la imagen nueva pise a las anteriores.
+  const [sceneGallery, setSceneGallery] = useState<Array<{ src: string; label: string }>>([]);
+  const [galleryIndex, setGalleryIndex] = useState(-1); // -1 = la última (viva)
+  useEffect(() => { setSceneGallery([]); setGalleryIndex(-1); }, [room?.id]);
+  useEffect(() => {
+    const src = liveSceneImage.src;
+    if (!room || !src) return;
+    setSceneGallery((prev) => (prev.some((item) => item.src === src) ? prev : [...prev, { src, label: scene.title }]));
+  }, [liveSceneImage.src, room?.id]);
+  const galleryView = galleryIndex >= 0 ? sceneGallery[galleryIndex] : sceneGallery[sceneGallery.length - 1];
+  const galleryNav = sceneGallery.length > 1
+    ? {
+        index: galleryIndex >= 0 ? galleryIndex : sceneGallery.length - 1,
+        total: sceneGallery.length,
+        onPrev: () => setGalleryIndex((current) => Math.max(0, (current >= 0 ? current : sceneGallery.length - 1) - 1)),
+        onNext: () => setGalleryIndex((current) => {
+          const next = (current >= 0 ? current : sceneGallery.length - 1) + 1;
+          return next >= sceneGallery.length - 1 ? -1 : next;
+        })
+      }
+    : undefined;
+
   const [sceneAudioUrl, setSceneAudioUrl] = useState(scene.atmosphere.fallbackAudio);
   const [soundMood, setSoundMood] = useState(scene.atmosphere.ambientSoundPrompt);
   const [isAudioPlaying, setAudioPlaying] = useState(false);
@@ -1295,6 +1366,7 @@ export function App() {
         }
         nextRoom = { ...nextRoom, finalRecap };
       }
+      nextRoom = integrateArrivals(nextRoom);
       const latestEvent = nextRoom.sessionLog[0];
       const safeNarration = latestEvent?.narration ?? narration.playerNarration ?? narration.sections?.narration ?? narration.narration;
       const safeConsequence = latestEvent?.consequenceText ?? narration.consequenceText ?? narration.sections?.consequence ?? narration.consequence ?? "La escena cambia de forma concreta.";
@@ -1348,7 +1420,7 @@ export function App() {
           theory: room.narrativeMemory?.conclusions.currentTheory ?? room.memorySummary.currentTwist
         });
         const nextRoom = applyNarration(room, resolution, fallback);
-        const safeRoom = nextRoom.sessionComplete && !nextRoom.finalRecap ? { ...nextRoom, finalRecap: buildFinalRecap(nextRoom) } : nextRoom;
+        const safeRoom = integrateArrivals(nextRoom.sessionComplete && !nextRoom.finalRecap ? { ...nextRoom, finalRecap: buildFinalRecap(nextRoom) } : nextRoom);
         const latestEvent = safeRoom.sessionLog[0];
         const safeNarration = latestEvent?.narration ?? fallback.narration;
         const safeConsequence = latestEvent?.consequenceText ?? fallback.consequence ?? "La escena cambia de forma concreta.";
@@ -1387,6 +1459,7 @@ export function App() {
       <MultiplayerLobbyScreen
         mode={mpLobbyMode}
         mpState={mpState}
+        draft={draft}
         joinCodeInput={joinCodeInput}
         setJoinCodeInput={setJoinCodeInput}
         onConfirmJoin={confirmJoinRoom}
@@ -1432,7 +1505,14 @@ export function App() {
     <main className="appShell">
       <TopStatus room={room} sceneTitle={scene.title} danger={room?.dangerClock ?? 0} remainingSeconds={remainingSeconds} activePlayer={activePlayer} />
       <HelpButton open={showHelp} setOpen={setShowHelp} />
-      {isMultiplayer && <MultiplayerStatusBar mpState={mpState} onLeave={cancelMultiplayer} />}
+      {isMultiplayer && <MultiplayerStatusBar mpState={mpState} onLeave={cancelMultiplayer} onToggleDoor={mpState.isHost ? () => multiplayerClient.setRoomOptions(!mpState.allowMidJoin) : undefined} />}
+      {/* Recién llegado a partida en curso: mira la historia mientras el narrador
+          teje su entrada (el host lo integra tras un par de turnos). */}
+      {isMultiplayer && !mpState.isHost && mpState.playerId && room && !room.players.some((seatIn) => seatIn.id === mpState.playerId) && (
+        <div className="midJoinBanner" role="status">
+          <Sparkles size={14} /> Estás mirando la historia: el narrador está tejiendo tu entrada — en un par de turnos tu héroe aparece en escena.
+        </div>
+      )}
       {room.sessionComplete && <FinalBanner room={room} onBackToCampaigns={() => { cancelMultiplayer(); setRoom(null); }} onReplayRoute={startSolo} />}
       {chapterBanner && !room.sessionComplete && (
         <div className="chapterBanner" role="status" onClick={() => setChapterBanner(null)}>
@@ -1463,7 +1543,7 @@ export function App() {
       >
         <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
         {/* La narración vive en la pista central ancha; elección y dados en la columna derecha. */}
-        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} sceneImage={liveSceneImage.src ?? sceneImageUrl} sceneForging={liveSceneImage.status === "loading"} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} />
+        <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} sceneImage={galleryView?.src ?? liveSceneImage.src ?? sceneImageUrl} sceneForging={liveSceneImage.status === "loading" && galleryIndex < 0} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} imageNav={galleryNav} imageLabel={galleryView?.label} />
         <section className="centerColumn actionColumn">
           {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
           {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} styleHint={`${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`} />}
@@ -1510,7 +1590,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
         </div>
         <div className="lobbyHeaderActions">
           <button className="ghostButton" type="button" onClick={onMultiplayerHost} disabled={mpBlocked} title={mpBlocked ? "Terminá de forjar tu héroe antes de abrir una sala." : undefined}><img className="uiIcon" src={uiIcon("crear_sala")} alt="" /> Crear sala</button>
-          <button className="ghostButton" type="button" onClick={onMultiplayerJoin}><img className="uiIcon" src={uiIcon("unirse_codigo")} alt="" /> Unirse con código</button>
+          <button className="ghostButton" type="button" onClick={onMultiplayerJoin} disabled={mpBlocked} title={mpBlocked ? "Terminá de forjar tu héroe antes de unirte: entrás a la sala CON tu personaje." : undefined}><img className="uiIcon" src={uiIcon("unirse_codigo")} alt="" /> Unirse con código</button>
         </div>
       </header>
 
@@ -2531,7 +2611,7 @@ function getTurnRoll(turn: CinematicTurn) {
   return { total, dc, result, label: `${translateOutcome(turn.event?.outcome ?? result)}: ${total}${dc ? ` vs ${dc}` : ""}` };
 }
 
-function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTurnPaused, onContinueBot, sections, plotBeat, dialogue, finalRecap, warnings, sceneImage, sceneForging = false, imageMode, onImageMode }: { room: GameRoom; narration: string; latestTurnNarration?: NarrationResponse; dice: DiceSnapshot | null; botTurnPaused: boolean; onContinueBot: () => void; sections?: NarrationResponse["sections"]; plotBeat?: NarrationResponse["plotBeat"]; dialogue: string[]; finalRecap?: string; warnings: string[]; sceneImage?: string; sceneForging?: boolean; imageMode?: SceneImageMode; onImageMode?: (mode: SceneImageMode) => void }) {
+function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTurnPaused, onContinueBot, sections, plotBeat, dialogue, finalRecap, warnings, sceneImage, sceneForging = false, imageMode, onImageMode, imageNav, imageLabel }: { room: GameRoom; narration: string; latestTurnNarration?: NarrationResponse; dice: DiceSnapshot | null; botTurnPaused: boolean; onContinueBot: () => void; sections?: NarrationResponse["sections"]; plotBeat?: NarrationResponse["plotBeat"]; dialogue: string[]; finalRecap?: string; warnings: string[]; sceneImage?: string; sceneForging?: boolean; imageMode?: SceneImageMode; onImageMode?: (mode: SceneImageMode) => void; imageNav?: { index: number; total: number; onPrev: () => void; onNext: () => void }; imageLabel?: string }) {
   const shownNarration = sections?.narration ?? cleanSection(narration, "Narracion");
   const shownDialogue = sections?.dialogue ?? dialogue.join(" ");
   const shownConsequence = sections?.consequence ?? extractConsequence(narration);
@@ -2559,7 +2639,15 @@ function DungeonMasterPanel({ room, narration, latestTurnNarration, dice, botTur
               ))}
             </div>
           )}
-          <span className="dmSceneCaption">{currentScene.title}</span>
+          {/* Galería: las imágenes se acumulan y se hojean sin perder la actual. */}
+          {imageNav && (
+            <div className="dmSceneNav" role="group" aria-label="Hojear las imágenes de la historia">
+              <button type="button" onClick={imageNav.onPrev} disabled={imageNav.index <= 0} aria-label="Imagen anterior">‹</button>
+              <span>{imageNav.index + 1}/{imageNav.total}</span>
+              <button type="button" onClick={imageNav.onNext} disabled={imageNav.index >= imageNav.total - 1} aria-label="Imagen siguiente">›</button>
+            </div>
+          )}
+          <span className="dmSceneCaption">{imageLabel ?? currentScene.title}</span>
         </div>
       )}
       {hasTurnHistory
@@ -3262,9 +3350,10 @@ function translateOutcome(outcome: string) {
 
 // ─── Multiplayer components ───────────────────────────────────────────────────
 
-function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput, onConfirmJoin, onStartParty, forgingStory, onCancel }: {
+function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCodeInput, onConfirmJoin, onStartParty, forgingStory, onCancel }: {
   mode: "host" | "guest";
   mpState: MultiplayerState;
+  draft: Character;
   joinCodeInput: string;
   setJoinCodeInput: (v: string) => void;
   onConfirmJoin: () => void;
@@ -3277,6 +3366,18 @@ function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput
   const error = mpState.errorMessage;
   // Antes de tener código, el invitado todavía ve el formulario de ingreso.
   const guestInRoom = mode === "guest" && Boolean(mpState.roomCode);
+  // El héroe que traés a la sala, a la vista: entrás CON tu personaje.
+  const heroCard = (
+    <div className="mpHeroCard">
+      <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="mpHeroPortrait" />
+      <div className="mpHeroInfo">
+        <strong>{draft.name}</strong>
+        <small>{draft.species} · {draft.role}</small>
+        <small className="mpHeroPet"><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={16} /> {draft.pet.name}</small>
+      </div>
+      <span className="mpHeroTag">Tu héroe</span>
+    </div>
+  );
 
   const playerList = mpState.players.length > 0 && (
     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px", textAlign: "left" }}>
@@ -3329,6 +3430,7 @@ function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput
           ) : (
             <>
               <h2 style={{ fontSize: 22, marginBottom: 8 }}>Unirse a sala</h2>
+              {heroCard}
               <p style={{ color: "#ccc", marginBottom: 20 }}>Ingresá el código de 6 caracteres que te compartió el anfitrión:</p>
               <input
                 type="text"
@@ -3360,7 +3462,7 @@ function MultiplayerLobbyScreen({ mode, mpState, joinCodeInput, setJoinCodeInput
   );
 }
 
-function MultiplayerStatusBar({ mpState, onLeave }: { mpState: MultiplayerState; onLeave: () => void }) {
+function MultiplayerStatusBar({ mpState, onLeave, onToggleDoor }: { mpState: MultiplayerState; onLeave: () => void; onToggleDoor?: () => void }) {
   const activeName = mpState.players.find((p) => p.id === mpState.activePlayerId)?.name ?? "otro jugador";
   const phaseLabel: Record<MultiplayerState["phase"], string> = {
     idle: "", connecting: "Conectando…", lobby_host: "Lobby", lobby_guest: "Lobby",
@@ -3375,6 +3477,16 @@ function MultiplayerStatusBar({ mpState, onLeave }: { mpState: MultiplayerState;
       <span style={{ color: "#ffd77b", fontWeight: 700 }}>Party</span>
       {mpState.roomCode && <span style={{ color: "#aaa" }}>Sala: <strong style={{ color: "#fff" }}>{mpState.roomCode}</strong> · {connectedCount} en línea</span>}
       <span style={{ color: mpState.yourTurn ? "#7fff90" : "#aaa", flexGrow: 1 }}>{phaseLabel[mpState.phase]}</span>
+      {/* Puerta de la sala: el host decide si pueden entrar amigos a mitad de partida. */}
+      {onToggleDoor && (
+        <button
+          onClick={onToggleDoor}
+          title={mpState.allowMidJoin ? "Los amigos pueden entrar con el código aunque la historia ya esté en curso (entran a la escena tras un par de turnos). Tocá para cerrar." : "Nadie más puede entrar. Tocá para abrir la puerta a mitad de partida."}
+          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: mpState.allowMidJoin ? "rgba(127,255,144,.12)" : "rgba(255,255,255,.06)", border: `1px solid ${mpState.allowMidJoin ? "rgba(127,255,144,.4)" : "rgba(255,255,255,.18)"}`, borderRadius: 8, color: mpState.allowMidJoin ? "#7fff90" : "#aaa", cursor: "pointer", fontSize: 12, padding: "3px 10px" }}
+        >
+          <UserPlus size={12} /> {mpState.allowMidJoin ? "Puerta abierta" : "Puerta cerrada"}
+        </button>
+      )}
       <button onClick={onLeave} style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: 12, padding: "2px 6px" }}>Salir</button>
     </div>
   );

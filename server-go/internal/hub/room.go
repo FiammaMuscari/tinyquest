@@ -48,8 +48,11 @@ type Room struct {
 	players        []*player // players[0] es siempre el host
 	activePlayerID string
 	narrating      bool
-	createdAt      time.Time
-	lastActivity   time.Time
+	// openDoor: el host permite que entren jugadores con la historia YA empezada
+	// (el motor del host integra al recién llegado tras un par de turnos).
+	openDoor     bool
+	createdAt    time.Time
+	lastActivity time.Time
 	// lastState/lastSummary: última difusión autoritativa del host. Se guarda para
 	// re-sincronizar a un jugador que reconecta a media partida.
 	lastState   json.RawMessage

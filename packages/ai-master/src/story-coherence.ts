@@ -40,6 +40,8 @@ export function storyCoherenceIssues(content: ImprovisedStoryContent, input: Imp
   const shortClock = /(anochecer|amanecer|medianoche|esta noche|antes del alba|en horas|una noche|hoy mismo)/i.test(content.summary?.timeLimit ?? "");
   if (longDuration && shortClock) issues.push("reloj-ignora-escala-larga");
   if (input.hero && !content.heroBond) issues.push("hero-sin-vinculo");
+  // Nota: las opciones de escena las arma el MOTOR (campaigns/room-state), que ya
+  // evita "presionar" a NPCs animales; acá no hay opciones que validar.
   // Apellidos que se leen mal: epíteto-guion descriptivo ('Ojos-de-Humo',
   // 'Susurro-Gris') o el nombre del mundo pegado como apellido ('de Ceniza').
   const requested = new Set(nameMatches.map((m) => m[1].toLowerCase()));
