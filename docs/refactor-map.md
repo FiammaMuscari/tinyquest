@@ -194,3 +194,6 @@ acción y adoptan el estado.
   `packages/game-engine/src/party-scale.ts` (≥20 rondas totales, host+4;
   el pacing usa max(scene.maxRounds, sessionConfig.maxRoundsPerScene)).
   Vite permite hosts de túnel (allowedHosts en vite.config.ts).
+- Tema por compañera: `petThemes`/`petThemeVars` en App.tsx (junto a
+  `companionLogos`) — Alma turquesa, Polilla VIOLETA, Sabueso DORADO; CSS
+  "Tema por compañera" al final de app.css (vars --pet-color/--pet-border/--pet-glow).

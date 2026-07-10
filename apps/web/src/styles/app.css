@@ -3939,3 +3939,26 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 @media (max-height: 760px) {
   .dmSceneImage { min-height: 150px; }
 }
+
+/* ── Tema por compañera (2026-07-09) ─────────────────────────────────────────
+   Cada compañera se selecciona con SU color de leyenda (variables --pet-* que
+   inyecta App.tsx via petThemeVars): Alma Dracónica turquesa, Polilla de Cripta
+   VIOLETA, Sabueso del Umbral DORADO. Borde + glow + texto, en el picker rápido,
+   en las cards del tab Compañero y en el pill del resumen del lobby. */
+.petPickerRow button:hover:not(:disabled) { border-color: var(--pet-border, rgba(117,234,219,.4)); }
+.petPickerRow button.selected {
+  border-color: var(--pet-color, #75eadb) !important;
+  box-shadow: 0 0 14px var(--pet-glow, rgba(117,234,219,.3)) !important;
+}
+.petPickerRow button.selected small { color: var(--pet-color, #75eadb); }
+.lobbyShell .builderCard.petCard:hover:not(:disabled) { border-color: var(--pet-border); }
+.builderCard.petCard.selected,
+.lobbyShell .builderCard.petCard.selected {
+  border-color: var(--pet-color, #ffbf35);
+  box-shadow: 0 0 0 1px var(--pet-border, rgba(255,191,53,.25)), 0 0 22px var(--pet-glow, rgba(255,174,52,.16));
+  background: linear-gradient(170deg, rgba(20,16,26,.55), rgba(10,9,13,.92));
+}
+.builderCard.petCard.selected::after { color: var(--pet-color, #ffbf35); text-shadow: 0 0 10px var(--pet-glow, rgba(255,191,53,.8)); }
+.builderCard.petCard.selected .builderCardHead strong { color: var(--pet-color); }
+.builderCard.petCard.selected .npcPortrait,
+.petPickerRow button.selected .npcPortrait { box-shadow: 0 0 12px var(--pet-glow); border-radius: 50%; }

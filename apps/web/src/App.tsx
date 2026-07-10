@@ -1528,7 +1528,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
-                <span className="heroSummaryPet"><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={22} /> {draft.pet.name}</span>
+                <span className="heroSummaryPet" style={{ color: petTheme(draft.pet.name).color, borderColor: petTheme(draft.pet.name).border, background: petTheme(draft.pet.name).bg, boxShadow: `0 0 10px ${petTheme(draft.pet.name).glow}` }}><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={22} /> {draft.pet.name}</span>
               </div>
               <div className="heroSummaryActions">
                 <button className="ghostButton framedButton" type="button" onClick={() => setEditingHero(true)}><img className="uiIcon" src={uiIcon("editar_heroe")} alt="" /> Editar héroe</button>
@@ -1937,6 +1937,21 @@ const worldEmblems: Record<string, string> = { veldaran: uiIcon("shield_medieval
 const companionLogos: Record<string, string> = { "Alma Dracónica": "/assets/companions/alma-draconica.png", "Polilla de Cripta": "/assets/companions/polilla-de-cripta.png", "Sabueso del Umbral": "/assets/companions/sabueso-del-umbral.png" };
 // Los 3 compañeros base tienen su logo del pack de diseño; uno futuro cae al retrato IA.
 const petImage = (pet: { name: string; description: string }) => companionLogos[pet.name] ?? petPortraitUrl(pet.name, pet.description);
+
+// Cada compañera viste su color de leyenda, tomado de su propia imagen:
+// dragón turquesa, polilla VIOLETA, sabueso DORADO. El borde, la sombra y el
+// glow de selección usan este tema en el editor y en el resumen del lobby.
+type PetTheme = { color: string; border: string; glow: string; bg: string };
+const petThemes: Record<string, PetTheme> = {
+  "Alma Dracónica": { color: "#75eadb", border: "rgba(117,234,219,.45)", glow: "rgba(117,234,219,.32)", bg: "rgba(8,20,18,.55)" },
+  "Polilla de Cripta": { color: "#c9a2ff", border: "rgba(178,124,255,.55)", glow: "rgba(178,124,255,.38)", bg: "rgba(26,14,40,.55)" },
+  "Sabueso del Umbral": { color: "#ffd77b", border: "rgba(212,175,55,.6)", glow: "rgba(255,215,123,.38)", bg: "rgba(32,24,12,.55)" }
+};
+const petTheme = (name: string): PetTheme => petThemes[name] ?? petThemes["Alma Dracónica"];
+const petThemeVars = (name: string): CSSProperties => {
+  const theme = petTheme(name);
+  return { ["--pet-color" as string]: theme.color, ["--pet-border" as string]: theme.border, ["--pet-glow" as string]: theme.glow } as CSSProperties;
+};
 
 // Card de mundo: los 3 mundos base usan el arte pintado del pack de diseño
 // (instantáneo); un mundo futuro sin asset cae al arte generado por IA.
@@ -3038,7 +3053,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
               <span>Tu compañera de aventuras</span>
               <div className="petPickerRow">
                 {legendaryPets.map((pet) => (
-                  <button key={pet.id} type="button" className={draft.pet.id === pet.id ? "selected" : ""} onClick={() => setDraft(createCharacter({ ...draft, pet }))} disabled={disabled} title={`${pet.name} — ${pet.description}`}>
+                  <button key={pet.id} type="button" className={draft.pet.id === pet.id ? "selected" : ""} style={petThemeVars(pet.name)} onClick={() => setDraft(createCharacter({ ...draft, pet }))} disabled={disabled} title={`${pet.name} — ${pet.description}`}>
                     <NpcPortrait name={pet.name} portraitUrl={petImage(pet)} size={44} />
                     <small>{pet.name}</small>
                   </button>
@@ -3109,7 +3124,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           <>
             <div className="builderCardGrid">
               {legendaryPets.map((pet) => (
-                <button key={pet.id} type="button" disabled={disabled} className={`builderCard ${draft.pet.id === pet.id ? "selected" : ""}`} onClick={() => setDraft(createCharacter({ ...draft, pet }))}>
+                <button key={pet.id} type="button" disabled={disabled} className={`builderCard petCard ${draft.pet.id === pet.id ? "selected" : ""}`} style={petThemeVars(pet.name)} onClick={() => setDraft(createCharacter({ ...draft, pet }))}>
                   <span className="builderCardHead">
                     <NpcPortrait name={pet.name} portraitUrl={petImage(pet)} size={42} />
                     <strong>{pet.name}</strong>
@@ -3119,7 +3134,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 </button>
               ))}
             </div>
-            <div className="builderDetail petDetail">
+            <div className="builderDetail petDetail" style={{ ...petThemeVars(selectedPet.name), borderColor: petTheme(selectedPet.name).border, boxShadow: `inset 0 0 26px ${petTheme(selectedPet.name).glow}` }}>
               {/* La compañera tiene SU retrato generado, separado del héroe. */}
               <NpcPortrait name={selectedPet.name} portraitUrl={petImage(selectedPet)} size={72} />
               <div className="petDetailText">
