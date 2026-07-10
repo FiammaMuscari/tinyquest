@@ -197,3 +197,10 @@ acción y adoptan el estado.
 - Tema por compañera: `petThemes`/`petThemeVars` en App.tsx (junto a
   `companionLogos`) — Alma turquesa, Polilla VIOLETA, Sabueso DORADO; CSS
   "Tema por compañera" al final de app.css (vars --pet-color/--pet-border/--pet-glow).
+- Sonido: clicks DEFAULT OFF (`uiSoundEnabled` exige localStorage "on"); ambiente
+  ya era opt-in. Compañeras: los PNG de /assets/companions fueron REPROCESADOS
+  con máscara circular (transparente fuera del círculo del emblema) — no
+  restaurar los viejos. `img.npcPortrait[src^="/assets/companions/"]` sin sombra.
+- Héroe: UNA sola imagen generada (cuerpo). `heroImageUrls.face === .fullbody`;
+  "Frente" es recorte CSS (object-position center 8%) y "Cuerpo" object-fit
+  contain. No volver a generar el frente aparte — divergía de personaje.

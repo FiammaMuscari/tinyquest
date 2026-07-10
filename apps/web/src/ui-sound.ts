@@ -18,7 +18,9 @@ const buffers: Partial<Record<ClickKind, AudioBuffer>> = {};
 const loading: Partial<Record<ClickKind, Promise<void>>> = {};
 
 export function uiSoundEnabled(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== "off";
+  // Silencio por defecto (pedido de Fiamy 2026-07-10): los clicks suenan solo
+  // si el jugador los prende en Ajustes. La música de ambiente ya era opt-in.
+  return localStorage.getItem(STORAGE_KEY) === "on";
 }
 
 export function setUiSoundEnabled(on: boolean) {

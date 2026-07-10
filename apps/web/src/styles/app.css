@@ -3960,5 +3960,70 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 }
 .builderCard.petCard.selected::after { color: var(--pet-color, #ffbf35); text-shadow: 0 0 10px var(--pet-glow, rgba(255,191,53,.8)); }
 .builderCard.petCard.selected .builderCardHead strong { color: var(--pet-color); }
-.builderCard.petCard.selected .npcPortrait,
-.petPickerRow button.selected .npcPortrait { box-shadow: 0 0 12px var(--pet-glow); border-radius: 50%; }
+
+/* ── Pulido: logos de compañeras transparentes + botones del héroe + frente como
+   recorte del cuerpo (2026-07-10) ─────────────────────────────────────────────
+   1) Los PNG de compañeras SON transparentes: el "fondo" que se veía era el
+      box-shadow de .npcPortrait pintándose detrás de la transparencia. Acá se
+      apaga para esos assets — el arte circular del logo queda flotando limpio,
+      sin glow ni placa detrás. El color de selección vive en el BORDE del botón. */
+img.npcPortrait[src^="/assets/companions/"] {
+  box-shadow: none !important;
+  border-radius: 0;
+  object-fit: contain;
+  background: transparent;
+}
+
+/* 2) El héroe tiene UNA imagen (cuerpo entero). "Frente" = la misma imagen
+      recortada arriba (cover anclado a la cabeza); "Cuerpo" = figura completa. */
+.heroSpecial .heroSummaryRow img.summaryShot { object-position: center 8%; }
+.heroSpecial .heroSummaryRow img.summaryShot.fullShot { object-fit: contain; object-position: center top; background: rgba(5,8,18,.5); }
+.heroPortraitFrame:not(.fullbodyFrame) .heroPortrait { object-position: center 8%; }
+.heroPortraitFrame.fullbodyFrame .heroPortrait { object-fit: contain; background: rgba(5,8,18,.5); }
+.avatar img { object-position: center 12%; }
+
+/* 3) Botones del héroe: "Guardar héroe" es EL botón (CTA dorado sólido, serif,
+      más presencia); "Reimaginar" es su hermano enmarcado, mismo lenguaje. */
+.lobbyShell .heroDone {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 14px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  padding: 12px 24px !important;
+  border-radius: 12px !important;
+  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
+}
+.lobbyShell .heroDone:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255,251,230,.7), inset 0 -3px 8px rgba(110,78,16,.45), 0 8px 26px rgba(212,175,55,.35) !important;
+}
+.lobbyShell .reimagineButton {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 12.5px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 11px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(212,175,55,.55) !important;
+  background: linear-gradient(180deg, rgba(44,34,16,.92), rgba(14,11,6,.96)) !important;
+  color: #f2d27c !important;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.lobbyShell .reimagineButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: #ffd77b !important;
+  box-shadow: 0 0 18px rgba(255,215,123,.28);
+}
+.lobbyShell .reimagineButton:disabled { opacity: .5; }
+
+/* ── Hint del héroe sin blancos + placeholder medallón (2026-07-10) ──────────
+   El aviso "Tu héroe todavía no tiene cara" era una placa beige clara que
+   chocaba con todo el tema oscuro: pasa a placa oscura con letra dorada. */
+.heroSpecial .startHint {
+  background: linear-gradient(180deg, rgba(46,36,18,.88), rgba(18,14,8,.94));
+  color: #e8c987;
+  border: 1px solid rgba(212,175,55,.38);
+  box-shadow: inset 0 1px 0 rgba(255,225,150,.08);
+}
+.heroSpecial .startHint strong { color: #ffd77b; }
+.startHint { color: #e8c987; }

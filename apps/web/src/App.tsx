@@ -1986,13 +1986,14 @@ function lookComplete(draft: Character): boolean {
   return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
 }
 
-// Las dos imágenes del héroe con el mismo seed: retrato de frente y cuerpo entero.
+// El héroe tiene UNA sola imagen generada: el cuerpo entero. El "Frente" es la
+// MISMA imagen recortada arriba por CSS (encuadre, no otra generación): así el
+// frente es siempre variante fiel del cuerpo — mismo personaje garantizado al
+// 100% — y se ahorra una generación de Pollinations por héroe.
 function heroImageUrls(draft: Character, nonce = 0): { face: string; fullbody: string } {
   const spec = heroPortraitSpec(draft);
-  return {
-    face: characterPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce),
-    fullbody: fullBodyPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce)
-  };
+  const body = fullBodyPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce);
+  return { face: body, fullbody: body };
 }
 
 function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => void }) {
@@ -2141,10 +2142,38 @@ const lookHairOptions = [
 // Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
 // medallón data-URI de placeholder (sigue siendo un <img>, así hereda el CSS
 // de .avatar img / .heroPortrait / .heroSummaryRow img sin tocar selectores).
+// Placeholder del héroe sin forjar: busto en sombra dentro de un anillo dorado,
+// sobre placa oscura — nada de blancos. Reemplaza a los avatares clásicos.
+const heroPlaceholderDataUri = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='220' height='275' viewBox='0 0 220 275'>
+  <defs>
+    <radialGradient id='hpBg' cx='50%' cy='38%' r='75%'>
+      <stop offset='0%' stop-color='#221a2b'/>
+      <stop offset='100%' stop-color='#0e0a13'/>
+    </radialGradient>
+    <linearGradient id='hpBust' x1='0' y1='0' x2='0' y2='1'>
+      <stop offset='0%' stop-color='#4a3a20'/>
+      <stop offset='100%' stop-color='#241a0e'/>
+    </linearGradient>
+  </defs>
+  <rect width='220' height='275' rx='14' fill='url(#hpBg)'/>
+  <rect x='3' y='3' width='214' height='269' rx='12' fill='none' stroke='#d4af37' stroke-opacity='.28'/>
+  <circle cx='110' cy='128' r='86' fill='none' stroke='#d4af37' stroke-opacity='.5' stroke-width='2'/>
+  <circle cx='110' cy='128' r='94' fill='none' stroke='#d4af37' stroke-opacity='.16'/>
+  <circle cx='110' cy='100' r='31' fill='url(#hpBust)'/>
+  <path d='M52 208 C60 158 160 158 168 208 L168 214 L52 214 Z' fill='url(#hpBust)'/>
+  <text x='110' y='36' text-anchor='middle' font-size='16' fill='#d4af37' fill-opacity='.75'>&#10022;</text>
+  <text x='110' y='253' text-anchor='middle' font-family='Georgia, serif' font-size='12' letter-spacing='2' fill='#c9a45c' fill-opacity='.85'>POR FORJAR</text>
+</svg>`)}`;
+
 function HeroAvatarImg({ url, name, className, priority = false }: { url: string; name: string; className?: string; priority?: boolean }) {
   const generated = isGeneratedPortraitUrl(url);
   const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority });
-  if (!generated) return <img className={className} src={url} alt={name} />;
+  // Los avatares clásicos (gato con damero blanco horneado) quedaron retirados:
+  // hasta que el look esté completo se muestra el busto dorado de "héroe por forjar".
+  if (!generated) {
+    const staticUrl: string = url;
+    return <img className={className} src={staticUrl.startsWith("/assets/avatars/") ? heroPlaceholderDataUri : staticUrl} alt={name} />;
+  }
   if (src) return <img className={`${className ?? ""} ${status === "loading" ? "portraitForging" : "portraitFade"}`} src={src} alt={name} />;
   // Cargando: spinner sobre fondo gris; si falló del todo, medallón procedural.
   if (status === "failed") return <img className={className} src={medallionDataUri(name)} alt={name} />;
