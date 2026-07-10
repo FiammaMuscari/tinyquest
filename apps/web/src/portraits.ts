@@ -224,11 +224,12 @@ async function fetchViaCloudflare(url: string): Promise<Blob | null> {
     if (!prompt) return null;
     const width = Number(parsed.searchParams.get("width") ?? "512");
     const height = Number(parsed.searchParams.get("height") ?? "512");
-    // Cloudflare SOLO para imágenes chicas de ambiente (escena viva, mapas,
-    // arquetipos), donde la velocidad manda. Retratos del héroe/NPCs y portadas
-    // van SIEMPRE por Pollinations flux: su aspecto es el bueno (medido con
-    // Fiamy 2026-07-10 — "el modelo anterior era mil veces mejor").
-    if (height > 400 || width > 900) return null;
+    // Cloudflare SOLO para miniaturas (arquetipos, mapas de mundo ≤448px):
+    // TODO lo visible de la historia — retratos, portada Y la imagen viva del
+    // recorrido — va por Pollinations flux, el estilo pintado que aprobó Fiamy
+    // (2026-07-10: "me encanta como se ve ahora"). La espera de la primera
+    // generación la cubre el spinner + la imagen anterior (stale-while-revalidate).
+    if (height > 288 || width > 448) return null;
     const seed = Number(parsed.searchParams.get("seed") ?? "0");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 50_000);

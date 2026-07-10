@@ -240,11 +240,12 @@ acción y adoptan el estado.
   Pollinations ante cualquier fallo. ~2s vs 20-90s. Sin credenciales: 501 y se
   apaga solo para la sesión.
 
-- Imágenes por proveedor (regla vigente 2026-07-10): Cloudflare Workers AI
-  (flux-1-schnell, ~2-4s) SOLO para imágenes chicas de ambiente
-  (height ≤ 400 y width ≤ 900: escena viva 512×288, mapas 448×252, arquetipos).
-  Retratos héroe/NPC (512×768) y portadas (1120×480) SIEMPRE Pollinations flux —
-  el estilo pintado que aprobó Fiamy. El gate vive en fetchViaCloudflare.
+- Imágenes por proveedor (regla vigente 2026-07-10 noche): TODO lo visible de la
+  historia (retratos 512×768, portada 1120×480, escena viva 512×288) va por
+  Pollinations flux — el estilo pintado que aprobó Fiamy ("me encanta como se
+  ve"). Cloudflare (flux-1-schnell) queda SOLO para miniaturas ≤448×288
+  (arquetipos, mapas). El gate vive en fetchViaCloudflare — no lo aflojes sin
+  preguntarle a Fiamy: la calidad manda sobre la velocidad.
 - Portada: UNA sola generación (sin collage): prompt póster en storySceneImageUrl
   (elenco grande en primer plano, caras iluminadas; castLine desde ForgedStoryBanner).
   drawFadedFigure/loadImg eliminados.
