@@ -11,7 +11,7 @@
 | Forja de historia, apertura, recap | **Gemini 2.5 Flash** (`VITE_GEMINI_MODEL`) | Calidad de escritura; pocas llamadas por día |
 | Narración por turno (ruta "cheap") | **Groq llama-3.3-70b-versatile** | Velocidad brutal + no gasta el RPD de Gemini |
 | Failover | El otro proveedor, automático | Si uno falla o agota cuota |
-| Imágenes (retratos, portadas, escenas) | **Pollinations (flux)** | Gratis, sin key, cache IndexedDB por URL |
+| Imágenes (retratos, portadas, escenas) | **Cloudflare Workers AI (SDXL-lightning, ~2s)** con fallback **Pollinations (flux)** | Gratis; cache IndexedDB por URL (clave = URL de Pollinations) |
 | Cache de LLM | Proxy de Vite (`/api/groq/chat`, `/api/gemini/chat`) | Mismo prompt = 0 tokens |
 
 ## Límites free vigentes (julio 2026)

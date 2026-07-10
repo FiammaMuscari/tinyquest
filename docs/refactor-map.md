@@ -232,3 +232,9 @@ acción y adoptan el estado.
   pantalla de ingreso muestra tu héroe (`.mpHeroCard`).
 - OJO tests: room-state.ts ahora importa "./campaigns" — los tests que lo
   transpilan necesitan el replacement 'from "./campaigns"' → campaigns.mjs.
+- Imágenes rápidas (2026-07-10): proxy `/api/cf-image` en vite.config (Cloudflare
+  Workers AI, SDXL-lightning; credenciales CF_* en .env.local, server-side).
+  `fetchViaCloudflare` en portraits.ts intenta CF PRIMERO (parsea prompt/seed/
+  tamaño de la URL de Pollinations — la clave de caché NO cambia) y cae a
+  Pollinations ante cualquier fallo. ~2s vs 20-90s. Sin credenciales: 501 y se
+  apaga solo para la sesión.

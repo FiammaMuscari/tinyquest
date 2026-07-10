@@ -205,7 +205,49 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ─── Vía rápida: Cloudflare Workers AI (proxy /api/cf-image del dev server) ──
+// La clave de caché sigue siendo la URL de Pollinations (NO cambia): de ella se
+// extraen prompt/tamaño/seed y se intenta generar en CF (~2-5s). Si el proxy no
+// está configurado (501) se apaga para la sesión; ante cualquier fallo se cae a
+// Pollinations como siempre. Las imágenes ya cacheadas no se regeneran nunca.
+let cfImageAvailable = true;
+async function fetchViaCloudflare(url: string): Promise<Blob | null> {
+  if (!cfImageAvailable || !url.startsWith("https://image.pollinations.ai/")) return null;
+  try {
+    const parsed = new URL(url);
+    const prompt = decodeURIComponent(parsed.pathname.replace(/^\/prompt\//, ""));
+    if (!prompt) return null;
+    const width = Number(parsed.searchParams.get("width") ?? "512");
+    const height = Number(parsed.searchParams.get("height") ?? "512");
+    const seed = Number(parsed.searchParams.get("seed") ?? "0");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 50_000);
+    try {
+      const response = await fetch("/api/cf-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, width, height, seed }),
+        signal: controller.signal
+      });
+      if (response.status === 501 || response.status === 404 || response.status === 405) {
+        cfImageAvailable = false;
+        return null;
+      }
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      if (!blob.type.startsWith("image/")) return null;
+      return blob;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
+}
+
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
+  const fast = await fetchViaCloudflare(url);
+  if (fast) return fast;
   let lastError: unknown = new Error("portrait fetch failed");
   for (const delay of RETRY_DELAYS_MS) {
     if (delay > 0) await sleep(delay);

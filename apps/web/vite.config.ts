@@ -78,6 +78,73 @@ function llmProxyPlugin(): Plugin {
 
       register("/api/groq/chat", "https://api.groq.com/openai/v1/chat/completions", env.GROQ_API_KEY, "GROQ_API_KEY");
       register("/api/gemini/chat", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", env.GEMINI_API_KEY, "GEMINI_API_KEY");
+
+      // Imágenes por Cloudflare Workers AI (rápido y gratis): el cliente manda
+      // {prompt, width, height, seed} y recibe los bytes de la imagen. El token
+      // vive SOLO acá (server-side). Sin credenciales responde 501 y el cliente
+      // sigue con Pollinations como siempre.
+      server.middlewares.use("/api/cf-image", async (request, response) => {
+        if (request.method !== "POST") {
+          response.statusCode = 405;
+          response.end("Method not allowed");
+          return;
+        }
+        if (!env.CF_ACCOUNT_ID || !env.CF_AI_TOKEN) {
+          response.statusCode = 501;
+          response.end("Cloudflare Workers AI no configurado");
+          return;
+        }
+        const chunks: Buffer[] = [];
+        request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        request.on("end", async () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { prompt?: string; width?: number; height?: number; seed?: number };
+            if (!body.prompt) {
+              response.statusCode = 400;
+              response.end("prompt requerido");
+              return;
+            }
+            const model = env.CF_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning";
+            const upstream = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/ai/run/${model}`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${env.CF_AI_TOKEN}`, "Content-Type": "application/json" },
+              body: JSON.stringify({
+                prompt: body.prompt.slice(0, 2048),
+                width: Math.min(2048, Math.max(256, body.width ?? 512)),
+                height: Math.min(2048, Math.max(256, body.height ?? 512)),
+                seed: body.seed
+              }),
+              signal: AbortSignal.timeout(45000)
+            });
+            const contentType = upstream.headers.get("content-type") ?? "";
+            if (!upstream.ok) {
+              response.statusCode = upstream.status;
+              response.end(await upstream.text());
+              return;
+            }
+            if (contentType.includes("application/json")) {
+              // Modelos tipo flux devuelven {result:{image:"<base64>"}}.
+              const parsed = await upstream.json() as { result?: { image?: string } };
+              const base64 = parsed.result?.image;
+              if (!base64) {
+                response.statusCode = 502;
+                response.end("respuesta sin imagen");
+                return;
+              }
+              response.statusCode = 200;
+              response.setHeader("Content-Type", "image/jpeg");
+              response.end(Buffer.from(base64, "base64"));
+              return;
+            }
+            response.statusCode = 200;
+            response.setHeader("Content-Type", contentType || "image/png");
+            response.end(Buffer.from(await upstream.arrayBuffer()));
+          } catch (error) {
+            response.statusCode = 502;
+            response.end(error instanceof Error ? error.message : "cf-image failed");
+          }
+        });
+      });
     }
   };
 }
