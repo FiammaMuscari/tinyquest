@@ -4027,3 +4027,46 @@ img.npcPortrait[src^="/assets/companions/"] {
 }
 .heroSpecial .startHint strong { color: #ffd77b; }
 .startHint { color: #e8c987; }
+
+/* ── Teaser con iconos + CTA de invitar amigos (2026-07-10) ──────────────────
+   Emojis → iconos lucide (.tIcon, color por card); cards con acento lateral y
+   fondo con profundidad; título de la historia en serif dorado con llama. */
+.forgedTeaser .tIcon { vertical-align: -2px; margin-right: 2px; flex: 0 0 auto; }
+.forgedTeaser .teaserTitle {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 21px; letter-spacing: .05em; color: #ffd77b;
+}
+.forgedTeaser .teaserTitle .tIcon { color: #ff9d47; filter: drop-shadow(0 0 6px rgba(255,140,50,.55)); }
+.summaryCard { position: relative; border-left: 3px solid rgba(212,175,55,.55); }
+.summaryCard em { display: inline-flex; align-items: center; gap: 6px; }
+.summaryCard.mission { border-left-color: #ffd77b; background: linear-gradient(165deg, rgba(52,40,16,.5), rgba(14,11,6,.85)); }
+.summaryCard.mission em, .summaryCard.mission .tIcon { color: #ffd77b; }
+.summaryCard.stakes { border-left-color: #75eadb; background: linear-gradient(165deg, rgba(10,42,38,.5), rgba(6,14,13,.85)); }
+.summaryCard.stakes em, .summaryCard.stakes .tIcon { color: #75eadb; }
+.summaryCard.against { border-left-color: #e86450; background: linear-gradient(165deg, rgba(52,18,14,.5), rgba(15,7,6,.85)); }
+.summaryCard.against em, .summaryCard.against .tIcon { color: #ff9d8a; }
+.stakesFold summary, .keywordsUsed summary { display: flex; align-items: center; gap: 7px; }
+.stakesFold summary .tIcon { color: #cfc39a; }
+.keywordsUsed summary .tIcon { color: #ffd77b; }
+.heroBondLine { display: flex; align-items: center; gap: 7px; }
+.heroBondLine .tIcon { color: #e86450; }
+.teaserHint .tIcon { color: #ffd77b; }
+.timeChip { display: inline-flex; align-items: center; gap: 5px; }
+
+/* Invitar amigos desde el paso 4: el hermano social del CTA dorado. */
+.inviteCta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  width: 100%; margin-top: 10px; padding: 12px 20px;
+  font-family: 'Cinzel', Georgia, serif; font-size: 13.5px;
+  letter-spacing: .05em; text-transform: uppercase;
+  border-radius: 12px; cursor: pointer;
+  border: 1px solid rgba(117,234,219,.45);
+  background: linear-gradient(180deg, rgba(10,40,36,.85), rgba(6,16,14,.95));
+  color: #8ff2e2;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.inviteCta:hover:not(:disabled) { transform: translateY(-1px); border-color: #75eadb; box-shadow: 0 0 18px rgba(117,234,219,.25); }
+.inviteCta:disabled { opacity: .5; cursor: default; }
+.inviteHint { margin: 6px 0 0; font-size: 12px; color: #9fb8b3; }
+.inviteHint strong { color: #8ff2e2; }

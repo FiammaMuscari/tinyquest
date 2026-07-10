@@ -204,3 +204,9 @@ acción y adoptan el estado.
 - Héroe: UNA sola imagen generada (cuerpo). `heroImageUrls.face === .fullbody`;
   "Frente" es recorte CSS (object-position center 8%) y "Cuerpo" object-fit
   contain. No volver a generar el frente aparte — divergía de personaje.
+- Teaser: emojis → iconos lucide (`.tIcon`, colores por card: misión dorado,
+  en-juego turquesa, contra-vos rojo); título serif con llama. CTA social
+  `.inviteCta` en el paso 4 (abre sala + código; usa onMultiplayerHost/mpBlocked).
+- Portada: `drawFadedFigure` usa máscara ELÍPTICA + recorte lateral 16% — los
+  retratos ya no se ven como rectángulos pegados. Informe de modelos free:
+  `docs/modelos-ia.md`.

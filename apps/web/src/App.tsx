@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Brain, Dices, Download, Heart, HelpCircle, Pause, Play, Sparkles, Users, Wand2, X, Zap } from "lucide-react";
+import { Bot, Brain, Dices, Download, Flame, Gem, Heart, HelpCircle, Hourglass, Lightbulb, Pause, Play, Scale, ShieldAlert, Sparkles, Swords, Target, UserPlus, Users, Wand2, X, Zap } from "lucide-react";
 import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
@@ -1578,31 +1578,31 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {improvisedSelected && !forgingStory && improvisedCampaign && (
             <div className="forgedTeaser">
               <ForgedStoryBanner campaign={improvisedCampaign} world={selectedWorld} hero={draft} onReady={setBannerReady} />
-              <strong>⚡ {normalizeUiText(improvisedCampaign.title)}</strong>
+              <strong className="teaserTitle"><Flame size={17} className="tIcon" /> {normalizeUiText(improvisedCampaign.title)}</strong>
               <p>{normalizeUiText(improvisedCampaign.premise ?? improvisedCampaign.description)}</p>
               {improvisedCampaign.forgeNotes?.summary?.objective && (
                 <div className="summaryGrid">
                   <div className="summaryCard mission">
-                    <em>🎯 Tu misión</em>
+                    <em><Target size={14} className="tIcon" /> Tu misión</em>
                     <p>{normalizeUiText(improvisedCampaign.forgeNotes.summary.objective)}</p>
-                    {improvisedCampaign.forgeNotes.summary.timeLimit && <span className="timeChip">⏳ {normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}</span>}
+                    {improvisedCampaign.forgeNotes.summary.timeLimit && <span className="timeChip"><Hourglass size={12} className="tIcon" /> {normalizeUiText(improvisedCampaign.forgeNotes.summary.timeLimit)}</span>}
                   </div>
                 </div>
               )}
               {/* Menos info a la vista: lo que arriesgás se abre solo si querés saberlo. */}
               {(improvisedCampaign.forgeNotes?.summary?.risk || (improvisedCampaign.forgeNotes?.evidence?.length ?? 0) > 0) && (
                 <details className="stakesFold">
-                  <summary>⚖️ Lo que está en juego — abrilo si te animás</summary>
+                  <summary><Scale size={14} className="tIcon" /> Lo que está en juego — abrilo si te animás</summary>
                   <div className="summaryGrid">
                     {improvisedCampaign.forgeNotes?.summary?.risk && (
                       <div className="summaryCard stakes">
-                        <em>💎 En juego</em>
+                        <em><Gem size={14} className="tIcon" /> En juego</em>
                         <p>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>
                       </div>
                     )}
                     {improvisedCampaign.forgeNotes?.evidence && improvisedCampaign.forgeNotes.evidence.length > 0 && (
                       <div className="summaryCard against">
-                        <em>⚠️ Contra vos</em>
+                        <em><ShieldAlert size={14} className="tIcon" /> Contra vos</em>
                         <ul>
                           {improvisedCampaign.forgeNotes.evidence.slice(0, 3).map((item) => <li key={item}>{normalizeUiText(item)}</li>)}
                         </ul>
@@ -1611,10 +1611,10 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   </div>
                 </details>
               )}
-              {improvisedCampaign.forgeNotes?.heroBond && <p className="heroBondLine">⚔ {normalizeUiText(improvisedCampaign.forgeNotes.heroBond)}</p>}
+              {improvisedCampaign.forgeNotes?.heroBond && <p className="heroBondLine"><Swords size={14} className="tIcon" /> {normalizeUiText(improvisedCampaign.forgeNotes.heroBond)}</p>}
               {improvisedCampaign.forgeNotes?.keywordsUsed && improvisedCampaign.forgeNotes.keywordsUsed.length > 0 && (
                 <details className="keywordsUsed">
-                  <summary>💡 Cómo se usaron tus ideas</summary>
+                  <summary><Lightbulb size={14} className="tIcon" /> Cómo se usaron tus ideas</summary>
                   <div>
                     {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
                       <span key={keyword.idea}>✓ {normalizeUiText(keyword.idea)} → {normalizeUiText(keyword.how)}</span>
@@ -1654,7 +1654,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                 )}
               </div>
               {/* Los primeros caminos se descubren JUGANDO — mostrarlos acá era ruido. */}
-              <em className="teaserHint">👆 Tocá un personaje para conocerlo. El resto —secretos, giros, verdades— se descubre jugando.</em>
+              <em className="teaserHint"><Sparkles size={12} className="tIcon" /> Tocá un personaje para conocerlo. El resto —secretos, giros, verdades— se descubre jugando.</em>
             </div>
           )}
           {castPeek && <CharacterPeekModal peek={castPeek} onClose={() => setCastPeek(null)} />}
@@ -1668,6 +1668,12 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <button className="startCta" type="button" onClick={startSolo} disabled={forgingStory || editingHero || !heroLookDone || assetsForging}>
             <Play size={20} /> {forgingStory ? "Forjando tu historia…" : !heroLookDone ? "Forjá tu héroe para empezar" : editingHero ? "Guardá tu héroe para empezar" : assetsForging ? "Forjando las imágenes de tu leyenda…" : "Empezar la historia"}
           </button>
+          {/* La otra puerta: abrir sala con código para que tus amigos se INTEGREN
+              a esta misma historia con sus propios héroes y turnos. */}
+          <button className="inviteCta" type="button" onClick={onMultiplayerHost} disabled={mpBlocked}>
+            <UserPlus size={17} /> Jugar con amigos — abrí la sala y compartí el código
+          </button>
+          <p className="inviteHint">Se crea un código de 6 letras: tus amigos entran con <strong>Unirse con código</strong> (hasta 4), traen su propio héroe y juegan sus turnos en esta misma historia.</p>
           {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel, ojos y pelo para que el narrador lo vea.</p>}
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
         </section>
@@ -1832,21 +1838,35 @@ function AssetForging() {
 // de la portada, en la posición/escala pedidas. Devuelve el canvas recortado.
 function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, centerXRatio: number, heightRatio: number, canvasW: number, canvasH: number) {
   const h = canvasH * heightRatio;
-  const w = img.naturalWidth * (h / img.naturalHeight);
+  // Los retratos traen SU PROPIO fondo pintado: si se pegan enteros se ve un
+  // rectángulo de otro color sobre la escena. Receta anti-cuadrado:
+  //  1) recorte lateral (nos quedamos con la franja central donde vive la figura),
+  //  2) máscara ELÍPTICA que funde hacia los 4 bordes — sin esquinas visibles.
+  const sideCrop = 0.16;
+  const sx = img.naturalWidth * sideCrop;
+  const sw = img.naturalWidth * (1 - sideCrop * 2);
+  const w = sw * (h / img.naturalHeight);
   const cut = document.createElement("canvas");
   cut.width = Math.max(1, Math.round(w)); cut.height = Math.max(1, Math.round(h));
   const cc = cut.getContext("2d");
   if (!cc) return;
-  cc.drawImage(img, 0, 0, cut.width, cut.height);
+  cc.drawImage(img, sx, 0, sw, img.naturalHeight, 0, 0, cut.width, cut.height);
   cc.globalCompositeOperation = "destination-in";
-  const fadeX = cut.width * 0.2;
-  const gx = cc.createLinearGradient(0, 0, cut.width, 0);
-  gx.addColorStop(0, "rgba(0,0,0,0)"); gx.addColorStop(fadeX / cut.width, "rgba(0,0,0,1)");
-  gx.addColorStop(1 - fadeX / cut.width, "rgba(0,0,0,1)"); gx.addColorStop(1, "rgba(0,0,0,0)");
-  cc.fillStyle = gx; cc.fillRect(0, 0, cut.width, cut.height);
-  const gy = cc.createLinearGradient(0, 0, 0, cut.height);
-  gy.addColorStop(0, "rgba(0,0,0,0)"); gy.addColorStop(0.14, "rgba(0,0,0,1)"); gy.addColorStop(1, "rgba(0,0,0,1)");
-  cc.fillStyle = gy; cc.fillRect(0, 0, cut.width, cut.height);
+  // Elipse centrada en el medio de la figura: semiejes ~0.5·ancho y ~0.58·alto —
+  // la cara (arriba) y los pies (abajo) conservan alpha casi pleno y el fundido
+  // a 0 pasa justo en el borde del recorte. Círculo radial + scale = elipse.
+  cc.save();
+  const semiX = cut.width * 0.5;
+  const semiY = cut.height * 0.58;
+  cc.translate(cut.width / 2, cut.height * 0.52);
+  cc.scale(1, semiY / semiX);
+  const rg = cc.createRadialGradient(0, 0, semiX * 0.55, 0, 0, semiX);
+  rg.addColorStop(0, "rgba(0,0,0,1)");
+  rg.addColorStop(0.55, "rgba(0,0,0,.95)");
+  rg.addColorStop(1, "rgba(0,0,0,0)");
+  cc.fillStyle = rg;
+  cc.fillRect(-cut.width * 2, -cut.width * 3, cut.width * 4, cut.width * 6);
+  cc.restore();
   ctx.drawImage(cut, canvasW * centerXRatio - cut.width / 2, canvasH - cut.height);
 }
 
