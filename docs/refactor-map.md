@@ -246,6 +246,8 @@ acción y adoptan el estado.
   ve"). Cloudflare (flux-1-schnell) queda SOLO para miniaturas ≤448×288
   (arquetipos, mapas). El gate vive en fetchViaCloudflare — no lo aflojes sin
   preguntarle a Fiamy: la calidad manda sobre la velocidad.
-- Portada: UNA sola generación (sin collage): prompt póster en storySceneImageUrl
-  (elenco grande en primer plano, caras iluminadas; castLine desde ForgedStoryBanner).
-  drawFadedFigure/loadImg eliminados.
+- Portada (definitivo 2026-07-10): fondo "lugar sin gente" (storySceneImageUrl,
+  prompt original → cache de fondos válido) + SOLO el héroe compositado con su
+  avatar REAL elegido (Frente o Cuerpo, hero.avatarUrl) vía drawFadedFigure
+  (máscara elíptica, recorte lateral 16%). NPCs NO se pegan (quedaban como
+  recortes). Cambiar Frente/Cuerpo recompone la portada.

@@ -1904,28 +1904,90 @@ function AssetForging() {
 }
 
 
-// Portada de la historia: UNA sola imagen generada con la escena Y el elenco
-// (héroe + hasta 2 NPCs con appearance) descriptos en el prompt — estilo, luz y
-// perspectiva coherentes. El viejo collage de retratos pegados quedó atrás.
+// Recorta la figura del héroe con máscara ELÍPTICA (fundido a 0 hacia los 4
+// bordes, sin esquinas visibles) y la apoya sobre la escena. Recorte lateral
+// previo: el retrato trae su propio fondo y entero se ve como un cartel.
+function loadImg(src: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = src;
+  return image.decode().then(() => image);
+}
+function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, centerXRatio: number, heightRatio: number, canvasW: number, canvasH: number) {
+  const h = canvasH * heightRatio;
+  const sideCrop = 0.16;
+  const sx = img.naturalWidth * sideCrop;
+  const sw = img.naturalWidth * (1 - sideCrop * 2);
+  const w = sw * (h / img.naturalHeight);
+  const cut = document.createElement("canvas");
+  cut.width = Math.max(1, Math.round(w)); cut.height = Math.max(1, Math.round(h));
+  const cc = cut.getContext("2d");
+  if (!cc) return;
+  cc.drawImage(img, sx, 0, sw, img.naturalHeight, 0, 0, cut.width, cut.height);
+  cc.globalCompositeOperation = "destination-in";
+  cc.save();
+  const semiX = cut.width * 0.5;
+  const semiY = cut.height * 0.58;
+  cc.translate(cut.width / 2, cut.height * 0.52);
+  cc.scale(1, semiY / semiX);
+  const rg = cc.createRadialGradient(0, 0, semiX * 0.55, 0, 0, semiX);
+  rg.addColorStop(0, "rgba(0,0,0,1)");
+  rg.addColorStop(0.55, "rgba(0,0,0,.95)");
+  rg.addColorStop(1, "rgba(0,0,0,0)");
+  cc.fillStyle = rg;
+  cc.fillRect(-cut.width * 2, -cut.width * 3, cut.width * 4, cut.width * 6);
+  cc.restore();
+  ctx.drawImage(cut, canvasW * centerXRatio - cut.width / 2, canvasH - cut.height);
+}
+
+// Portada de la historia: escena del mundo (sin gente, Pollinations flux) + TU
+// imagen REAL del héroe — el Frente o Cuerpo que elegiste como avatar — fundida
+// con elipse. Solo el héroe se composita: pegar NPCs encima se veía a recortes.
 function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
   const sceneHint = campaign.scenes[0]?.title;
-  const heroLine = heroPortraitSpec(hero).appearance;
-  const npcLines = campaign.npcs.filter((npc) => npc.appearance).slice(0, 2).map((npc) => npc.appearance as string);
-  const castLine = [`the protagonist (${heroLine})`, ...npcLines.map((line) => `beside them, ${line}`)].join("; ");
-  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint, castLine));
-  const ready = Boolean(src);
+  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint));
+  // La imagen elegida por el jugador manda: su avatar actual (Frente o Cuerpo).
+  const avatarUrl: string = hero.avatarUrl;
+  const heroShotUrl = isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : hero.look?.fullBodyUrl ?? null;
+  const [composed, setComposed] = useState<string | null>(null);
+  const ready = composed !== null || (Boolean(src) && !heroShotUrl);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
-  if (!src && status === "loading") return <AssetForging />;
+  useEffect(() => {
+    if (!src || !heroShotUrl) { setComposed(null); return; }
+    let alive = true;
+    void (async () => {
+      try {
+        const scene = await loadImg(src);
+        const canvas = document.createElement("canvas");
+        canvas.width = 1120; canvas.height = 480;
+        const ctx2d = canvas.getContext("2d");
+        if (!ctx2d) return;
+        ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
+        // Con race de 12s: si el retrato no está listo, la portada sale igual
+        // (solo la escena) y se recompone sola cuando el retrato llega.
+        const heroImg = await Promise.race([
+          loadPortrait(heroShotUrl, { priority: true }).then(loadImg),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000))
+        ]).catch(() => null);
+        if (heroImg) drawFadedFigure(ctx2d, heroImg, 0.74, 0.96, canvas.width, canvas.height);
+        if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
+      } catch {
+        if (alive) setComposed(null); // sin héroe listo: queda la escena sola
+      }
+    })();
+    return () => { alive = false; };
+  }, [src, heroShotUrl]);
+  if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
   if (!src) return null;
+  const cover = composed ?? src;
   const downloadCover = () => {
     const link = document.createElement("a");
-    link.href = src;
+    link.href = cover;
     link.download = `portada-${campaign.title.toLowerCase().replace(/\s+/g, "-").slice(0, 48)}.jpg`;
     link.click();
   };
   return (
     <div className="forgedBannerWrap">
-      <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title} con tu héroe`} />
+      <img className="forgedBanner portraitFade" src={cover} alt={`Escena de ${campaign.title} con tu héroe`} />
       <button className="bannerDownload" type="button" onClick={downloadCover} title="Descargar la portada" aria-label="Descargar la portada">
         <Download size={15} />
       </button>
