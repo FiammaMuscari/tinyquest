@@ -3974,13 +3974,8 @@ img.npcPortrait[src^="/assets/companions/"] {
   background: transparent;
 }
 
-/* 2) El héroe tiene UNA imagen (cuerpo entero). "Frente" = la misma imagen
-      recortada arriba (cover anclado a la cabeza); "Cuerpo" = figura completa. */
-.heroSpecial .heroSummaryRow img.summaryShot { object-position: center 8%; }
-.heroSpecial .heroSummaryRow img.summaryShot.fullShot { object-fit: contain; object-position: center top; background: rgba(5,8,18,.5); }
-.heroPortraitFrame:not(.fullbodyFrame) .heroPortrait { object-position: center 8%; }
-.heroPortraitFrame.fullbodyFrame .heroPortrait { object-fit: contain; background: rgba(5,8,18,.5); }
-.avatar img { object-position: center 12%; }
+/* 2) (revertido 2026-07-10: Frente y Cuerpo vuelven a ser DOS generaciones
+      propias con el mismo seed — el recorte CSS del cuerpo se veía peor.) */
 
 /* 3) Botones del héroe: "Guardar héroe" es EL botón (CTA dorado sólido, serif,
       más presencia); "Reimaginar" es su hermano enmarcado, mismo lenguaje. */

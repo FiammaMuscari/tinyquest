@@ -113,13 +113,18 @@ export function worldCardImageUrl(worldId: string, name: string, era: string, ta
 // creados interactuando. No es edición de la imagen del mundo (img2img no existe en
 // el tier gratis): es una generación nueva que hereda mundo + elenco, cacheada por
 // título. Cero uso de Gemini — las imágenes van siempre por Pollinations.
-export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, sceneHint?: string): string {
-  // Fondo de PAISAJE/AMBIENTE, SIN personajes: los personajes reales (héroe + NPCs)
-  // se compositan encima desde sus retratos generados, para que coincidan con el
-  // elenco de la historia (antes flux inventaba caras/perros que no cerraban).
-  const where = sceneHint?.trim() ? ` Setting detail: ${sceneHint}.` : "";
-  const prompt = `Epic fantasy environment concept art, cinematic wide establishing shot of an empty dramatic location for the tale "${storyTitle}" in ${worldName} (${era}).${where} No people, no characters, no creatures — only the place: architecture, terrain, sky, atmosphere. Painted, dramatic light, rich detail, no text`;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
+export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, sceneHint?: string, castLine?: string): string {
+  // Portada en UNA sola generación coherente: la escena Y el elenco descriptos en
+  // el prompt (estilo y luz consistentes). El collage de retratos pegados quedó
+  // atrás: se veía como recortes flotando sobre el fondo.
+  const where = sceneHint?.trim() ? ` Behind them, atmospheric and smaller: ${sceneHint}.` : "";
+  // Composición de póster: elenco GRANDE en primer plano con caras iluminadas
+  // (a contraluz salían siluetas); el lugar queda detrás como atmósfera.
+  const who = castLine?.trim()
+    ? ` Movie poster group composition: ${castLine}. They stand large in the foreground, waist-up, their faces clearly LIT, detailed and looking toward the viewer, warm light on their faces.`
+    : " No people, no characters — only the place, cinematic wide shot.";
+  const prompt = `Epic fantasy book cover illustration, one cohesive painted scene for the tale "${storyTitle}" in ${worldName} (${era}).${who}${where} Single consistent painterly style, rich color, sharp detail, no text, no borders, no split panels`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle + (castLine ?? "")) % 100000}`;
 }
 
 // Imagen de escena VIVA durante la partida: se genera con la historia real y se
@@ -219,6 +224,11 @@ async function fetchViaCloudflare(url: string): Promise<Blob | null> {
     if (!prompt) return null;
     const width = Number(parsed.searchParams.get("width") ?? "512");
     const height = Number(parsed.searchParams.get("height") ?? "512");
+    // Cloudflare SOLO para imágenes chicas de ambiente (escena viva, mapas,
+    // arquetipos), donde la velocidad manda. Retratos del héroe/NPCs y portadas
+    // van SIEMPRE por Pollinations flux: su aspecto es el bueno (medido con
+    // Fiamy 2026-07-10 — "el modelo anterior era mil veces mejor").
+    if (height > 400 || width > 900) return null;
     const seed = Number(parsed.searchParams.get("seed") ?? "0");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 50_000);

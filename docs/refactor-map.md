@@ -201,9 +201,10 @@ acción y adoptan el estado.
   ya era opt-in. Compañeras: los PNG de /assets/companions fueron REPROCESADOS
   con máscara circular (transparente fuera del círculo del emblema) — no
   restaurar los viejos. `img.npcPortrait[src^="/assets/companions/"]` sin sombra.
-- Héroe: UNA sola imagen generada (cuerpo). `heroImageUrls.face === .fullbody`;
-  "Frente" es recorte CSS (object-position center 8%) y "Cuerpo" object-fit
-  contain. No volver a generar el frente aparte — divergía de personaje.
+- Héroe (REVERTIDO 2026-07-10 tarde): Frente y Cuerpo son DOS generaciones con
+  el mismo seed/prompt raíz (characterPortraitUrl 3/4 cintura + fullBodyPortraitUrl
+  parado), SIEMPRE vía Pollinations flux — es EL estilo que Fiamy quiere (pintura
+  oscura al óleo). El experimento "frente = recorte CSS del cuerpo" se veía peor.
 - Teaser: emojis → iconos lucide (`.tIcon`, colores por card: misión dorado,
   en-juego turquesa, contra-vos rojo); título serif con llama. CTA social
   `.inviteCta` en el paso 4 (abre sala + código; usa onMultiplayerHost/mpBlocked).
@@ -238,3 +239,12 @@ acción y adoptan el estado.
   tamaño de la URL de Pollinations — la clave de caché NO cambia) y cae a
   Pollinations ante cualquier fallo. ~2s vs 20-90s. Sin credenciales: 501 y se
   apaga solo para la sesión.
+
+- Imágenes por proveedor (regla vigente 2026-07-10): Cloudflare Workers AI
+  (flux-1-schnell, ~2-4s) SOLO para imágenes chicas de ambiente
+  (height ≤ 400 y width ≤ 900: escena viva 512×288, mapas 448×252, arquetipos).
+  Retratos héroe/NPC (512×768) y portadas (1120×480) SIEMPRE Pollinations flux —
+  el estilo pintado que aprobó Fiamy. El gate vive en fetchViaCloudflare.
+- Portada: UNA sola generación (sin collage): prompt póster en storySceneImageUrl
+  (elenco grande en primer plano, caras iluminadas; castLine desde ForgedStoryBanner).
+  drawFadedFigure/loadImg eliminados.

@@ -1880,14 +1880,6 @@ function NpcPortrait({ name, role, portraitUrl, size = 46 }: { name: string; rol
   );
 }
 
-// Banner de la historia forjada: el mundo elegido con el elenco creado en escena.
-// URL determinística desde el contenido de la campaña → cacheado, cero re-cómputo.
-function loadImg(src: string): Promise<HTMLImageElement> {
-  const image = new Image();
-  image.src = src;
-  return image.decode().then(() => image);
-}
-
 // Cartel de forja de assets: spinner + frases que laten, rotando, mientras la IA
 // pinta la portada (escena del mundo + tu héroe compositado).
 const assetForgingLines = [
@@ -1911,105 +1903,29 @@ function AssetForging() {
   );
 }
 
-// Portada de la historia: la escena generada + TU AVATAR compositado encima con
-// bordes fundidos — la promesa es dura: sea cual sea tu imagen (IA o clásica),
-// aparece en la portada. El prompt además describe al héroe por si flux lo pinta.
-// Recorta una figura con bordes fundidos por los 4 lados y la apoya en el piso
-// de la portada, en la posición/escala pedidas. Devuelve el canvas recortado.
-function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, centerXRatio: number, heightRatio: number, canvasW: number, canvasH: number) {
-  const h = canvasH * heightRatio;
-  // Los retratos traen SU PROPIO fondo pintado: si se pegan enteros se ve un
-  // rectángulo de otro color sobre la escena. Receta anti-cuadrado:
-  //  1) recorte lateral (nos quedamos con la franja central donde vive la figura),
-  //  2) máscara ELÍPTICA que funde hacia los 4 bordes — sin esquinas visibles.
-  const sideCrop = 0.16;
-  const sx = img.naturalWidth * sideCrop;
-  const sw = img.naturalWidth * (1 - sideCrop * 2);
-  const w = sw * (h / img.naturalHeight);
-  const cut = document.createElement("canvas");
-  cut.width = Math.max(1, Math.round(w)); cut.height = Math.max(1, Math.round(h));
-  const cc = cut.getContext("2d");
-  if (!cc) return;
-  cc.drawImage(img, sx, 0, sw, img.naturalHeight, 0, 0, cut.width, cut.height);
-  cc.globalCompositeOperation = "destination-in";
-  // Elipse centrada en el medio de la figura: semiejes ~0.5·ancho y ~0.58·alto —
-  // la cara (arriba) y los pies (abajo) conservan alpha casi pleno y el fundido
-  // a 0 pasa justo en el borde del recorte. Círculo radial + scale = elipse.
-  cc.save();
-  const semiX = cut.width * 0.5;
-  const semiY = cut.height * 0.58;
-  cc.translate(cut.width / 2, cut.height * 0.52);
-  cc.scale(1, semiY / semiX);
-  const rg = cc.createRadialGradient(0, 0, semiX * 0.55, 0, 0, semiX);
-  rg.addColorStop(0, "rgba(0,0,0,1)");
-  rg.addColorStop(0.55, "rgba(0,0,0,.95)");
-  rg.addColorStop(1, "rgba(0,0,0,0)");
-  cc.fillStyle = rg;
-  cc.fillRect(-cut.width * 2, -cut.width * 3, cut.width * 4, cut.width * 6);
-  cc.restore();
-  ctx.drawImage(cut, canvasW * centerXRatio - cut.width / 2, canvasH - cut.height);
-}
 
-// Portada de la historia: fondo de LUGAR (sin personajes inventados) + los
-// retratos REALES compositados — el héroe y hasta 2 NPCs clave (los mismos que
-// tiene la historia, ej. Firulais), para que la portada coincida con el elenco.
+// Portada de la historia: UNA sola imagen generada con la escena Y el elenco
+// (héroe + hasta 2 NPCs con appearance) descriptos en el prompt — estilo, luz y
+// perspectiva coherentes. El viejo collage de retratos pegados quedó atrás.
 function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
   const sceneHint = campaign.scenes[0]?.title;
-  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint));
-  const avatarUrl: string = hero.avatarUrl;
-  const heroShotUrl = hero.look?.fullBodyUrl ?? (avatarUrl.startsWith("/") || isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : null);
-  // Hasta 2 NPCs con retrato generado (los reales de la historia) van a la portada.
-  const npcShots = campaign.npcs.filter((npc) => isGeneratedPortraitUrl(npc.portraitUrl)).slice(0, 2).map((npc) => npc.portraitUrl as string);
-  const [composed, setComposed] = useState<string | null>(null);
-  const ready = composed !== null || (!!src && !heroShotUrl);
+  const heroLine = heroPortraitSpec(hero).appearance;
+  const npcLines = campaign.npcs.filter((npc) => npc.appearance).slice(0, 2).map((npc) => npc.appearance as string);
+  const castLine = [`the protagonist (${heroLine})`, ...npcLines.map((line) => `beside them, ${line}`)].join("; ");
+  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint, castLine));
+  const ready = Boolean(src);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
-  useEffect(() => {
-    if (!src || !heroShotUrl) { setComposed(null); return; }
-    let alive = true;
-    void (async () => {
-      try {
-        const scene = await loadImg(src);
-        const canvas = document.createElement("canvas");
-        canvas.width = 1120; canvas.height = 480;
-        const ctx2d = canvas.getContext("2d");
-        if (!ctx2d) return;
-        ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
-        // NPCs primero (detrás), a la izquierda y centro, un poco más chicos. Cada
-        // uno con un race corto: Pollinations tarda 20-90s por retrato — NO bloquear
-        // la portada ni el botón Empezar por ellos; entran solo si están prontos.
-        const raceLoad = (url: string, ms: number) => Promise.race([
-          loadPortrait(url).then(loadImg),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
-        ]);
-        const npcPos = [{ x: 0.18, h: 0.8 }, { x: 0.4, h: 0.74 }];
-        const npcImgs = await Promise.all(npcShots.map((u) => raceLoad(u, 5000).catch(() => null)));
-        npcImgs.forEach((npcImg, i) => { if (npcImg) drawFadedFigure(ctx2d, npcImg, npcPos[i].x, npcPos[i].h, canvas.width, canvas.height); });
-        // El héroe adelante, a la derecha, el más grande (prioritario, ya cacheado).
-        // Con race de 10s: si no está listo, la portada igual se arma (no cuelga Empezar).
-        const heroImg = isGeneratedPortraitUrl(heroShotUrl)
-          ? await raceLoad(heroShotUrl, 10000).catch(() => null)
-          : await loadImg(heroShotUrl).catch(() => null);
-        if (heroImg) drawFadedFigure(ctx2d, heroImg, 0.74, 0.96, canvas.width, canvas.height);
-        if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
-      } catch {
-        if (alive) setComposed(null); // sin héroe listo: queda la escena sola
-      }
-    })();
-    return () => { alive = false; };
-  }, [src, heroShotUrl, npcShots.join(",")]);
-  // Generando (escena o composición): spinner + frases que laten.
-  if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
+  if (!src && status === "loading") return <AssetForging />;
   if (!src) return null;
-  const cover = composed ?? src;
   const downloadCover = () => {
     const link = document.createElement("a");
-    link.href = cover;
+    link.href = src;
     link.download = `portada-${campaign.title.toLowerCase().replace(/\s+/g, "-").slice(0, 48)}.jpg`;
     link.click();
   };
   return (
     <div className="forgedBannerWrap">
-      <img className="forgedBanner portraitFade" src={cover} alt={`Escena de ${campaign.title} con tu héroe`} />
+      <img className="forgedBanner portraitFade" src={src} alt={`Escena de ${campaign.title} con tu héroe`} />
       <button className="bannerDownload" type="button" onClick={downloadCover} title="Descargar la portada" aria-label="Descargar la portada">
         <Download size={15} />
       </button>
@@ -2086,14 +2002,15 @@ function lookComplete(draft: Character): boolean {
   return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
 }
 
-// El héroe tiene UNA sola imagen generada: el cuerpo entero. El "Frente" es la
-// MISMA imagen recortada arriba por CSS (encuadre, no otra generación): así el
-// frente es siempre variante fiel del cuerpo — mismo personaje garantizado al
-// 100% — y se ahorra una generación de Pollinations por héroe.
+// Las dos imágenes del héroe con el MISMO seed y prompt raíz (solo cambia el
+// encuadre): retrato de frente y cuerpo entero — la receta original que se veía
+// mil veces mejor que derivar el frente recortando el cuerpo (probado 2026-07-10).
 function heroImageUrls(draft: Character, nonce = 0): { face: string; fullbody: string } {
   const spec = heroPortraitSpec(draft);
-  const body = fullBodyPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce);
-  return { face: body, fullbody: body };
+  return {
+    face: characterPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce),
+    fullbody: fullBodyPortraitUrl(spec.name, spec.appearance, spec.styleHint, nonce)
+  };
 }
 
 function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => void }) {
