@@ -614,6 +614,29 @@ export function App() {
       avatarUrl: urls[shot]
     }));
   }
+  // CURACIÓN al arrancar: si el par guardado apunta a un template de prompt que
+  // ya no existe (p. ej. quedó estampado durante un experimento de estilo), se
+  // re-deriva del template VIGENTE conservando el seed — la imagen cacheada de
+  // antes vuelve instantánea. Idempotente: si ya coincide, no toca nada.
+  useEffect(() => {
+    const current = draftRef.current;
+    const stored = current.look?.faceUrl;
+    if (!stored || !isGeneratedPortraitUrl(stored)) return;
+    const expected = heroImageUrls(current);
+    const strip = (url: string) => url.replace(/seed=\d+$/, "");
+    if (strip(stored) === strip(expected.face)) return; // par sano, no tocar
+    const seed = stored.match(/seed=(\d+)$/)?.[1];
+    const face = seed ? expected.face.replace(/seed=\d+$/, `seed=${seed}`) : expected.face;
+    const fullbody = seed ? expected.fullbody.replace(/seed=\d+$/, `seed=${seed}`) : expected.fullbody;
+    const shot = current.look?.avatarShot ?? "face";
+    void loadPortrait(face, { priority: true }).catch(() => undefined);
+    void loadPortrait(fullbody, { priority: true }).catch(() => undefined);
+    setDraft(createCharacter({
+      ...current,
+      look: { ...current.look, faceUrl: face, fullBodyUrl: fullbody },
+      avatarUrl: shot === "fullbody" ? fullbody : face
+    }));
+  }, []);
   useEffect(() => {
     const current = draftRef.current.avatarUrl;
     if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
