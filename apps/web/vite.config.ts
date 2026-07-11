@@ -79,6 +79,35 @@ function llmProxyPlugin(): Plugin {
       register("/api/groq/chat", "https://api.groq.com/openai/v1/chat/completions", env.GROQ_API_KEY, "GROQ_API_KEY");
       register("/api/gemini/chat", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", env.GEMINI_API_KEY, "GEMINI_API_KEY");
 
+      // Proxy de Pollinations: el navegador corta conexiones largas contra su
+      // cola (fetch "Failed to fetch" intermitente en generaciones de 30-90s);
+      // servidor-a-servidor es estable. El cliente pide /api/pollinations?u=<url>
+      // y la clave de caché sigue siendo la URL original de Pollinations.
+      server.middlewares.use("/api/pollinations", async (request, response) => {
+        try {
+          const query = new URL(request.url ?? "", "http://local").searchParams;
+          const target = query.get("u") ?? "";
+          if (!target.startsWith("https://image.pollinations.ai/")) {
+            response.statusCode = 400;
+            response.end("solo image.pollinations.ai");
+            return;
+          }
+          const upstream = await fetch(target, { signal: AbortSignal.timeout(150000) });
+          const contentType = upstream.headers.get("content-type") ?? "";
+          if (!upstream.ok || !contentType.startsWith("image/")) {
+            response.statusCode = upstream.ok ? 502 : upstream.status;
+            response.end(`pollinations ${upstream.status} ${contentType}`);
+            return;
+          }
+          response.statusCode = 200;
+          response.setHeader("Content-Type", contentType);
+          response.end(Buffer.from(await upstream.arrayBuffer()));
+        } catch (error) {
+          response.statusCode = 502;
+          response.end(error instanceof Error ? error.message : "pollinations proxy failed");
+        }
+      });
+
       // Imágenes por Cloudflare Workers AI (rápido y gratis): el cliente manda
       // {prompt, width, height, seed} y recibe los bytes de la imagen. El token
       // vive SOLO acá (server-side). Sin credenciales responde 501 y el cliente
@@ -109,10 +138,13 @@ function llmProxyPlugin(): Plugin {
               method: "POST",
               headers: { "Authorization": `Bearer ${env.CF_AI_TOKEN}`, "Content-Type": "application/json" },
               body: JSON.stringify({
-                prompt: body.prompt.slice(0, 2048),
+                // El sufijo anti-firma va SOLO acá (server-side): la URL que
+                // hace de clave de caché en el cliente no cambia.
+                prompt: `${body.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
                 width: Math.min(2048, Math.max(256, body.width ?? 512)),
                 height: Math.min(2048, Math.max(256, body.height ?? 512)),
-                seed: body.seed
+                seed: body.seed,
+                ...(model.includes("flux") ? { steps: 8 } : {})
               }),
               signal: AbortSignal.timeout(45000)
             });

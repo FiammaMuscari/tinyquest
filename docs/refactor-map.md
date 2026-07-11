@@ -257,3 +257,9 @@ acción y adoptan el estado.
   avatar REAL elegido (Frente o Cuerpo, hero.avatarUrl) vía drawFadedFigure
   (máscara elíptica, recorte lateral 16%). NPCs NO se pegan (quedaban como
   recortes). Cambiar Frente/Cuerpo recompone la portada.
+- ⚠️ 2026-07-11: Pollinations RETIRÓ flux (models = ["sana"], calidad inferior,
+  cola 1/IP con 429). Vía principal AHORA: Cloudflare flux-1-schnell steps 8
+  para TODOS los tamaños (gate abierto en fetchViaCloudflare); proxy /api/cf-image
+  agrega ", no text, no signature, no watermark" server-side (la clave de caché
+  del cliente no cambia). Proxy /api/pollinations (dev server) + espera paciente
+  de 429 quedan como último recurso. Imágenes cacheadas: intactas.

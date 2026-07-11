@@ -246,12 +246,12 @@ async function fetchViaCloudflare(url: string): Promise<Blob | null> {
     if (!prompt) return null;
     const width = Number(parsed.searchParams.get("width") ?? "512");
     const height = Number(parsed.searchParams.get("height") ?? "512");
-    // Cloudflare SOLO para miniaturas (arquetipos, mapas de mundo ≤448px):
-    // TODO lo visible de la historia — retratos, portada Y la imagen viva del
-    // recorrido — va por Pollinations flux, el estilo pintado que aprobó Fiamy
-    // (2026-07-10: "me encanta como se ve ahora"). La espera de la primera
-    // generación la cubre el spinner + la imagen anterior (stale-while-revalidate).
-    if (height > 288 || width > 448) return null;
+    // CAMBIO DE PROVEEDOR (2026-07-11): Pollinations RETIRÓ flux — su único
+    // modelo hoy es "sana" (calidad muy inferior) y la cola por IP es de 1
+    // pedido (todo lo demás rebota 429). El estilo aprobado por Fiamy ES flux,
+    // así que la vía principal pasa a Cloudflare flux-1-schnell (steps 8, ~3s)
+    // para TODOS los tamaños; Pollinations queda solo de último recurso.
+    // Las claves de caché no cambian: lo ya generado sigue intacto.
     const seed = Number(parsed.searchParams.get("seed") ?? "0");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 50_000);
@@ -278,18 +278,44 @@ async function fetchViaCloudflare(url: string): Promise<Blob | null> {
   }
 }
 
+// Pollinations corta conexiones LARGAS de navegador de forma intermitente
+// ("Failed to fetch" tras 30-90s de cola, medido 2026-07-11): el dev server
+// hace de puente estable (/api/pollinations). Si el proxy no existe (build
+// estático), se cae al fetch directo de siempre. La clave de caché NO cambia.
+let pollinationsProxyAvailable = true;
+function portraitFetchTarget(url: string): string {
+  if (pollinationsProxyAvailable && url.startsWith("https://image.pollinations.ai/")) {
+    return `/api/pollinations?u=${encodeURIComponent(url)}`;
+  }
+  return url;
+}
+
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
   const fast = await fetchViaCloudflare(url);
   if (fast) return fast;
   let lastError: unknown = new Error("portrait fetch failed");
-  for (const delay of RETRY_DELAYS_MS) {
+  // Pollinations 2026-07: cola por IP de UN solo pedido — cualquier extra rebota
+  // con 429 al instante (otra pestaña, la portada, un reintento cruzado). Un 429
+  // NO es un fallo real: es "esperá tu turno" — se espera 20s y se reintenta
+  // hasta 8 veces extra sin quemar la serie normal de reintentos.
+  const delays = [...RETRY_DELAYS_MS];
+  const MAX_429_WAITS = 8;
+  let waits429 = 0;
+  for (let attempt = 0; attempt < delays.length; attempt += 1) {
+    const delay = delays[attempt];
     if (delay > 0) await sleep(delay);
     await acquireSlot(priority);
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
       try {
-        const response = await fetch(url, { signal: controller.signal });
+        const target = portraitFetchTarget(url);
+        const response = await fetch(target, { signal: controller.signal });
+        if (target !== url && (response.status === 404 || response.status === 405)) {
+          // Sin proxy (p. ej. preview estático): directo de acá en adelante.
+          pollinationsProxyAvailable = false;
+          throw new Error("proxy no disponible");
+        }
         if (!response.ok) throw new Error(`portrait HTTP ${response.status}`);
         const blob = await response.blob();
         if (!blob.type.startsWith("image/")) throw new Error(`portrait content-type ${blob.type}`);
@@ -299,6 +325,10 @@ async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> 
       }
     } catch (error) {
       lastError = error;
+      if (String(error).includes("HTTP 429") && waits429 < MAX_429_WAITS) {
+        waits429 += 1;
+        delays.push(20_000);
+      }
     } finally {
       releaseSlot();
     }
