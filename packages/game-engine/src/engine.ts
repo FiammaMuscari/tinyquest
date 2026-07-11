@@ -3,7 +3,7 @@ import { resolveCoherentTurnFacts } from "./action-outcomes";
 import { applyStatePatch } from "./game/memory/game-state.reducer";
 import { clueIdsForChoice, createLivingStateForRoom, emptyStatePatch, filterUndiscoveredClueIds, isValidRevealClueId } from "./living-state-adapter";
 import { createCharacter } from "./character";
-import { capDangerGainForRound, getDangerBand } from "./danger";
+import { capDangerGainForRound, dangerCapForParty, getDangerBand } from "./danger";
 import { rollConsequence } from "./consequences";
 import { resolveCheck } from "./checks";
 import { createBotPlayers } from "./bots";
@@ -411,7 +411,11 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
   const currentRoundDangerGain = room.sessionLog
     .filter((event) => event.sceneId === currentScene.id && event.roundNumber === room.roundInScene + 1)
     .reduce((total, event) => total + Math.max(0, event.dangerDelta ?? 0), 0);
-  const dangerGain = capDangerGainForRound({ requestedGain: requestedDangerGain, currentRoundGain: currentRoundDangerGain });
+  const dangerGain = capDangerGainForRound({
+    requestedGain: requestedDangerGain,
+    currentRoundGain: currentRoundDangerGain,
+    maxGainPerRound: dangerCapForParty(room.players.length)
+  });
   const dangerClock = Math.min(10, room.dangerClock + dangerGain);
   const companionDeath = activePlayer.type === "bot"
     && activePlayer.status !== "dead"

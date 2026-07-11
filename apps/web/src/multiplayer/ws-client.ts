@@ -30,6 +30,25 @@ export type MultiplayerEventMap = {
 
 type Handler<T> = (payload: T) => void;
 
+// Asiento persistido para reconectar tras una recarga: el server guarda el asiento
+// durante 5 min de gracia, así que rejoin_room por playerId nos vuelve a sentar.
+const SEAT_KEY = "tiny-quest:mp-seat";
+type StoredSeat = { roomCode: string; playerId: string };
+function saveSeat(roomCode: string, playerId: string): void {
+  try { localStorage.setItem(SEAT_KEY, JSON.stringify({ roomCode, playerId })); } catch { /* sin storage */ }
+}
+function loadSeat(): StoredSeat | null {
+  try {
+    const raw = localStorage.getItem(SEAT_KEY);
+    if (!raw) return null;
+    const seat = JSON.parse(raw) as StoredSeat;
+    return seat.roomCode && seat.playerId ? seat : null;
+  } catch { return null; }
+}
+function clearSeat(): void {
+  try { localStorage.removeItem(SEAT_KEY); } catch { /* sin storage */ }
+}
+
 const emptyState: MultiplayerState = {
   phase: "idle",
   roomCode: null,
@@ -119,6 +138,7 @@ export class MultiplayerClient {
 
   disconnect(): void {
     this.stopPing();
+    clearSeat(); // salida intencional: no queremos reconectar a esta sala
     this.pending = [];
     if (this.ws) {
       this.ws.onclose = null; // salida limpia: no dispares "host_gone"
@@ -146,7 +166,16 @@ export class MultiplayerClient {
   joinRoom(roomCode: string, playerName: string, character: Character): void {
     this.connect();
     this.setState({ phase: "lobby_guest", isHost: false });
-    this.send({ type: "join_room", roomCode: roomCode.toUpperCase(), playerName, character });
+    const code = roomCode.toUpperCase();
+    // Reconexión: si ya tenemos un asiento en ESTA sala (recarga de página o caída
+    // breve), pedimos rejoin_room —re-sienta por playerId y NO chequea la puerta—
+    // en vez de un join nuevo, que daría "sala cerrada" con la historia ya empezada.
+    const seat = loadSeat();
+    if (seat && seat.roomCode === code) {
+      this.send({ type: "rejoin_room", roomCode: code, playerId: seat.playerId });
+      return;
+    }
+    this.send({ type: "join_room", roomCode: code, playerName, character });
   }
 
   // ─── Acciones (host) ────────────────────────────────────────────────────────
@@ -198,13 +227,18 @@ export class MultiplayerClient {
         this.setState({ roomCode: msg.roomCode, playerId: msg.playerId, isHost: true, players: msg.players, phase: "lobby_host" });
         break;
 
-      case "room_joined":
+      case "room_joined": {
+        const rejoinedActive = this._state.gameRoom !== null; // llegó estado tras rejoin
+        const isHostSeat = msg.players.find((p) => p.id === msg.playerId)?.isHost ?? this._state.isHost;
+        // Guardamos el asiento para poder reconectar tras una recarga (solo invitados).
+        if (!isHostSeat) saveSeat(msg.roomCode, msg.playerId);
         this.setState({
-          roomCode: msg.roomCode, playerId: msg.playerId, players: msg.players,
-          isHost: msg.players.find((p) => p.id === msg.playerId)?.isHost ?? this._state.isHost,
-          phase: this._state.phase === "lobby_host" ? "lobby_host" : "waiting_room"
+          roomCode: msg.roomCode, playerId: msg.playerId, players: msg.players, isHost: isHostSeat,
+          errorMessage: null,
+          phase: this._state.phase === "lobby_host" ? "lobby_host" : rejoinedActive ? this._state.phase : "waiting_room"
         });
         break;
+      }
 
       case "player_joined":
       case "player_left":
@@ -215,7 +249,7 @@ export class MultiplayerClient {
       case "story_started": {
         const state = msg.state as GameRoom;
         this.setState({
-          gameRoom: state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn,
+          gameRoom: state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn, errorMessage: null,
           phase: state.sessionComplete ? "ended" : msg.yourTurn ? "active" : "watching"
         });
         this.emit("story_started", { state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn });
@@ -225,7 +259,7 @@ export class MultiplayerClient {
       case "state_update": {
         const state = msg.state as GameRoom;
         this.setState({
-          gameRoom: state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn,
+          gameRoom: state, activePlayerId: msg.activePlayerId, yourTurn: msg.yourTurn, errorMessage: null,
           lastEventSummary: msg.eventSummary ?? this._state.lastEventSummary,
           phase: state.sessionComplete ? "ended" : msg.yourTurn ? "active" : "watching"
         });
@@ -247,6 +281,10 @@ export class MultiplayerClient {
         break;
 
       case "error":
+        // El asiento guardado ya no sirve (sala/asiento inexistente o partida
+        // terminada): lo borramos para no reintentar rejoin en loop y permitir un
+        // join limpio. El resto de errores no tocan el asiento.
+        if (msg.code === "room_not_found" || msg.code === "game_ended") clearSeat();
         this.setState({ errorMessage: msg.message });
         this.emit("error", msg.message);
         break;

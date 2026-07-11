@@ -1,10 +1,10 @@
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Brain, Dices, Download, Flame, Gem, Heart, HelpCircle, Hourglass, Lightbulb, Pause, Play, Scale, ShieldAlert, Sparkles, Swords, Target, UserPlus, Users, Wand2, X, Zap } from "lucide-react";
+import { Bot, Brain, Dices, Download, Flame, Heart, HelpCircle, Hourglass, Lightbulb, Pause, Play, Sparkles, Target, UserPlus, Users, Wand2, X, Zap } from "lucide-react";
 import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 
 // Play/pausa del ambiente (song-of-the-north) — vive en los popups de ayuda y ajustes.
@@ -690,6 +690,21 @@ export function App() {
   // somos host y difundir, sin capturar un mpState viejo.
   const mpRef = useRef(mpState);
   useEffect(() => { mpRef.current = mpState; }, [mpState]);
+  // Ref al runTurn ACTUAL: el handler de guest_action se registra una sola vez
+  // (efecto con deps []), así que sin esto ejecutaría el runTurn del PRIMER render
+  // —con room=null— y descartaría la acción del invitado. Actualizado en cada
+  // render para que el host siempre resuelva contra el estado vigente.
+  // Refs "última versión" de los handlers que se disparan por eventos de SERVIDOR.
+  // Sus listeners se registran una sola vez (efecto con deps []), así que sin estos
+  // refs ejecutarían la clausura del PRIMER render —con room=null y estado viejo— y
+  // descartarían la acción/estado que llega de la red. Se reasignan en cada render
+  // (las funciones están hoisteadas) para apuntar siempre a la instancia vigente.
+  const runTurnRef = useRef<(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean) => Promise<void>>(() => Promise.resolve());
+  const launchMultiplayerRoomRef = useRef<(mpRoom: GameRoom) => void>(() => {});
+  const adoptRemoteRoomRef = useRef<(mpRoom: GameRoom) => void>(() => {});
+  runTurnRef.current = runTurn;
+  launchMultiplayerRoomRef.current = launchMultiplayerRoom;
+  adoptRemoteRoomRef.current = adoptRemoteRoom;
 
   useEffect(() => {
     const handler = (s: MultiplayerState) => {
@@ -702,14 +717,14 @@ export function App() {
   // Invitado: el host arrancó la historia. Adoptamos el GameRoom recibido y
   // montamos la apertura local (misma que en solo, derivada de la campaña).
   useEffect(() => {
-    const onStart = ({ state }: { state: GameRoom }) => { launchMultiplayerRoom(state); };
+    const onStart = ({ state }: { state: GameRoom }) => { launchMultiplayerRoomRef.current(state); };
     multiplayerClient.on("story_started", onStart);
     return () => multiplayerClient.off("story_started", onStart);
   }, []);
 
   // Invitado: llegó un estado autoritativo nuevo del host tras resolver un turno.
   useEffect(() => {
-    const onUpdate = ({ state }: { state: GameRoom }) => { adoptRemoteRoom(state); };
+    const onUpdate = ({ state }: { state: GameRoom }) => { adoptRemoteRoomRef.current(state); };
     multiplayerClient.on("state_update", onUpdate);
     return () => multiplayerClient.off("state_update", onUpdate);
   }, []);
@@ -718,7 +733,7 @@ export function App() {
   // tiene activePlayerIndex apuntando a ese invitado (lo dejamos ahí al difundir).
   useEffect(() => {
     const onGuestAction = ({ action, stat, usePet: guestUsePet }: { action: string; stat: StatKey; usePet: boolean }) => {
-      void runTurn(action, stat, guestUsePet);
+      void runTurnRef.current(action, stat, guestUsePet);
     };
     multiplayerClient.on("guest_action", onGuestAction);
     return () => multiplayerClient.off("guest_action", onGuestAction);
@@ -784,7 +799,9 @@ export function App() {
       multiplayerClient.submitAction(pick.action, pick.recommendedStats[0], false);
       return;
     }
-    void runTurn(pick.action, pick.recommendedStats[0]);
+    // Vía ref: garantiza el runTurn vigente (con visibleChoices/scene actuales),
+    // aunque el efecto no liste esas dependencias.
+    void runTurnRef.current(pick.action, pick.recommendedStats[0]);
   }, [remainingSeconds, room, busy]);
 
   const [sceneImageUrl, setSceneImageUrl] = useState(scene.atmosphere.fallbackImage);
@@ -850,7 +867,7 @@ export function App() {
     if (!room) return;
     const styleHint = `${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`;
     for (const npc of room.campaign.npcs) {
-      loadPortrait(npc.portraitUrl ?? characterPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)).catch(() => undefined);
+      loadPortrait(npc.portraitUrl ?? beingPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)).catch(() => undefined);
     }
   }, [room?.selectedCampaignId]);
 
@@ -1151,7 +1168,7 @@ export function App() {
       // El LLM imaginó el aspecto de cada personaje: acá nace su retrato generado.
       const campaign: Campaign = {
         ...built,
-        npcs: built.npcs.map((npc) => ({ ...npc, portraitUrl: characterPortraitUrl(npc.name, npc.appearance ?? npc.description, `${world.era}, ${world.name}`) }))
+        npcs: built.npcs.map((npc) => ({ ...npc, portraitUrl: beingPortraitUrl(npc.name, npc.appearance ?? npc.description, `${world.era}, ${world.name}`) }))
       };
       setImprovisedCampaign(campaign);
       setImprovisedWorldId(world.id);
@@ -1669,35 +1686,18 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   </div>
                 </div>
               )}
-              {/* Menos info a la vista: lo que arriesgás se abre solo si querés saberlo. */}
-              {(improvisedCampaign.forgeNotes?.summary?.risk || (improvisedCampaign.forgeNotes?.evidence?.length ?? 0) > 0) && (
-                <details className="stakesFold">
-                  <summary><Scale size={14} className="tIcon" /> Lo que está en juego — abrilo si te animás</summary>
-                  <div className="summaryGrid">
-                    {improvisedCampaign.forgeNotes?.summary?.risk && (
-                      <div className="summaryCard stakes">
-                        <em><Gem size={14} className="tIcon" /> En juego</em>
-                        <p>{normalizeUiText(improvisedCampaign.forgeNotes.summary.risk)}</p>
-                      </div>
-                    )}
-                    {improvisedCampaign.forgeNotes?.evidence && improvisedCampaign.forgeNotes.evidence.length > 0 && (
-                      <div className="summaryCard against">
-                        <em><ShieldAlert size={14} className="tIcon" /> Contra vos</em>
-                        <ul>
-                          {improvisedCampaign.forgeNotes.evidence.slice(0, 3).map((item) => <li key={item}>{normalizeUiText(item)}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </details>
-              )}
-              {improvisedCampaign.forgeNotes?.heroBond && <p className="heroBondLine"><Swords size={14} className="tIcon" /> {normalizeUiText(improvisedCampaign.forgeNotes.heroBond)}</p>}
+              {/* "Lo que está en juego" se sacó del teaser (pedido de Fiamy): era
+                  info innecesaria; el riesgo/evidencia se descubre jugando. */}
+              {/* heroBond: se sigue generando y validando (ata la historia al héroe),
+                  pero NO se muestra — en el teaser era texto redundante/ruidoso. */}
+              {/* Solo si el jugador dio ideas (input no vacío): cada cambio en su
+                  propia línea, explicación corta, sin flecha de acordeón ni símbolos. */}
               {improvisedCampaign.forgeNotes?.keywordsUsed && improvisedCampaign.forgeNotes.keywordsUsed.length > 0 && (
                 <details className="keywordsUsed">
                   <summary><Lightbulb size={14} className="tIcon" /> Cómo se usaron tus ideas</summary>
                   <div>
                     {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
-                      <span key={keyword.idea}>✓ {normalizeUiText(keyword.idea)} → {normalizeUiText(keyword.how)}</span>
+                      <span key={keyword.idea}>{normalizeUiText(keyword.idea)}: {normalizeUiText(keyword.how)}</span>
                     ))}
                   </div>
                 </details>
@@ -1723,9 +1723,9 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                     type="button"
                     className="castChip threat castChipButton"
                     style={{ "--chip-i": improvisedCampaign.npcs.length } as CSSProperties}
-                    onClick={() => setCastPeek({ name: improvisedCampaign.enemies[0].name, description: improvisedCampaign.enemies[0].description, portraitUrl: characterPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`), threat: true, dangerLevel: improvisedCampaign.enemies[0].dangerLevel })}
+                    onClick={() => setCastPeek({ name: improvisedCampaign.enemies[0].name, description: improvisedCampaign.enemies[0].description, portraitUrl: beingPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`), threat: true, dangerLevel: improvisedCampaign.enemies[0].dangerLevel })}
                   >
-                    <NpcPortrait name={improvisedCampaign.enemies[0].name} role="amenaza" size={28} portraitUrl={characterPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`)} />
+                    <NpcPortrait name={improvisedCampaign.enemies[0].name} role="amenaza" size={28} portraitUrl={beingPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`)} />
                     <span className="castChipText">
                       <strong>{improvisedCampaign.enemies[0].name}</strong>
                       <small>La amenaza de esta historia</small>
@@ -1904,15 +1904,18 @@ function AssetForging() {
 }
 
 
-// Recorta la figura del héroe con máscara ELÍPTICA (fundido a 0 hacia los 4
-// bordes, sin esquinas visibles) y la apoya sobre la escena. Recorte lateral
-// previo: el retrato trae su propio fondo y entero se ve como un cartel.
 function loadImg(src: string): Promise<HTMLImageElement> {
   const image = new Image();
   image.src = src;
   return image.decode().then(() => image);
 }
-function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, centerXRatio: number, heightRatio: number, canvasW: number, canvasH: number) {
+
+// Apoya una figura del reparto sobre la escena para la portada. Máscara ANCLADA
+// AL PISO: se desvanece hacia los lados y hacia arriba, pero el borde inferior
+// queda sólido y baja del cuadro — así la figura "entra" en la escena en vez de
+// flotar como busto. Sombra de contacto abajo para que se asiente. `dim`: velo
+// azulado para los secundarios (perspectiva atmosférica: leen como "más atrás").
+function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, centerXRatio: number, heightRatio: number, canvasW: number, canvasH: number, dim = 0) {
   const h = canvasH * heightRatio;
   const sideCrop = 0.16;
   const sx = img.naturalWidth * sideCrop;
@@ -1923,31 +1926,87 @@ function drawFadedFigure(ctx: CanvasRenderingContext2D, img: HTMLImageElement, c
   const cc = cut.getContext("2d");
   if (!cc) return;
   cc.drawImage(img, sx, 0, sw, img.naturalHeight, 0, 0, cut.width, cut.height);
+  // Máscara = producto de dos gradientes (destination-in multiplica el alfa):
+  // horizontal funde los costados; vertical funde SOLO arriba y deja el pie sólido.
   cc.globalCompositeOperation = "destination-in";
-  cc.save();
-  const semiX = cut.width * 0.5;
-  const semiY = cut.height * 0.58;
-  cc.translate(cut.width / 2, cut.height * 0.52);
-  cc.scale(1, semiY / semiX);
-  const rg = cc.createRadialGradient(0, 0, semiX * 0.55, 0, 0, semiX);
-  rg.addColorStop(0, "rgba(0,0,0,1)");
-  rg.addColorStop(0.55, "rgba(0,0,0,.95)");
-  rg.addColorStop(1, "rgba(0,0,0,0)");
-  cc.fillStyle = rg;
-  cc.fillRect(-cut.width * 2, -cut.width * 3, cut.width * 4, cut.width * 6);
-  cc.restore();
-  ctx.drawImage(cut, canvasW * centerXRatio - cut.width / 2, canvasH - cut.height);
+  const hg = cc.createLinearGradient(0, 0, cut.width, 0);
+  hg.addColorStop(0, "rgba(0,0,0,0)");
+  hg.addColorStop(0.24, "rgba(0,0,0,1)");
+  hg.addColorStop(0.76, "rgba(0,0,0,1)");
+  hg.addColorStop(1, "rgba(0,0,0,0)");
+  cc.fillStyle = hg;
+  cc.fillRect(0, 0, cut.width, cut.height);
+  const vg = cc.createLinearGradient(0, 0, 0, cut.height);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(0.16, "rgba(0,0,0,1)");
+  vg.addColorStop(1, "rgba(0,0,0,1)");
+  cc.fillStyle = vg;
+  cc.fillRect(0, 0, cut.width, cut.height);
+  if (dim > 0) {
+    cc.globalCompositeOperation = "source-atop";
+    cc.fillStyle = `rgba(9,12,22,${dim})`;
+    cc.fillRect(0, 0, cut.width, cut.height);
+  }
+  const dx = canvasW * centerXRatio - cut.width / 2;
+  // Sombra de contacto: elipse oscura bajo la figura para que no flote.
+  ctx.save();
+  ctx.globalAlpha = 0.4 * (1 - dim * 0.5);
+  const shW = cut.width * 0.6;
+  const grad = ctx.createRadialGradient(canvasW * centerXRatio, canvasH - 6, 0, canvasW * centerXRatio, canvasH - 6, shW);
+  grad.addColorStop(0, "rgba(0,0,0,.85)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(canvasW * centerXRatio - shW, canvasH - 40, shW * 2, 40);
+  ctx.restore();
+  ctx.drawImage(cut, dx, canvasH - cut.height);
+}
+
+// Pase de unificación sobre la portada COMPLETA: viñeta oscura en los bordes
+// (funde figuras y fondo, y tapa el texto basura que flux mete en las esquinas)
+// + grano fino para que retrato y escena dejen de leerse como capas separadas.
+function unifyCover(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.42, w / 2, h / 2, Math.max(w, h) * 0.62);
+  vg.addColorStop(0, "rgba(0,0,0,0)");
+  vg.addColorStop(1, "rgba(0,0,0,.34)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
+  const tile = document.createElement("canvas");
+  tile.width = 160; tile.height = 90;
+  const tc = tile.getContext("2d");
+  if (tc) {
+    const noise = tc.createImageData(tile.width, tile.height);
+    for (let i = 0; i < noise.data.length; i += 4) {
+      const v = (Math.random() * 255) | 0;
+      noise.data[i] = noise.data[i + 1] = noise.data[i + 2] = v;
+      noise.data[i + 3] = 255;
+    }
+    tc.putImageData(noise, 0, 0);
+    ctx.save();
+    ctx.globalAlpha = 0.045;
+    ctx.globalCompositeOperation = "overlay";
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(tile, 0, 0, w, h);
+    ctx.restore();
+  }
 }
 
 // Portada de la historia: escena del mundo (sin gente, Pollinations flux) + TU
 // imagen REAL del héroe — el Frente o Cuerpo que elegiste como avatar — fundida
-// con elipse. Solo el héroe se composita: pegar NPCs encima se veía a recortes.
+// con elipse, AL FRENTE y grande, flanqueada por 1-2 personajes secundarios del
+// elenco (más chicos y oscurecidos = atrás, en escena). Cada figura usa el mismo
+// fundido elíptico: leen como tapa de libro con reparto, no como recortes pegados.
 function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
   const sceneHint = campaign.scenes[0]?.title;
   const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint));
   // La imagen elegida por el jugador manda: su avatar actual (Frente o Cuerpo).
   const avatarUrl: string = hero.avatarUrl;
   const heroShotUrl = isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : hero.look?.fullBodyUrl ?? null;
+  // Hasta 2 secundarios con retrato ya generado: acompañan al héroe en la portada.
+  const castShotUrls = (campaign.npcs ?? [])
+    .map((npc) => npc.portraitUrl)
+    .filter(isGeneratedPortraitUrl)
+    .slice(0, 2);
+  const castKey = castShotUrls.join("|");
   const [composed, setComposed] = useState<string | null>(null);
   const ready = composed !== null || (Boolean(src) && !heroShotUrl);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
@@ -1957,25 +2016,52 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
     void (async () => {
       try {
         const scene = await loadImg(src);
-        const canvas = document.createElement("canvas");
-        canvas.width = 1120; canvas.height = 480;
-        const ctx2d = canvas.getContext("2d");
-        if (!ctx2d) return;
-        ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
-        // Con race de 12s: si el retrato no está listo, la portada sale igual
-        // (solo la escena) y se recompone sola cuando el retrato llega.
-        const heroImg = await Promise.race([
-          loadPortrait(heroShotUrl, { priority: true }).then(loadImg),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000))
-        ]).catch(() => null);
-        if (heroImg) drawFadedFigure(ctx2d, heroImg, 0.74, 0.96, canvas.width, canvas.height);
-        if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
+        const hasCast = castShotUrls.length > 0;
+        // El héroe se centra (0.5) SIEMPRE que la historia tenga elenco, aunque los
+        // NPCs todavía no hayan cargado: así reserva su lugar y no salta cuando llegan.
+        const heroX = hasCast ? 0.5 : 0.72;
+        const castSlots: Array<{ x: number; h: number; dim: number }> = [
+          { x: 0.17, h: 0.92, dim: 0.42 },
+          { x: 0.85, h: 0.96, dim: 0.36 }
+        ];
+        // Redibuja la portada completa con lo que haya cargado hasta el momento.
+        const render = (heroImg: HTMLImageElement | null, castImgs: Array<HTMLImageElement | null>) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = 1120; canvas.height = 480;
+          const ctx2d = canvas.getContext("2d");
+          if (!ctx2d) return;
+          ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
+          castImgs.forEach((img, i) => {
+            const slot = castSlots[i];
+            if (img && slot) drawFadedFigure(ctx2d, img, slot.x, slot.h, canvas.width, canvas.height, slot.dim);
+          });
+          if (heroImg) drawFadedFigure(ctx2d, heroImg, heroX, 1.08, canvas.width, canvas.height);
+          unifyCover(ctx2d, canvas.width, canvas.height); // viñeta + grano: funde todo
+          if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
+        };
+        const load = (url: string, priority: boolean) => loadPortrait(url, { priority }).then(loadImg).catch(() => null);
+        // FASE 1 — portada rápida con el héroe (prioritario). Si tarda mucho, race
+        // de 15s para no dejar la escena vacía; igual se recompone en la fase 2.
+        const heroImg = await Promise.race<HTMLImageElement | null>([
+          load(heroShotUrl, true),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000))
+        ]);
+        render(heroImg, []);
+        if (!hasCast) return;
+        // FASE 2 — los secundarios cargan SIN timeout que los descarte (Pollinations
+        // tarda en la primera generación); cuando terminan, la portada se rearma con
+        // el elenco. loadPortrait ya reintenta y cachea, así que llegan aunque tarden.
+        const [heroReady, ...castImgs] = await Promise.all([
+          heroImg ? Promise.resolve(heroImg) : load(heroShotUrl, true),
+          ...castShotUrls.map((url) => load(url, false))
+        ]);
+        if (alive && castImgs.some(Boolean)) render(heroReady, castImgs);
       } catch {
         if (alive) setComposed(null); // sin héroe listo: queda la escena sola
       }
     })();
     return () => { alive = false; };
-  }, [src, heroShotUrl]);
+  }, [src, heroShotUrl, castKey]);
   if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
   if (!src) return null;
   const cover = composed ?? src;
@@ -2076,6 +2162,10 @@ function heroImageUrls(draft: Character, nonce = 0): { face: string; fullbody: s
 }
 
 function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => void }) {
+  // Solo se muestra el retrato + nombre + descripción (pedido de Fiamy: el resto
+  // —vínculo, deseo, miedo, mentira— se descubre jugando). Tocar el retrato lo
+  // abre en grande (lightbox); un click en cualquier lado del lightbox lo cierra.
+  const [zoomed, setZoomed] = useState(false);
   return (
     <div className="castModalBackdrop" onClick={onClose} role="presentation">
       <div className="castModal peekModal" role="dialog" aria-label={peek.name} onClick={(event) => event.stopPropagation()}>
@@ -2084,20 +2174,20 @@ function CharacterPeekModal({ peek, onClose }: { peek: CastPeek; onClose: () => 
           <button type="button" className="castClose" onClick={onClose} aria-label="Cerrar"><X size={16} /></button>
         </div>
         <div className="peekBody">
-          <NpcPortrait name={peek.name} role={peek.threat ? "amenaza" : peek.role} portraitUrl={peek.portraitUrl} size={92} />
+          <button type="button" className="peekPortraitZoom" onClick={() => setZoomed(true)} aria-label={`Ver el retrato de ${peek.name} en grande`}>
+            <NpcPortrait name={peek.name} role={peek.threat ? "amenaza" : peek.role} portraitUrl={peek.portraitUrl} size={92} />
+          </button>
           <div className="peekIdentity">
             <strong>{normalizeUiText(peek.name)}</strong>
-            {peek.role && <span className="castRole">{normalizeUiText(peek.role)}</span>}
-            {peek.threat && typeof peek.dangerLevel === "number" && <span className="peekDanger">Peligro {peek.dangerLevel}/10</span>}
           </div>
         </div>
-        {peek.bond && <p className="peekBond">{normalizeUiText(peek.bond)}</p>}
         <p className="peekDesc">{normalizeUiText(peek.description)}</p>
-        {peek.desire && <p className="peekTrait"><em>Quiere</em>{normalizeUiText(peek.desire)}</p>}
-        {peek.fear && <p className="peekTrait"><em>Teme</em>{normalizeUiText(peek.fear)}</p>}
-        {peek.whyMightLie && <p className="peekTrait"><em>Podría mentirte</em>{normalizeUiText(peek.whyMightLie)}</p>}
-        <p className="peekSealed">Lo que esconde queda sellado hasta que lo descubras jugando.</p>
       </div>
+      {zoomed && (
+        <div className="peekLightbox" role="presentation" onClick={(event) => { event.stopPropagation(); setZoomed(false); }}>
+          <NpcPortrait name={peek.name} role={peek.threat ? "amenaza" : peek.role} portraitUrl={peek.portraitUrl} size={360} />
+        </div>
+      )}
     </div>
   );
 }
@@ -2284,7 +2374,7 @@ function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcI
               {present.map((npc) => (
                 <div key={npc.id} className="castCard open">
                   <span className="castHead">
-                    <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl ?? characterPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)} />
+                    <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl ?? beingPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)} />
                     <span className="castHeadText">
                       <strong>{npc.name}</strong>
                       {npc.role && <span className="castRole">{npc.role}</span>}
@@ -2367,9 +2457,10 @@ function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraft
           const disabled = !canPayActionEnergy(energy, choice);
           const roundsLeft = choice.expiresAfterRound !== undefined ? choice.expiresAfterRound - roundInScene : null;
           const isCrisis = choice.skillTag === "crisis";
+          const fullLabel = enrichedLabels?.[choice.id] ?? choice.label;
           return (
-            <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""} ${isCrisis ? "crisisChoice" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button">
-              <strong>{enrichedLabels?.[choice.id] ?? choice.label}</strong>
+            <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""} ${isCrisis ? "crisisChoice" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button" title={fullLabel}>
+              <strong>{fullLabel}</strong>
               {/* Un solo tag por opción: el stat principal. Excepciones puntuales:
                   expiración inminente y costo solo cuando bloquea por falta de energía. */}
               <div className="choiceMeta">

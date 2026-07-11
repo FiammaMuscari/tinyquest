@@ -15,6 +15,12 @@ section** — an outdated map costs more than no map.
 4. Fiamy plays at **1360×700**. Verify UI at that size, not at 1300-1500+.
 5. Dev runs with React StrictMode semantics (double effect invocation). Effects
    that write state on mount must be idempotent (compare before set).
+6. **El estilo de imagen es un contrato.** Todos los prompts de Pollinations se
+   componen desde la constante `STYLE_DNA` en `apps/web/src/portraits.ts` — nunca
+   escribir fragmentos de estilo sueltos en un template. Ningún cambio de prompt o
+   de proveedor de imagen se mergea sin comparar 3 generaciones contra `docs/estilo/`
+   (el set dorado aprobado por Fiamy) a ojo. Cambiar `STYLE_DNA` o cualquier prompt
+   **invalida el cache** de esa familia de imágenes: avisar siempre y agruparlo.
 
 ## apps/web/src/App.tsx — grep anchors
 

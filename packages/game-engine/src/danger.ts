@@ -44,6 +44,16 @@ export function shouldForceSceneAdvance(params: {
   );
 }
 
+// Techo de peligro por ronda ESCALADO por tamaño del grupo: con más gente en
+// escena hay más acciones por ronda y más caos, así que la amenaza puede subir
+// más rápido (proporcional). Base 2/ronda (solo) + 1 por cada jugador extra —
+// 2 jugadores → 3, party llena de 5 → 6. Sin esto, una mesa de 5 acumulaba
+// peligro al mismo ritmo que en solitario, restándole tensión al multijugador.
+export function dangerCapForParty(playerCount: number): number {
+  const extraPlayers = Math.max(0, Math.floor(playerCount) - 1);
+  return 2 + extraPlayers;
+}
+
 export function capDangerGainForRound(params: {
   requestedGain: number;
   currentRoundGain: number;

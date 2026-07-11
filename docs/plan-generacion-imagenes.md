@@ -1,7 +1,12 @@
 # Plan: mejorar el sistema de generación de imágenes SIN perder el estilo
 
-> Estado: PLAN aprobable, nada implementado (2026-07-10). Cada fase es una
-> instrucción autocontenida que se le puede dar a Claude tal cual.
+> Estado (2026-07-11): **Fase 0 REVERTIDA** — la unificación `STYLE_DNA` cambió
+> todas las URLs y las imágenes de referencia de Fiamy "desaparecieron" (seguían
+> en el cache bajo las claves viejas). Los templates volvieron a su texto EXACTO
+> original. Lección incorporada abajo: la Fase 0 solo puede rehacerse CON
+> migración de caché (re-key de blobs URL vieja → nueva en IndexedDB) y ok
+> explícito de Fiamy. Las fases 1-5 siguen sin implementar.
+> Cada fase es una instrucción autocontenida que se le puede dar a Claude tal cual.
 > Regla madre en todo el plan: **el estilo aprobado manda** — pintura al óleo
 > oscura de Pollinations flux (`heroPromptRoot`), luz dramática, proporciones
 > naturales. Cualquier cambio se compara contra el set dorado ANTES de quedar.

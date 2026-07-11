@@ -98,12 +98,17 @@ const MENU_SCOPE = ".lobbyHeaderActions, .helpButton, .settingsButton, .settings
 /** Acciones grandes: elegir mundo, crear/editar/guardar héroe, forjar historia y empezar. */
 const ACTION_SCOPE = ".worldCard, .forgeButton, .startCta, .heroSummaryActions, .heroDone, .reimagineButton";
 
-/** Listener global delegado: cualquier click en un botón habilitado suena. */
+/** Listener global delegado: SOLO suenan las interacciones importantes —acciones
+ * grandes (elegir mundo, forjar, empezar) y el menú principal—. El resto de los
+ * botones (chips de elenco, cerrar, flechas, tabs, opciones) quedan en silencio:
+ * "no todo necesita ruido" (pedido de Fiamy 2026-07-11). */
 export function installUiClickSound(): () => void {
   const onClick = (event: MouseEvent) => {
     const button = (event.target as HTMLElement | null)?.closest?.("button");
     if (!button || button.disabled) return;
-    playUiClick(button.closest(ACTION_SCOPE) ? "action" : button.closest(MENU_SCOPE) ? "menu" : "soft");
+    const kind: ClickKind | null = button.closest(ACTION_SCOPE) ? "action" : button.closest(MENU_SCOPE) ? "menu" : null;
+    if (!kind) return; // botón secundario: sin sonido
+    playUiClick(kind);
   };
   document.addEventListener("click", onClick, true);
   return () => document.removeEventListener("click", onClick, true);

@@ -29,6 +29,13 @@ export function nameHash(name: string): number {
 // arte de mundos/escenas ≥896px de ancho. Nunca pedir menos: la imagen se muestra
 // hasta 2x en pantallas grandes y el upscale se nota. Cambiar dims cambia la URL
 // (invalida esa caché) — hacerlo solo a propósito.
+// ─── Estilo: los prompts de abajo SON las claves del cache de Fiamy ──────────
+// ROLLBACK Fase 0 (2026-07-11): la unificación STYLE_DNA re-clavó todas las URLs
+// y las imágenes de referencia de Fiamy "desaparecieron" (seguían en IndexedDB
+// bajo las claves viejas). Los templates volvieron a su texto EXACTO original.
+// Si algún día se rehace la Fase 0, debe incluir MIGRACIÓN de caché (copiar los
+// blobs de la URL vieja a la nueva en IndexedDB) y el ok explícito de Fiamy.
+
 // El LLM imagina el aspecto (appearance) y este prompt lo pinta. Seed determinística
 // por nombre → mismo personaje, mismo retrato durante toda la partida. `seedNonce`
 // permite "reimaginar": nueva cara para la misma identidad.
@@ -138,9 +145,29 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
 
 // Retrato de la mascota: template propio de criatura (cuerpo entero), URL distinta
 // de la del héroe — la compañera tiene SU imagen, no se mezcla en el retrato.
+// Template original (clave de cache). La criatura se pinta como bestia — el
+// ruteo por aspecto vive en beingPortraitUrl (un gato NPC entra por acá).
 export function petPortraitUrl(name: string, description: string): string {
   const prompt = `Fantasy RPG magical creature companion portrait, adorable but epic, full body, dark moody lighting, detailed illustration: ${name}, ${description}. Dark blurred background`;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
+}
+
+// Delata si un personaje NO es humano sino un animal/criatura por su aspecto: sus
+// retratos deben pintarse como bestia, no como persona. Se chequea SOLO sobre
+// nombre + aspecto/descripción (nunca el styleHint del mundo, que puede decir
+// "Marcado por Dragón" sin que el personaje sea un dragón).
+const CREATURE_HINT = /\b(animal|bestia|criatura|no\s*human[oa]|cuadr[úu]pedo|felin[oa]|gat[oa]|minino|perr[oa]|canino|sabueso|lob[oa]|zorr[oa]|os[oa]|drag[óo]n|drac[óo]nic|serpiente|reptil|lagart|salamandra|ave|p[áa]jaro|cuervo|b[úu]ho|halc[óo]n|[áa]guila|caballo|corcel|potro|ciervo|conejo|rat[óo]n|murci[ée]lago|ara[ñn]a|insecto|escarabaj|tigre|le[óo]n|pantera|lince|nutria|hur[óo]n|comadreja|mono|simio|quimera|grifo|f[ée]nix|hocico|pelaje|plumas|escamas|colmillos|bigotes|cat|kitten|kitty|feline|hound|wolf|fox|beast|creature|dragon|serpent|feathers|fur|whiskers?)\b/i;
+
+export function looksLikeCreature(...texts: Array<string | undefined>): boolean {
+  return CREATURE_HINT.test(texts.filter(Boolean).join(" "));
+}
+
+// Retrato de un personaje del elenco (NPC o enemigo): humano por defecto, pero si
+// su aspecto lo delata como animal/criatura usa el prompt de bestia. Punto único
+// para que cast, portada y prefetch coincidan en la MISMA URL (misma caché).
+export function beingPortraitUrl(name: string, appearance: string | undefined, styleHint: string): string {
+  if (looksLikeCreature(name, appearance)) return petPortraitUrl(name, appearance ?? "");
+  return characterPortraitUrl(name, appearance, styleHint);
 }
 
 export function isGeneratedPortraitUrl(url: string | undefined): url is string {

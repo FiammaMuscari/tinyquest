@@ -14,7 +14,7 @@ async function importDangerModule() {
   return import(`data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`);
 }
 
-const { capDangerGainForRound, getDangerBand, shouldForceSceneAdvance } = await importDangerModule();
+const { capDangerGainForRound, dangerCapForParty, getDangerBand, shouldForceSceneAdvance } = await importDangerModule();
 
 test("getDangerBand maps danger clock thresholds", () => {
   assert.equal(getDangerBand(0), "low");
@@ -67,4 +67,14 @@ test("capDangerGainForRound stretches danger escalation", () => {
   assert.equal(capDangerGainForRound({ requestedGain: 2, currentRoundGain: 1 }), 1);
   assert.equal(capDangerGainForRound({ requestedGain: 2, currentRoundGain: 2 }), 0);
   assert.equal(capDangerGainForRound({ requestedGain: 1, currentRoundGain: 4 }), 0);
+});
+
+
+test("dangerCapForParty escala el techo con jugadores extra (proporcional)", () => {
+  assert.equal(dangerCapForParty(1), 2); // solo: base 2/ronda
+  assert.equal(dangerCapForParty(2), 3); // +1 jugador extra
+  assert.equal(dangerCapForParty(5), 6); // party llena (host + 4)
+  assert.equal(dangerCapForParty(0), 2); // degenerado: nunca menos que la base
+  assert.equal(capDangerGainForRound({ requestedGain: 3, currentRoundGain: 2, maxGainPerRound: dangerCapForParty(5) }), 3);
+  assert.equal(capDangerGainForRound({ requestedGain: 3, currentRoundGain: 2, maxGainPerRound: dangerCapForParty(1) }), 0);
 });
