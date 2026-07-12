@@ -55,7 +55,7 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: close three-quarter PROFILE VIEW from the waist up, head turned 30 to 45 degrees away from camera, one cheek more prominent, both eyes still visible, entire head visible, natural expressive face. Preserve exact canonical medieval clothing, jewelry, weapons and scars${heroPromptTail(name, styleHint)}`;
+  const prompt = `TINYQUEST PORTRAIT RENDER V13. HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: close three-quarter PROFILE VIEW from the waist up, head turned 30 to 45 degrees away from camera, one cheek more prominent, both eyes still visible, entire head visible, natural expressive face. Preserve exact canonical medieval clothing, jewelry, weapons and scars${heroPromptTail(name, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -69,7 +69,7 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
   // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
   // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
-  const prompt = `HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: distant full-length character study, entire standing figure visible from top of head to both feet, generous space above head and below feet, no crop, grounded relaxed standing pose. Preserve the EXACT SAME face, medieval clothing, jewelry, weapons, scars and colors as the canonical character; elegant natural proportions, loose broad visible oil strokes${heroPromptTail(name, styleHint)}`;
+  const prompt = `TINYQUEST PORTRAIT RENDER V13. HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: distant full-length character study, entire standing figure visible from top of head to both feet, generous space above head and below feet, no crop, grounded relaxed standing pose. Preserve the EXACT SAME face, medieval clothing, jewelry, weapons, scars and colors as the canonical character; elegant natural proportions, loose broad visible oil strokes${heroPromptTail(name, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -260,7 +260,6 @@ function sleep(ms: number): Promise<void> {
 // Pollinations como siempre. Las imágenes ya cacheadas no se regeneran nunca.
 let cfImageAvailable = true;
 const portraitReferences = new Map<string, string>();
-const portraitStyleReferences = new Map<string, string[]>();
 
 /** Declara que una variante debe editarse desde otra imagen canónica. Se llama
  * antes de montar el <img>, evitando que una carrera dispare text-to-image. */
@@ -268,9 +267,6 @@ export function linkPortraitReference(targetUrl: string, referenceUrl: string): 
   portraitReferences.set(targetUrl, referenceUrl);
 }
 
-export function linkPortraitStyleReferences(targetUrl: string, styleUrls: string[]): void {
-  portraitStyleReferences.set(targetUrl, [...styleUrls]);
-}
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -323,6 +319,10 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
         cfImageAvailable = false;
         return null;
       }
+      if (response.status === 429) {
+        cfImageAvailable = false;
+        throw new Error("TINYQUEST_QUALITY_IMAGE_QUOTA_EXHAUSTED");
+      }
       if (!response.ok) return null;
       const blob = await response.blob();
       if (!blob.type.startsWith("image/")) return null;
@@ -330,7 +330,10 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
     } finally {
       clearTimeout(timer);
     }
-  } catch {
+  } catch (error) {
+    // No cachear una imagen inferior cuando se agota la cuota del proveedor de
+    // calidad. El hook conserva la imagen anterior y reintenta más tarde.
+    if (error instanceof Error && error.message === "TINYQUEST_QUALITY_IMAGE_QUOTA_EXHAUSTED") throw error;
     return null;
   }
 }
@@ -348,7 +351,7 @@ function portraitFetchTarget(url: string): string {
 }
 
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
-  const fast = await fetchViaCloudflare(url, portraitReferences.get(url), portraitStyleReferences.get(url));
+  const fast = await fetchViaCloudflare(url, portraitReferences.get(url));
   if (fast) return fast;
   let lastError: unknown = new Error("portrait fetch failed");
   // Pollinations 2026-07: cola por IP de UN solo pedido — cualquier extra rebota

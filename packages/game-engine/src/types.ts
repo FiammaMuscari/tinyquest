@@ -75,6 +75,10 @@ export type CharacterLook = {
   /** Firma de los rasgos usados al generar el par actual. Permite avisar que el
    * retrato quedó desactualizado sin regenerarlo silenciosamente. */
   portraitIdentity?: string;
+  /** Nonce del seed del par actual (0 = primera imaginación; >0 = reimaginado).
+   * Al cambiar un color el par se regenera CON ESTE MISMO nonce → misma cara,
+   * colores nuevos. "Reimaginar" lo cambia por uno al azar → cara nueva. */
+  portraitNonce?: number;
 };
 
 export type Character = {

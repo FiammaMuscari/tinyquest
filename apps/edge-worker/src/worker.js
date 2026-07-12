@@ -31,6 +31,27 @@ async function cfImage(request, env) {
   const input = await request.json();
   if (typeof input.prompt !== "string" || !input.prompt.trim()) return new Response("prompt requerido", { status: 400 });
   const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
+  const quotaError = (error) => /4006|daily free allocation|neurons/i.test(error instanceof Error ? error.message : String(error));
+  const runSchnell = async () => {
+    try {
+      const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+        prompt: `${input.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
+        width: Math.min(2048, Math.max(256, Number(input.width) || 512)),
+        height: Math.min(2048, Math.max(256, Number(input.height) || 512)),
+        seed: Number(input.seed) || 0,
+        steps: 8
+      });
+      if (result instanceof ReadableStream || result instanceof ArrayBuffer || ArrayBuffer.isView(result)) {
+        return new Response(result, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
+      }
+      const encoded = result?.image;
+      if (typeof encoded !== "string") return new Response("respuesta sin imagen", { status: 502 });
+      const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+      return new Response(bytes, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
+    } catch (error) {
+      return json({ error: { message: error instanceof Error ? error.message : String(error), stage: "flux-1-schnell" } }, quotaError(error) ? 429 : 502);
+    }
+  };
   const styleImages = Array.isArray(input.styleImages) ? input.styleImages.filter((item) => typeof item?.data === "string").slice(0, 2) : [];
   const runKlein = async (referenceImage) => {
     const form = new FormData();
@@ -59,6 +80,9 @@ async function cfImage(request, env) {
         multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") }
       });
     } catch (error) {
+      // La edición de referencia es cara en neuronas. Si se agotó, Schnell
+      // conserva el prompt/seed y evita caer al generador de baja calidad.
+      if (quotaError(error)) return runSchnell();
       return json({ error: { message: error instanceof Error ? error.message : String(error), stage: "flux-2-klein" } }, 502);
     }
     const encoded = edited?.image;
@@ -70,20 +94,7 @@ async function cfImage(request, env) {
     return runKlein(input.referenceImage);
   }
   if (model.includes("flux-2-klein") || styleImages.length) return runKlein();
-  const result = await env.AI.run(model, {
-    prompt: `${input.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
-    width: Math.min(2048, Math.max(256, Number(input.width) || 512)),
-    height: Math.min(2048, Math.max(256, Number(input.height) || 512)),
-    seed: Number(input.seed) || 0,
-    steps: 8
-  });
-  if (result instanceof ReadableStream || result instanceof ArrayBuffer || ArrayBuffer.isView(result)) {
-    return new Response(result, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
-  }
-  const encoded = result?.image;
-  if (typeof encoded !== "string") return new Response("respuesta sin imagen", { status: 502 });
-  const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
-  return new Response(bytes, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
+  return runSchnell();
 }
 
 async function pollinations(url) {

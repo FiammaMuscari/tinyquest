@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -609,19 +609,19 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function forgeHeroPortraitPair(seedNonce: number) {
     const urls = heroImageUrls(draftRef.current, seedNonce);
-    linkPortraitStyleReferences(urls.face, ["/assets/style/hero-oil-reference-face.webp"]);
-    linkPortraitStyleReferences(urls.fullbody, ["/assets/style/hero-oil-reference-1.webp", "/assets/style/hero-oil-reference-2.webp"]);
-    // Frente fija cara + colores; Cuerpo se genera como EDICIÓN de esa imagen
-    // mediante Flux.2, no como otra tirada de texto independiente.
-    linkPortraitReference(urls.fullbody, urls.face);
+    // Frente y Cuerpo son DOS generaciones text-to-image independientes con el
+    // MISMO seed y el mismo prompt raíz (solo cambia el encuadre): misma persona,
+    // dos tomas de verdad. NO se deriva el cuerpo como edición img2img de la cara
+    // (flux-2-klein devolvía casi la misma imagen → "cuerpo == frente", el bug
+    // que reportó Fiamy). La receta gemela con seed compartido se ve mucho mejor.
     const shot = draftRef.current.look?.avatarShot ?? "fullbody";
-    // Las DOS variantes se regeneran juntas, pero la elegida obtiene el primer
-    // lugar de la cola. Por defecto Cuerpo llega antes; Frente queda precargada.
+    // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
+    // primer lugar de la cola; la otra queda precargada para el toggle instantáneo.
     void loadPortrait(urls[shot], { priority: true }).catch(() => undefined);
     void loadPortrait(urls[shot === "face" ? "fullbody" : "face"], { priority: false }).catch(() => undefined);
     setDraft(createCharacter({
       ...draftRef.current,
-      look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentity(draftRef.current) },
+      look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentity(draftRef.current), portraitNonce: seedNonce },
       avatarUrl: urls[shot]
     }));
   }
@@ -662,6 +662,23 @@ export function App() {
   function unlockAutoPortrait() {
     manualAvatarRef.current = false;
   }
+  // AUTO-REIMAGINADO por cambio de rasgo: al elegir/cambiar género, piel, ojos,
+  // pelo, cicatriz, linaje, nombre u oficio, el par frente+cuerpo se regenera
+  // solo (debounce 800ms) con los colores nuevos, conservando la MISMA cara
+  // (mismo nonce). Antes había que tocar "Reimaginar" a mano y la imagen quedaba
+  // vieja — el bug "no se reimagina con los colores que seleccionaste" (Fiamy).
+  // Idempotente (StrictMode-safe): compara el PROMPT (URL sin seed) del par
+  // guardado contra el esperado; si el prompt no cambió, no regenera nada — así
+  // un retrato legacy con seed viejo pero mismos colores NO se pisa.
+  useEffect(() => {
+    if (manualAvatarRef.current || !lookComplete(draft)) return;
+    const nonce = draft.look?.portraitNonce ?? 0;
+    const expected = heroImageUrls(draft, nonce);
+    const promptOf = (url?: string) => url?.replace(/seed=\d+$/, "");
+    if (draft.look?.faceUrl && promptOf(draft.look.faceUrl) === promptOf(expected.face)) return; // par al día
+    const timer = window.setTimeout(() => forgeHeroPortraitPair(nonce), 800);
+    return () => window.clearTimeout(timer);
+  }, [draft.name, draft.role, draft.concept, draft.species, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor, draft.look?.scar, draft.look?.portraitNonce]);
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => readStoredCampaignId());
   // Historia improvisada: campaña generada por el LLM en runtime; no vive en el registro estático.
   const [improvisedCampaign, setImprovisedCampaign] = useState<Campaign | null>(null);

@@ -168,8 +168,9 @@ function llmProxyPlugin(): Plugin {
             });
             const contentType = upstream.headers.get("content-type") ?? "";
             if (!upstream.ok) {
-              response.statusCode = upstream.status;
-              response.end(await upstream.text());
+              const errorBody = await upstream.text();
+              response.statusCode = /4006|daily free allocation|neurons/i.test(errorBody) ? 429 : upstream.status;
+              response.end(errorBody);
               return;
             }
             if (contentType.includes("application/json")) {

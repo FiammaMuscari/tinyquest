@@ -65,11 +65,23 @@ section** — an outdated map costs more than no map.
   manual/classic-avatar mode). `petPortraitUrl` gives the companion its own
   creature image (designer pet tab, hero summary, queue). `loadPortrait`/hook
   accept `{ priority: true }` — hero portraits jump the download queue.
-- Hero portrait auto-generates from identity (name/linaje/oficio/concepto),
-  debounced 800ms, in an effect in `App()`. Picking a classic avatar from the
-  picker disables auto-gen (manual mode); "Reimaginar" re-enables it with a
-  random nonce. Same-identity check compares URL minus `seed=` — don't "fix" it
-  back to plain equality or reloads will clobber rerolled portraits.
+- Hero portrait auto-generates from identity (name/linaje/oficio/concepto/rasgos),
+  debounced 800ms, in an effect in `App()` (2026-07-12: restaurado — el mapa lo
+  declaraba pero el efecto no existía). El efecto compara el PROMPT (URL sin
+  `seed=`) del par guardado contra el esperado con el nonce guardado
+  (`look.portraitNonce`): si el prompt no cambió NO regenera (así un retrato
+  legacy con seed viejo pero mismos colores no se pisa). Cambiar un color →
+  regenera con el MISMO nonce (misma cara, colores nuevos). Picking a classic
+  avatar disables auto-gen (`manualAvatarRef`, manual mode); "Reimaginar" usa un
+  nonce AL AZAR (cara nueva). No cambiar el compare a igualdad plana o los
+  rerolls/legacy se clobberean.
+- `forgeHeroPortraitPair` genera SIEMPRE las dos tomas como text-to-image
+  independientes con el MISMO seed (frente 3/4 + cuerpo entero, solo cambia el
+  encuadre). NO deriva el cuerpo como edición img2img de la cara — flux-2-klein
+  devolvía casi la misma imagen ("cuerpo == frente", bug de Fiamy 2026-07-12).
+  `linkPortraitReference` quedó sin usar en App (sigue disponible en portraits.ts
+  para el img2img opcional pago de la Fase 1). Cache viejo intacto (las URLs no
+  cambian); los cuerpos img2img ya cacheados se refrescan al reimaginar/recolorear.
 - NPC portraitUrl is stamped in `forgeStory` (App) from the LLM's `appearance`.
 
 ## Lobby flow (4 steps — HERO FIRST since 2026-07-06 night; order changed twice that day, confirm with Fiamy before moving it again)
