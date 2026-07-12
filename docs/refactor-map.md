@@ -26,9 +26,9 @@ section** — an outdated map costs more than no map.
 
 | Anchor (grep) | What lives there |
 |---|---|
-| `function App()` | All state, turn flow, `forgeStory`, `startSolo`/`launchSolo`, `reimagineHeroPortrait`, auto hero-portrait effect, column drag |
+| `function App()` | All state, turn flow, `forgeStory`, `startSolo`/`launchSolo`, hero portrait save/reimagine, column drag |
 | `function LobbyScreen` | World cards, perspective/party pills, forge input, `ForgeRitual`, `forgedTeaser` (chips → `CharacterPeekModal`), hero summary |
-| `function CharacterDesigner` | Hero forge: identity + portrait + Reimaginar, tabs Linaje/Oficio/Compañero, stat bars, talents |
+| `function CharacterDesigner` | Hero forge: identity + portrait + Reimaginar, tabs Raza/Oficio/Compañero, stat bars, talents |
 | `function TurnQueue` | Left rail: player cards (avatars via `HeroAvatarImg`, bots get generated portraits here), audio, journeyPanel (map + world laws) |
 | `function ScenePanel` | Scene header, objective, choice cards (imagen estática de fondo, sin selector) |
 | `function ActionComposer` | Tirada: stat select, pet, roll button |
@@ -65,16 +65,14 @@ section** — an outdated map costs more than no map.
   manual/classic-avatar mode). `petPortraitUrl` gives the companion its own
   creature image (designer pet tab, hero summary, queue). `loadPortrait`/hook
   accept `{ priority: true }` — hero portraits jump the download queue.
-- Hero portrait auto-generates from identity (name/linaje/oficio/concepto/rasgos),
-  debounced 800ms, in an effect in `App()` (2026-07-12: restaurado — el mapa lo
-  declaraba pero el efecto no existía). El efecto compara el PROMPT (URL sin
-  `seed=`) del par guardado contra el esperado con el nonce guardado
-  (`look.portraitNonce`): si el prompt no cambió NO regenera (así un retrato
-  legacy con seed viejo pero mismos colores no se pisa). Cambiar un color →
-  regenera con el MISMO nonce (misma cara, colores nuevos). Picking a classic
-  avatar disables auto-gen (`manualAvatarRef`, manual mode); "Reimaginar" usa un
-  nonce AL AZAR (cara nueva). No cambiar el compare a igualdad plana o los
-  rerolls/legacy se clobberean.
+- El par del héroe está congelado mientras se edita. Cambiar raza, oficio,
+  concepto, stat dominante, género, piel, ojos, pelo o cicatriz solo marca
+  `heroPortraitNeedsRefresh`; no hace IO ni prefetch. **Guardar** aplica las
+  opciones con el mismo `portraitNonce` (preserva identidad); **Reimaginar** usa
+  nonce aleatorio (cara nueva). `portraitIdentity` incluye exactamente los campos
+  que alimentan el prompt. La curación de templates al arrancar se salta si la
+  firma no coincide, porque eso representa una edición pendiente, no una URL
+  legacy rota.
 - `forgeHeroPortraitPair` genera Frente como identidad canónica con Schnell y
   deriva Cuerpo mediante `linkPortraitReference` + Flux.2 Klein 4B. En V14 la
   instrucción de cámara LONG SHOT vive al principio del prompt: evita el bug

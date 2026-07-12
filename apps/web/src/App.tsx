@@ -47,6 +47,8 @@ import {
   encodeCustomAction,
   getDangerLabel,
   getVisibleActionChoices,
+  heroPortraitIdentityKey,
+  heroPortraitNeedsRefresh,
   sceneImageBeat,
   legendaryPets,
   roles,
@@ -608,26 +610,31 @@ export function App() {
   // rasgos NO regenera nada — el par fijado en look.faceUrl/fullBodyUrl es la
   // verdad y el toggle Frente/Cuerpo solo alterna entre esas dos variables.
   const manualAvatarRef = useRef(false);
-  function forgeHeroPortraitPair(seedNonce: number) {
-    const urls = heroImageUrls(draftRef.current, seedNonce);
-    // Frente fija identidad y Cuerpo usa esa imagen como referencia. V14 pone el
-    // LONG SHOT al principio (antes quedaba truncado y Klein repetía el frente).
-    // Validado contra el Worker real: figura completa + cara/ropa coherentes.
+  function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.fullbody, urls.face);
     linkPortraitStyleReferences(urls.fullbody, [
       "/assets/style/body-style-painterly.jpg",
       "/assets/style/body-style-delicate.jpg"
     ]);
-    const shot = draftRef.current.look?.avatarShot ?? "fullbody";
+  }
+  function forgeHeroPortraitPair(seedNonce: number, source = draftRef.current) {
+    const urls = heroImageUrls(source, seedNonce);
+    // Frente fija identidad y Cuerpo usa esa imagen como referencia. V14 pone el
+    // LONG SHOT al principio (antes quedaba truncado y Klein repetía el frente).
+    // Validado contra el Worker real: figura completa + cara/ropa coherentes.
+    prepareHeroPortraitPair(urls);
+    const shot = source.look?.avatarShot ?? "fullbody";
     // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
     // primer lugar de la cola; la otra queda precargada para el toggle instantáneo.
     void loadPortrait(urls[shot], { priority: true }).catch(() => undefined);
     void loadPortrait(urls[shot === "face" ? "fullbody" : "face"], { priority: false }).catch(() => undefined);
-    setDraft(createCharacter({
-      ...draftRef.current,
-      look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentity(draftRef.current), portraitNonce: seedNonce },
+    const next = createCharacter({
+      ...source,
+      look: { ...source.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentityKey(source), portraitNonce: seedNonce },
       avatarUrl: urls[shot]
-    }));
+    });
+    draftRef.current = next;
+    setDraft(next);
   }
   // CURACIÓN al arrancar: si el par guardado apunta a un template de prompt que
   // ya no existe (p. ej. quedó estampado durante un experimento de estilo), se
@@ -637,12 +644,16 @@ export function App() {
     const current = draftRef.current;
     const stored = current.look?.faceUrl;
     if (!stored || !isGeneratedPortraitUrl(stored)) return;
+    // Identidad distinta = edición pendiente del usuario, no migración de
+    // template. Se aplica solo al guardar o tocar Reimaginar.
+    if (current.look?.portraitIdentity && current.look.portraitIdentity !== heroPortraitIdentityKey(current)) return;
     const expected = heroImageUrls(current);
     const strip = (url: string) => url.replace(/seed=\d+$/, "");
     if (strip(stored) === strip(expected.face)) return; // par sano, no tocar
     const seed = stored.match(/seed=(\d+)$/)?.[1];
     const face = seed ? expected.face.replace(/seed=\d+$/, `seed=${seed}`) : expected.face;
     const fullbody = seed ? expected.fullbody.replace(/seed=\d+$/, `seed=${seed}`) : expected.fullbody;
+    prepareHeroPortraitPair({ face, fullbody });
     const shot = current.look?.avatarShot ?? "fullbody";
     void loadPortrait(face, { priority: true }).catch(() => undefined);
     void loadPortrait(fullbody, { priority: true }).catch(() => undefined);
@@ -661,28 +672,19 @@ export function App() {
     manualAvatarRef.current = false;
     forgeHeroPortraitPair(seedNonce);
   }
-  // Elegir un rasgo del retrato implica querer el retrato generado: sale del modo
-  // manual (retrato clásico fijo) para que el efecto auto-regenere con el rasgo.
+  // Elegir un rasgo sale del modo avatar fijo, pero NO genera: queda pendiente
+  // hasta Guardar o Reimaginar explícitamente.
   function unlockAutoPortrait() {
     manualAvatarRef.current = false;
   }
-  // AUTO-REIMAGINADO por cambio de rasgo: al elegir/cambiar género, piel, ojos,
-  // pelo, cicatriz, linaje, nombre u oficio, el par frente+cuerpo se regenera
-  // solo (debounce 800ms) con los colores nuevos, conservando la MISMA cara
-  // (mismo nonce). Antes había que tocar "Reimaginar" a mano y la imagen quedaba
-  // vieja — el bug "no se reimagina con los colores que seleccionaste" (Fiamy).
-  // Idempotente (StrictMode-safe): compara el PROMPT (URL sin seed) del par
-  // guardado contra el esperado; si el prompt no cambió, no regenera nada — así
-  // un retrato legacy con seed viejo pero mismos colores NO se pisa.
-  useEffect(() => {
-    if (manualAvatarRef.current || !lookComplete(draft)) return;
-    const nonce = draft.look?.portraitNonce ?? 0;
-    const expected = heroImageUrls(draft, nonce);
-    const promptOf = (url?: string) => url?.replace(/seed=\d+$/, "");
-    if (draft.look?.faceUrl && promptOf(draft.look.faceUrl) === promptOf(expected.face)) return; // par al día
-    const timer = window.setTimeout(() => forgeHeroPortraitPair(nonce), 800);
-    return () => window.clearTimeout(timer);
-  }, [draft.name, draft.role, draft.concept, draft.species, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor, draft.look?.scar, draft.look?.portraitNonce]);
+  function saveHeroPortrait(character: Character) {
+    draftRef.current = character;
+    if (!lookComplete(character) || !heroPortraitNeedsRefresh(character)) return;
+    manualAvatarRef.current = false;
+    // Guardar aplica las especificaciones conservando la cara/nonce. Solo
+    // Reimaginar cambia el nonce y, por tanto, propone una identidad nueva.
+    forgeHeroPortraitPair(character.look?.portraitNonce ?? 0, character);
+  }
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => readStoredCampaignId());
   // Historia improvisada: campaña generada por el LLM en runtime; no vive en el registro estático.
   const [improvisedCampaign, setImprovisedCampaign] = useState<Campaign | null>(null);
@@ -1585,6 +1587,7 @@ export function App() {
         perspective={perspective}
         onChoosePerspective={choosePerspective}
         onReimagineHero={reimagineHeroPortrait}
+        onSaveHero={saveHeroPortrait}
         onUnlockAutoPortrait={unlockAutoPortrait}
         sceneImageMode={sceneImageMode}
         onSceneImageMode={chooseSceneImageMode}
@@ -1655,7 +1658,7 @@ export function App() {
   );
 }
 
-function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, onReimagineHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; onReimagineHero: (seedNonce: number) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
+function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, onReimagineHero, onSaveHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; onReimagineHero: (seedNonce: number) => void; onSaveHero: (character: Character) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
@@ -1665,6 +1668,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
   // Paso 3 obligatorio antes de empezar: el héroe necesita rasgos (género/piel/ojos).
   const heroLookDone = lookComplete(draft);
+  const heroImageHasPendingChanges = heroPortraitNeedsRefresh(draft);
   // El temple de la quest: la historia elegida sube una stat y baja otra en la partida.
   const questTemper = getQuestTemper(selectedCampaign);
   const improvisedSelected = improvisedCampaign !== null && selectedCampaign.id === improvisedCampaign.id;
@@ -1696,7 +1700,9 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
         {editingHero ? (
           <section className="heroEditWrap lobbyHeroGrid soloHero heroSpecial">
             <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
-            <button className="ghostButton heroDone" type="button" onClick={() => setEditingHero(false)}>✔ Guardar héroe y continuar</button>
+            <button className={`ghostButton heroDone ${heroLookDone && heroImageHasPendingChanges ? "forgeAttention" : ""}`} type="button" disabled={!heroLookDone} onClick={() => { onSaveHero(draft); setEditingHero(false); }} title={!heroLookDone ? "Elegí género, piel, ojos y pelo" : heroImageHasPendingChanges ? "Guardar y aplicar las nuevas opciones a Frente y Cuerpo" : "Guardar sin regenerar: la imagen ya está al día"}>
+              ✔ {heroImageHasPendingChanges ? "Guardar y actualizar imagen" : "Guardar héroe y continuar"}
+            </button>
           </section>
         ) : (
           <section className="panel heroSummary heroSpecial">
@@ -1715,7 +1721,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                 </button>
               </div>
             </div>
-            {!heroLookDone && <button type="button" className="startHint heroBuildCta" onClick={() => setEditingHero(true)}><strong>✨ Tu héroe espera una identidad</strong><span>Elegí linaje, piel, ojos, pelo y cicatrices para imaginarlo.</span><b>Armar mi héroe →</b></button>}
+            {!heroLookDone && <button type="button" className="startHint heroBuildCta" onClick={() => setEditingHero(true)}><strong>✨ Tu héroe espera una identidad</strong><span>Elegí raza, piel, ojos, pelo y cicatrices para imaginarlo.</span><b>Armar mi héroe →</b></button>}
             {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
           </section>
         )}
@@ -2211,12 +2217,6 @@ type CastPeek = { name: string; role?: string; description: string; desire?: str
 // La personalización física del héroe es obligatoria antes de forjar su retrato.
 function lookComplete(draft: Character): boolean {
   return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
-}
-
-function heroPortraitIdentity(draft: Character): string {
-  return [draft.species, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor, draft.look?.scar ?? "sin cicatrices"]
-    .map((value) => value?.trim().toLocaleLowerCase() ?? "")
-    .join("|");
 }
 
 // Las dos imágenes del héroe con el MISMO seed y prompt raíz (solo cambia el
@@ -3256,7 +3256,7 @@ function DiceBadge({ kind, value, muted = false }: { kind: "d20" | "d4" | "d6"; 
 }
 
 const builderTabList = [
-  { id: "species", label: "Linaje" },
+  { id: "species", label: "Raza" },
   { id: "role", label: "Oficio" },
   { id: "pet", label: "Compañero" }
 ] as const;
@@ -3283,26 +3283,12 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   const heroLookDone = lookComplete(draft);
   const currentShot = draft.look?.avatarShot ?? "fullbody";
   const hasForgedPortrait = Boolean(draft.look?.faceUrl && draft.look?.fullBodyUrl && isGeneratedPortraitUrl(draft.avatarUrl));
-  const portraitNeedsRefresh = !hasForgedPortrait || draft.look?.portraitIdentity !== heroPortraitIdentity(draft);
+  const portraitNeedsRefresh = heroPortraitNeedsRefresh(draft);
   const firstMissingLook = !draft.look?.gender ? "gender" : !draft.look?.skinTone ? "skin" : !draft.look?.eyeColor ? "eyes" : !draft.look?.hairColor ? "hair" : null;
   function chooseLook(patch: Partial<CharacterLook>) {
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { avatarShot: draft.look?.avatarShot ?? "fullbody", ...draft.look, ...patch } }));
   }
-  // Precalienta el retrato de las OTRAS razas con tu apariencia actual: cambiar de
-  // linaje actualiza la cara al instante (o casi) en vez de esperar una generación.
-  useEffect(() => {
-    if (!lookComplete(draft)) return;
-    const timer = setTimeout(() => {
-      for (const item of species) {
-        if (item.name === draft.species) continue;
-        const variant = heroImageUrls(createCharacter({ ...draft, species: item.name }));
-        void loadPortrait(variant.face).catch(() => undefined);
-      }
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [draft.name, draft.role, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor]);
-
   // Alterna entre retrato de frente y cuerpo entero SIN regenerar: conserva la seed
   // actual (mismo rostro en ambas tomas) reescribiéndola en la URL de la otra toma.
   function chooseShot(shot: "face" | "fullbody") {

@@ -13,6 +13,7 @@ export * from "./roles";
 export * from "./pets";
 export * from "./abilities";
 export * from "./character";
+export * from "./portrait-state";
 export * from "./scenes";
 export * from "./scene-images";
 export * from "./campaigns";
