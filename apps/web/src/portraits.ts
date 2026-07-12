@@ -284,8 +284,20 @@ function sleep(ms: number): Promise<void> {
 // está configurado (501) se apaga para la sesión; ante cualquier fallo se cae a
 // Pollinations como siempre. Las imágenes ya cacheadas no se regeneran nunca.
 let cfImageAvailable = true;
+let cfImageQuotaBlockedUntil = 0;
 const portraitReferences = new Map<string, string>();
 const portraitStyleReferences = new Map<string, string[]>();
+
+class QualityImageQuotaError extends Error {
+  constructor(readonly retryAt: number) {
+    super("TINYQUEST_QUALITY_IMAGE_QUOTA_EXHAUSTED");
+  }
+}
+
+function nextUtcMidnight(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+}
 
 /** Declara que una variante debe editarse desde otra imagen canónica. Se llama
  * antes de montar el <img>, evitando que una carrera dispare text-to-image. */
@@ -309,6 +321,9 @@ async function blobToBase64(blob: Blob): Promise<string> {
 
 async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls: string[] = []): Promise<Blob | null> {
   if (!cfImageAvailable || !url.startsWith("https://image.pollinations.ai/")) return null;
+  // No caer a Sana mientras la cuota de calidad está agotada. Al llegar el
+  // reset diario UTC se rehabilita solo, sin recargar ni degradar el retrato.
+  if (Date.now() < cfImageQuotaBlockedUntil) throw new QualityImageQuotaError(cfImageQuotaBlockedUntil);
   try {
     const parsed = new URL(url);
     const prompt = decodeURIComponent(parsed.pathname.replace(/^\/prompt\//, ""));
@@ -351,8 +366,8 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
         return null;
       }
       if (response.status === 429) {
-        cfImageAvailable = false;
-        throw new Error("TINYQUEST_QUALITY_IMAGE_QUOTA_EXHAUSTED");
+        cfImageQuotaBlockedUntil = nextUtcMidnight();
+        throw new QualityImageQuotaError(cfImageQuotaBlockedUntil);
       }
       if (!response.ok) return null;
       const blob = await response.blob();
@@ -364,7 +379,7 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
   } catch (error) {
     // No cachear una imagen inferior cuando se agota la cuota del proveedor de
     // calidad. El hook conserva la imagen anterior y reintenta más tarde.
-    if (error instanceof Error && error.message === "TINYQUEST_QUALITY_IMAGE_QUOTA_EXHAUSTED") throw error;
+    if (error instanceof QualityImageQuotaError) throw error;
     return null;
   }
 }
@@ -473,10 +488,15 @@ export function useGeneratedPortrait(url: string | undefined, options: { priorit
       setState((prev) => ({ src: prev.src, status: "loading" }));
       loadPortrait(url, { priority })
         .then((src) => alive && setState({ src, status: "ready" }))
-        .catch(() => {
+        .catch((error) => {
           if (!alive) return;
           setState((prev) => ({ src: prev.src, status: "failed" }));
-          if (roundsLeft > 0) timer = window.setTimeout(() => alive && run(roundsLeft - 1), BACKGROUND_RETRY_MS);
+          if (error instanceof QualityImageQuotaError) {
+            const delay = Math.max(BACKGROUND_RETRY_MS, error.retryAt - Date.now() + 1_000);
+            timer = window.setTimeout(() => alive && run(roundsLeft), delay);
+          } else if (roundsLeft > 0) {
+            timer = window.setTimeout(() => alive && run(roundsLeft - 1), BACKGROUND_RETRY_MS);
+          }
         });
     };
     run(BACKGROUND_RETRY_ROUNDS);

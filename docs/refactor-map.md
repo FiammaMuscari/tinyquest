@@ -53,6 +53,9 @@ section** — an outdated map costs more than no map.
   cachea además en IndexedDB. Pollinations es solo fallback: ahí la concurrencia
   DEBE seguir en 1, timeout 120s y reintentos [0, 5s, 15s]. No "optimizar" un
   prompt sin versión/migración: cambia la URL y su entrada de caché local.
+- Un 429 de Workers AI bloquea la vía inferior hasta el próximo reset UTC: el
+  hook programa el reintento exacto y NO cachea una imagen Sana peor. No volver a
+  apagar `cfImageAvailable` permanentemente ante cuota; 501/404 sí apagan el proxy.
 - Cast portraits are prefetched at game start (effect in `App()` keyed on
   `room?.selectedCampaignId`); its styleHint must stay identical to CastPanel's.
 - La forja exige `appearance` con TIPO explícito (mujer, hombre, hombre
