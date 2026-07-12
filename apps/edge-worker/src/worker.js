@@ -31,14 +31,18 @@ async function cfImage(request, env) {
   const input = await request.json();
   if (typeof input.prompt !== "string" || !input.prompt.trim()) return new Response("prompt requerido", { status: 400 });
   const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
-  if (typeof input.referenceImage === "string" && input.referenceImage) {
-    const bytes = Uint8Array.from(atob(input.referenceImage), (char) => char.charCodeAt(0));
+  const runKlein = async (referenceImage) => {
     const form = new FormData();
-    form.append("prompt", `Use image 0 as the canonical character identity. Preserve EXACT face, species, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and delicate oil-painted style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. ${input.prompt.slice(0, 1500)}`);
+    form.append("prompt", referenceImage
+      ? `Use image 0 as the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and premium painterly splash-art style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. ${input.prompt.slice(0, 1500)}`
+      : `${input.prompt.slice(0, 1900)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));
     form.append("height", String(Math.min(1920, Math.max(256, Number(input.height) || 768))));
     form.append("seed", String(Number(input.seed) || 0));
-    form.append("input_image_0", new Blob([bytes], { type: input.referenceType || "image/jpeg" }), "hero-reference.jpg");
+    if (referenceImage) {
+      const bytes = Uint8Array.from(atob(referenceImage), (char) => char.charCodeAt(0));
+      form.append("input_image_0", new Blob([bytes], { type: input.referenceType || "image/jpeg" }), "hero-reference.jpg");
+    }
     const serialized = new Response(form);
     const edited = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
       multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") }
@@ -47,7 +51,11 @@ async function cfImage(request, env) {
     if (typeof encoded !== "string") return new Response("respuesta de edición sin imagen", { status: 502 });
     const output = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
     return new Response(output, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
+  };
+  if (typeof input.referenceImage === "string" && input.referenceImage) {
+    return runKlein(input.referenceImage);
   }
+  if (model.includes("flux-2-klein")) return runKlein();
   const result = await env.AI.run(model, {
     prompt: `${input.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
     width: Math.min(2048, Math.max(256, Number(input.width) || 512)),

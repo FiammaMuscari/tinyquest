@@ -136,13 +136,15 @@ function llmProxyPlugin(): Plugin {
             const model = body.referenceImage ? "@cf/black-forest-labs/flux-2-klein-4b" : (env.CF_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning");
             let upstreamBody: BodyInit;
             let upstreamContentType = "application/json";
-            if (body.referenceImage) {
+            if (body.referenceImage || model.includes("flux-2-klein")) {
               const form = new FormData();
-              form.append("prompt", `Use image 0 as the canonical character identity. Preserve EXACT face, species, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and delicate oil-painted style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. ${body.prompt.slice(0, 1500)}`);
+              form.append("prompt", body.referenceImage
+                ? `Use image 0 as the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and premium painterly splash-art style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. ${body.prompt.slice(0, 1500)}`
+                : `${body.prompt.slice(0, 1900)}, no text, no signature, no watermark`);
               form.append("width", String(Math.min(1920, Math.max(256, body.width ?? 512))));
               form.append("height", String(Math.min(1920, Math.max(256, body.height ?? 768))));
               form.append("seed", String(body.seed ?? 0));
-              form.append("input_image_0", new Blob([Buffer.from(body.referenceImage, "base64")], { type: body.referenceType || "image/jpeg" }), "hero-reference.jpg");
+              if (body.referenceImage) form.append("input_image_0", new Blob([Buffer.from(body.referenceImage, "base64")], { type: body.referenceType || "image/jpeg" }), "hero-reference.jpg");
               upstreamBody = form;
               upstreamContentType = ""; // fetch agrega boundary multipart
             } else {
