@@ -39,14 +39,13 @@ test("criaturas no se humanizan por defecto y comparten el estilo visual", () =>
 
 test("el arte de portada es un ambiente y nunca hereda lenguaje de retrato", () => {
   const prompt = visual.sceneStylePrompt();
-  assert.match(prompt, /EMPTY landscape and architecture/i);
-  assert.match(prompt, /no portrait composition.*no close-up face.*no focal person/i);
+  assert.match(prompt, /hand-painted dark-fantasy RPG environment/i);
   assert.doesNotMatch(prompt, /expressive face|skin pores|character portrait/i);
 });
 
 test("Marea de Ceniza prohíbe agua expuesta en imágenes exteriores", () => {
   const rules = visual.worldImageConstraints("La Marea de Ceniza", "el agua se bombea de napas kilométricas", ["El agua limpia vale más que la sangre", "Nadie sobrevive a cielo abierto sin traje sellador"]);
-  assert.match(rules, /Absolutely no exposed water outdoors/i);
-  assert.match(rules, /no pools, fountains, canals, rivers, lakes, puddles/i);
+  assert.match(rules, /SHOW ONLY bone-dry cracked matte mineral ground/i);
+  assert.match(rules, /Every outdoor surface is dry, dusty, rough and non-reflective/i);
   assert.match(rules, /sealed survival suit/i);
 });

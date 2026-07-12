@@ -131,7 +131,7 @@ export function storySceneImageUrl(storyTitle: string, worldName: string, era: s
   // Prompt idéntico al original: los fondos ya cacheados siguen siendo válidos.
   const where = sceneHint?.trim() ? ` Setting detail: ${sceneHint}.` : "";
   const laws = worldImageConstraints(worldName, ambience, worldRules);
-  const prompt = `EMPTY LOCATION, ENVIRONMENT ONLY, ZERO FIGURES. ${sceneStylePrompt()}. ${laws} Wide establishing shot of a dramatic location for the tale "${storyTitle}" in ${worldName} (${era}).${where} The environment must visibly obey every world law. No people, no silhouettes, no characters, no creatures, no statues shaped like people — only architecture, terrain, sky and atmosphere. No text, no watermark. EMPTY LOCATION WITH ZERO FIGURES.`;
+  const prompt = `CLEAN ENVIRONMENT MATTE-PAINTING BACKGROUND PLATE FOR FILM COMPOSITING. ABANDONED EVACUATED GHOST CITY OR WILDERNESS, before inhabitants arrive. ABSOLUTE WORLD CONSTRAINTS: ${laws}. ${sceneStylePrompt()}. Wide establishing shot of a dramatic location for the tale "${storyTitle}" in ${worldName} (${era}).${where} Show the vacant architecture, terrain, sky and atmosphere as a clean background plate. The environment must visibly demonstrate every world law.`;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
 }
 
@@ -147,7 +147,10 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
   const identity = mode === "hero" ? ` ${anatomyFidelityRules(heroLine)}` : "";
   const laws = worldImageConstraints(worldName, ambience, worldRules);
   const storyBeat = beat?.trim() ? `CURRENT CONFIRMED STORY BEAT: ${beat.trim()} ` : "";
-  const prompt = `${storyBeat}${sceneStylePrompt()}. ${laws} ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. Show the current confirmed beat visually without inventing new people, objects or facts. World laws override visual clichés and the objective text. The character and environment must look painted by the same artist, with matching light and color; integrate the figure naturally into scene light, ground contact and atmosphere. No text, no watermark.`;
+  const subjectPolicy = mode === "hero"
+    ? "SINGLE-SUBJECT FILM COMPOSITE: one canonical hero alone dominates the subject layer."
+    : "CLEAN ENVIRONMENT MATTE-PAINTING BACKGROUND PLATE: abandoned, evacuated and empty before inhabitants arrive; architecture and terrain exclusively.";
+  const prompt = `${storyBeat}ABSOLUTE WORLD CONSTRAINTS: ${laws}. ${subjectPolicy} ${sceneStylePrompt()}. ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. Show the confirmed beat visually without inventing new people, objects or facts. World laws override visual clichés and objective text. Match character and environment light/color when hero mode is active. ${subjectPolicy}`;
   const seed = nameHash(campaignTitle + sceneTitle + mode + (beat ?? "")) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
 }

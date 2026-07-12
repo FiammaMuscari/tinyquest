@@ -32,3 +32,18 @@ test("Cuerpo exige long shot y pies antes del límite del proveedor", () => {
   assert.ok(prompt.indexOf("FULL BODY LONG SHOT") < prompt.indexOf("IDENTITY LOCK"));
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
+
+test("Portada prioriza leyes del mundo y fondo sin figuras", () => {
+  const prompt = promptFrom(portraits.storySceneImageUrl("Deuda de Ceniza", "Marea de Ceniza", "Era sellada", "Archivo quemado", "agua subterránea", ["No hay agua expuesta"]));
+  assert.match(prompt.slice(0, 800), /CLEAN ENVIRONMENT MATTE-PAINTING BACKGROUND PLATE.*ABANDONED EVACUATED.*ABSOLUTE WORLD CONSTRAINTS.*bone-dry cracked matte mineral ground/is);
+  assert.ok(prompt.length <= 1960, `prompt de portada truncable: ${prompt.length}`);
+});
+
+test("Escena diferencia ambiente vacío de modo héroe", () => {
+  const args = ["Historia", "Archivo", "Hallar el sello", "Marea de Ceniza", "Era sellada", "elfa de ojos verdes", "agua subterránea", ["No hay agua expuesta"], "La ceniza contiene oro"];
+  const place = promptFrom(portraits.liveSceneImageUrl("place", ...args));
+  const hero = promptFrom(portraits.liveSceneImageUrl("hero", ...args));
+  assert.match(place.slice(0, 1000), /ABSOLUTE WORLD CONSTRAINTS.*CLEAN ENVIRONMENT MATTE-PAINTING BACKGROUND PLATE/is);
+  assert.match(hero.slice(0, 900), /ABSOLUTE WORLD CONSTRAINTS.*SINGLE-SUBJECT FILM COMPOSITE/is);
+  assert.ok(place.length <= 1960, `prompt de escena truncable: ${place.length}`);
+});
