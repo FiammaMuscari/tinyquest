@@ -81,6 +81,11 @@ section** — an outdated map costs more than no map.
   histórico "cuerpo == frente" causado por truncar el encuadre después de 1960
   caracteres. Si Klein agota cuota, el Worker cae a Schnell con el mismo prompt;
   nunca cae a una imagen inferior que luego quede cacheada.
+- Cuerpo suma dos referencias estéticas JPEG comprimidas mediante
+  `linkPortraitStyleReferences`: son STYLE ONLY (pincel, silueta elegante y ropa
+  medieval), mientras Frente/colores/especie/cicatriz/armas mandan como identidad.
+  No conectar estas referencias al Frente ni a NPCs: gastaría cuota y copiaría
+  anatomía femenina/elfa donde no corresponde.
 - NPC portraitUrl is stamped in `forgeStory` (App) from the LLM's `appearance`.
 
 ## Lobby flow (4 steps — HERO FIRST since 2026-07-06 night; order changed twice that day, confirm with Fiamy before moving it again)

@@ -15,11 +15,14 @@ anatomía elegante, fondo oscuro y pinceladas amplias claramente visibles.
 - `golden-portada-deuda-ceniza.jpg`: referencia para portadas y escenas; grupo
   integrado en un ambiente de óleo cinematográfico, sin collage de rostros.
 
-Estas imágenes son guía de QA y prompt, no inputs enviados en cada inferencia:
-usar multi-referencia agotó la cuota gratuita de Workers AI y empeoró el
-fallback. El proveedor gratuito principal es Flux 1 Schnell; si agota su cuota,
-la aplicación conserva la imagen anterior y reintenta en lugar de cachear arte
-de calidad inferior.
+El set completo es guía de QA. Dos copias comprimidas de las referencias de
+cuerpo (`apps/web/public/assets/style/`, ~30 KB cada una) se envían **solo** al
+generar Cuerpo con Flux.2 Klein: Frente sigue siendo la identidad canónica y las
+referencias aportan exclusivamente técnica, silueta y acabado. Esta combinación
+fue validada también con piel oscura, pelo turquesa, ojos rojos, túnica marfil y
+bastón: Cuerpo conservó todas las configuraciones. Schnell sigue siendo la vía
+gratuita base; si se agota la cuota, se conserva la imagen anterior en vez de
+cachear arte inferior.
 
 `fiamy-cuerpo-rejected.png` es el anti-ejemplo: piel de muñeca suavizada,
 iluminación de estudio, acabado CGI brillante y facciones idealizadas. Ninguna

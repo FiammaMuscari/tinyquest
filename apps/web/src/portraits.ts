@@ -264,11 +264,17 @@ function sleep(ms: number): Promise<void> {
 // Pollinations como siempre. Las imágenes ya cacheadas no se regeneran nunca.
 let cfImageAvailable = true;
 const portraitReferences = new Map<string, string>();
+const portraitStyleReferences = new Map<string, string[]>();
 
 /** Declara que una variante debe editarse desde otra imagen canónica. Se llama
  * antes de montar el <img>, evitando que una carrera dispare text-to-image. */
 export function linkPortraitReference(targetUrl: string, referenceUrl: string): void {
   portraitReferences.set(targetUrl, referenceUrl);
+}
+
+/** Referencias estéticas aprobadas; nunca reemplazan identidad/colores. */
+export function linkPortraitStyleReferences(targetUrl: string, styleUrls: string[]): void {
+  portraitStyleReferences.set(targetUrl, [...styleUrls]);
 }
 
 
@@ -355,7 +361,7 @@ function portraitFetchTarget(url: string): string {
 }
 
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
-  const fast = await fetchViaCloudflare(url, portraitReferences.get(url));
+  const fast = await fetchViaCloudflare(url, portraitReferences.get(url), portraitStyleReferences.get(url));
   if (fast) return fast;
   let lastError: unknown = new Error("portrait fetch failed");
   // Pollinations 2026-07: cola por IP de UN solo pedido — cualquier extra rebota

@@ -16,6 +16,11 @@ await writeFile(join(dir, "visual-identity.mjs"), transpile(visualSource));
 await writeFile(join(dir, "portraits.mjs"), transpile(portraitSource));
 const portraits = await import(`file://${join(dir, "portraits.mjs")}`);
 
+test("expone referencias de estilo separadas de la identidad", () => {
+  assert.equal(typeof portraits.linkPortraitReference, "function");
+  assert.equal(typeof portraits.linkPortraitStyleReferences, "function");
+});
+
 const appearance = "EXACT SKIN COLOR: light warm beige skin. EXACT IRIS COLOR: strongly saturated VIOLET PURPLE irises, NOT blue. EXACT HAIR COLOR: metallic golden hair. female veil elf, black and gold medieval gown, scar on left eyebrow";
 const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""));
 

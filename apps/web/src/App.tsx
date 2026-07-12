@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -614,6 +614,10 @@ export function App() {
     // LONG SHOT al principio (antes quedaba truncado y Klein repetía el frente).
     // Validado contra el Worker real: figura completa + cara/ropa coherentes.
     linkPortraitReference(urls.fullbody, urls.face);
+    linkPortraitStyleReferences(urls.fullbody, [
+      "/assets/style/body-style-painterly.jpg",
+      "/assets/style/body-style-delicate.jpg"
+    ]);
     const shot = draftRef.current.look?.avatarShot ?? "fullbody";
     // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
     // primer lugar de la cola; la otra queda precargada para el toggle instantáneo.
