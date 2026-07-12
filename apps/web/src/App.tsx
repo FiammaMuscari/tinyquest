@@ -619,9 +619,9 @@ export function App() {
   }
   function forgeHeroPortraitPair(seedNonce: number, source = draftRef.current) {
     const urls = heroImageUrls(source, seedNonce);
-    // Frente fija identidad y Cuerpo usa esa imagen como referencia. V14 pone el
-    // LONG SHOT al principio (antes quedaba truncado y Klein repetía el frente).
-    // Validado contra el Worker real: figura completa + cara/ropa coherentes.
+    // Frente es el master inmutable y Cuerpo es una VARIANTE img2img hasta las
+    // rodillas. Una dependencia circular sería imposible; esta única fuente de
+    // verdad garantiza misma persona, ropa, armas, colores y cicatrices.
     prepareHeroPortraitPair(urls);
     const shot = source.look?.avatarShot ?? "fullbody";
     // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
@@ -1708,7 +1708,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           <section className="panel heroSummary heroSpecial">
             <LobbyStepTitle number={1} title="Forjá tu héroe" />
             <div className="heroSummaryRow">
-              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className={draft.look?.avatarShot === "fullbody" ? "summaryShot fullShot" : "summaryShot"} priority />
+              <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={draft.look?.avatarShot === "fullbody" ? draft.look?.faceUrl : undefined} name={draft.name} className={draft.look?.avatarShot === "fullbody" ? "summaryShot fullShot" : "summaryShot"} priority />
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
@@ -2219,9 +2219,8 @@ function lookComplete(draft: Character): boolean {
   return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
 }
 
-// Las dos imágenes del héroe con el MISMO seed y prompt raíz (solo cambia el
-// encuadre): retrato de frente y cuerpo entero — la receta original que se veía
-// mil veces mejor que derivar el frente recortando el cuerpo (probado 2026-07-10).
+// Las dos imágenes del héroe con el MISMO seed/identidad: Frente es el master 3/4
+// y Cuerpo su edición img2img hasta las rodillas. No son dos text-to-image sueltos.
 function heroImageUrls(draft: Character, nonce = 0): { face: string; fullbody: string } {
   const spec = heroPortraitSpec(draft);
   return {
@@ -2486,9 +2485,12 @@ const heroPlaceholderDataUri = `data:image/svg+xml,${encodeURIComponent(`<svg xm
   <text x='110' y='253' text-anchor='middle' font-family='Georgia, serif' font-size='12' letter-spacing='2' fill='#c9a45c' fill-opacity='.85'>POR FORJAR</text>
 </svg>`)}`;
 
-function HeroAvatarImg({ url, name, className, priority = false }: { url: string; name: string; className?: string; priority?: boolean }) {
+function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false }: { url: string; fallbackUrl?: string; name: string; className?: string; priority?: boolean }) {
   const generated = isGeneratedPortraitUrl(url);
   const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority });
+  // Cuerpo depende del master Frente. En la primera forja mostramos ese master
+  // apenas llega en vez de dejar un spinner durante la segunda edición img2img.
+  const fallback = useGeneratedPortrait(isGeneratedPortraitUrl(fallbackUrl) ? fallbackUrl : undefined, { priority });
   // Los avatares clásicos (gato con damero blanco horneado) quedaron retirados:
   // hasta que el look esté completo se muestra el busto dorado de "héroe por forjar".
   if (!generated) {
@@ -2496,6 +2498,7 @@ function HeroAvatarImg({ url, name, className, priority = false }: { url: string
     return <img className={className} src={staticUrl.startsWith("/assets/avatars/") ? heroPlaceholderDataUri : staticUrl} alt={name} />;
   }
   if (src) return <img className={`${className ?? ""} ${status === "loading" ? "portraitForging" : "portraitFade"}`} src={src} alt={name} />;
+  if (fallback.src) return <img className={`${className ?? ""} portraitForging`} src={fallback.src} alt={`${name}, preparando variante de cuerpo`} />;
   // Cargando: spinner sobre fondo gris; si falló del todo, medallón procedural.
   if (status === "failed") return <img className={className} src={medallionDataUri(name)} alt={name} />;
   return <img className={`${className ?? ""} imgLoadingBg`} src={loadingSpinnerDataUri} alt={`Generando retrato de ${name}`} />;
@@ -3289,7 +3292,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { avatarShot: draft.look?.avatarShot ?? "fullbody", ...draft.look, ...patch } }));
   }
-  // Alterna entre retrato de frente y cuerpo entero SIN regenerar: conserva la seed
+  // Alterna entre retrato de frente y cuerpo hasta las rodillas SIN regenerar: conserva la seed
   // actual (mismo rostro en ambas tomas) reescribiéndola en la URL de la otra toma.
   function chooseShot(shot: "face" | "fullbody") {
     // El toggle alterna entre el par FIJADO al generar/reimaginar: mismo personaje
@@ -3303,7 +3306,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: stored ?? legacy }));
   }
-  // Descarga la toma pedida (frente o cuerpo) — siempre del par fijado, exportada
+  // Descarga la toma pedida (frente o cuerpo hasta rodillas) — siempre del par fijado, exportada
   // como PNG con el fondo superior fundido a TRANSPARENTE (la cabeza queda
   // flotando, nítida, sin fondo arriba — el mismo look que en la UI).
   async function downloadShot(shot: "face" | "fullbody") {
@@ -3345,10 +3348,10 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           <div className="heroPortraitColumn">
             <div className={`heroPortraitFrame ${currentShot === "fullbody" ? "fullbodyFrame" : ""}`}>
               <button type="button" className="heroPortraitZoomButton" onClick={() => heroLookDone && setHeroZoomed(true)} disabled={!heroLookDone} aria-label="Ver retrato en pantalla completa">
-                <HeroAvatarImg key={draft.avatarUrl} url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
+                <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={currentShot === "fullbody" ? draft.look?.faceUrl : undefined} name={draft.name} className="heroPortrait" priority />
               </button>
               {heroLookDone && (
-                <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled} title={currentShot === "face" ? "Descargar la imagen de frente" : "Descargar la imagen de cuerpo entero"} aria-label="Descargar esta toma">
+                <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled} title={currentShot === "face" ? "Descargar la imagen de frente 3/4" : "Descargar la imagen de cuerpo hasta las rodillas"} aria-label="Descargar esta toma">
                   <Download size={14} />
                 </button>
               )}
@@ -3415,7 +3418,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             {heroZoomed && (
               <div className="heroPortraitLightbox" role="presentation" onClick={() => setHeroZoomed(false)}>
                 <button type="button" onClick={() => setHeroZoomed(false)} aria-label="Cerrar imagen ampliada">
-                  <HeroAvatarImg key={draft.avatarUrl} url={draft.avatarUrl} name={draft.name} className={currentShot === "fullbody" ? "zoomFullBody" : "zoomFace"} priority />
+                  <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={currentShot === "fullbody" ? draft.look?.faceUrl : undefined} name={draft.name} className={currentShot === "fullbody" ? "zoomFullBody" : "zoomFace"} priority />
                   <span>Click para cerrar</span>
                 </button>
               </div>

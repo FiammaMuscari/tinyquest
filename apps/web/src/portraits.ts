@@ -41,8 +41,8 @@ export function nameHash(name: string): number {
 // por nombre → mismo personaje, mismo retrato durante toda la partida. `seedNonce`
 // permite "reimaginar": nueva cara para la misma identidad.
 // MISMO TRAZO en las dos tomas: la raíz del prompt es idéntica palabra por palabra
-// y solo cambia el ENCUADRE — frente = plano 3/4 (cintura hacia arriba, 4:5);
-// cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
+// y solo cambia el ENCUADRE — frente = primer plano 3/4; cuerpo = de cabeza a
+// rodillas. Cuerpo se deriva además desde Frente por img2img en el Worker.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, styleHint: string) =>
   ` Character: ${name}. ${styleHint}. COLOR LOCK: exact selected skin, iris and hair colors, unaffected by species or lighting. Same canonical clothing, weapons, jewelry and scars in both shots. Simple dark tonal gradient only.`;
@@ -55,23 +55,23 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST PORTRAIT V14. CAMERA MANDATORY: close three-quarter profile portrait from waist up, head turned 30 degrees, both eyes visible, entire head and shoulders visible. IDENTITY LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)}`;
+  const prompt = `TINYQUEST HERO MASTER V16. CAMERA MANDATORY: close three-quarter profile portrait, head and torso, face turned exactly 30 degrees from camera, both eyes visible, entire head and shoulders visible. This 30-degree three-quarter face angle is mandatory, never straight-on. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
-// Imagen de cuerpo entero del héroe: MISMO personaje que el retrato de frente.
+// Imagen de cuerpo hasta las rodillas: MISMO personaje que el retrato de frente.
 // La receta de consistencia es seed idéntica + prompt idéntico palabra por palabra
 // (mismo estilo, misma descripción, mismo fondo) cambiando SOLO el encuadre:
-// "half body" → "full body standing, head to toe". No tocar el estilo acá — si
+// "close portrait" → "knee-up standing". No tocar el estilo acá — si
 // diverge del prompt de characterPortraitUrl, flux pinta OTRO personaje.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
-  // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
-  // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
-  const prompt = `TINYQUEST PORTRAIT V14. FULL BODY LONG SHOT. CAMERA 8 METERS AWAY. Standing character occupies only 55 percent of canvas height. Show complete body from head through legs to BOTH FEET, visible floor beneath boots and large empty margins. NO close-up, portrait, waist-up or crop. IDENTITY LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} BOTH FEET FULLY VISIBLE.`;
+  // Plano americano estricto: revela ropa/armas sin malgastar resolución en pies
+  // ni alejar tanto el rostro. El Worker usa Frente como input_image_0 y cambia
+  // SOLO el encuadre; no vuelve a inventar persona ni vestuario.
+  const prompt = `TINYQUEST HERO KNEE-UP V16. CAMERA MANDATORY: medium-long three-quarter-length standing shot from the top of the head through BOTH KNEES. Knees touch the lower frame edge. Show torso, waist, hips and upper legs. DO NOT show lower legs, ankles, boots, feet or floor. Face remains turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND PIXEL-FAITHFUL OUTFIT AS MASTER REFERENCE.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Arquetipos de linaje/oficio PRE-GENERADOS y guardados como assets fijos
@@ -161,7 +161,7 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
 // ruteo por aspecto vive en beingPortraitUrl (un gato NPC entra por acá).
 export function petPortraitUrl(name: string, description: string): string {
   const prompt = creaturePortraitPrompt(name, description);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=448&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
 }
 
 // Delata si un personaje NO es humano sino un animal/criatura por su aspecto: sus
@@ -198,9 +198,10 @@ export function beingPortraitUrlWithContext(name: string, appearance: string | u
     : kind === "creature" || kind === "hybrid"
       ? creaturePortraitPrompt(name, visualSpec, styleHint, kind)
       : humanoidPortraitPrompt(name, visualSpec, styleHint);
-  // Los NPC se muestran como medallones: 512² conserva detalle facial y evita
-  // gastar tiempo/neuronas pintando piernas que el recorte circular nunca usa.
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
+  // Los NPC se muestran como medallones: 448² conserva detalle incluso en el
+  // lightbox, reduce ~23% los píxeles respecto de 512² y no malgasta tiempo en
+  // piernas que el recorte circular nunca muestra.
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=448&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
 }
 
 export function isGeneratedPortraitUrl(url: string | undefined): url is string {
@@ -287,6 +288,7 @@ let cfImageAvailable = true;
 let cfImageQuotaBlockedUntil = 0;
 const portraitReferences = new Map<string, string>();
 const portraitStyleReferences = new Map<string, string[]>();
+const styleReferencePayloads = new Map<string, Promise<{ data: string; type: string }>>();
 
 class QualityImageQuotaError extends Error {
   constructor(readonly retryAt: number) {
@@ -319,6 +321,19 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+function styleReferencePayload(styleUrl: string): Promise<{ data: string; type: string }> {
+  const cached = styleReferencePayloads.get(styleUrl);
+  if (cached) return cached;
+  const pending = fetch(styleUrl).then(async (result) => {
+    if (!result.ok) throw new Error(`style reference HTTP ${result.status}`);
+    const blob = await result.blob();
+    return { data: await blobToBase64(blob), type: blob.type || "image/png" };
+  });
+  pending.catch(() => styleReferencePayloads.delete(styleUrl));
+  styleReferencePayloads.set(styleUrl, pending);
+  return pending;
+}
+
 async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls: string[] = []): Promise<Blob | null> {
   if (!cfImageAvailable || !url.startsWith("https://image.pollinations.ai/")) return null;
   // No caer a Sana mientras la cuota de calidad está agotada. Al llegar el
@@ -340,25 +355,21 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 50_000);
     try {
-      let referenceImage: string | undefined;
-      let referenceType: string | undefined;
-      if (referenceUrl) {
+      const referencePayload = referenceUrl ? (async () => {
         const referenceSrc = await loadPortrait(referenceUrl, { priority: true });
         const referenceBlob = await fetch(referenceSrc).then((result) => result.blob());
-        referenceImage = await blobToBase64(referenceBlob);
-        referenceType = referenceBlob.type || "image/jpeg";
-      }
-      const styleImages = await Promise.all(styleUrls.map(async (styleUrl) => {
-        const blob = await fetch(styleUrl).then((result) => {
-          if (!result.ok) throw new Error(`style reference HTTP ${result.status}`);
-          return result.blob();
-        });
-        return { data: await blobToBase64(blob), type: blob.type || "image/png" };
-      }));
+        return { image: await blobToBase64(referenceBlob), type: referenceBlob.type || "image/jpeg" };
+      })() : Promise.resolve({ image: undefined, type: undefined });
+      // Las referencias locales se leen/convierten en paralelo con la generación
+      // de Frente y quedan memoizadas para reimaginados posteriores.
+      const [reference, styleImages] = await Promise.all([
+        referencePayload,
+        Promise.all(styleUrls.map(styleReferencePayload))
+      ]);
       const response = await fetch("/api/cf-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, width, height, seed, referenceImage, referenceType, styleImages }),
+        body: JSON.stringify({ prompt, width, height, seed, referenceImage: reference.image, referenceType: reference.type, styleImages }),
         signal: controller.signal
       });
       if (response.status === 501 || response.status === 404 || response.status === 405) {

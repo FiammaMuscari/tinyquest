@@ -79,18 +79,21 @@ section** — an outdated map costs more than no map.
   firma no coincide, porque eso representa una edición pendiente, no una URL
   legacy rota.
 - `forgeHeroPortraitPair` genera Frente como identidad canónica con Schnell y
-  deriva Cuerpo mediante `linkPortraitReference` + Flux.2 Klein 4B. En V14 la
-  instrucción de cámara LONG SHOT vive al principio del prompt: evita el bug
-  histórico "cuerpo == frente" causado por truncar el encuadre después de 1960
-  caracteres. Si Klein agota cuota, el Worker cae a Schnell con el mismo prompt;
-  nunca cae a una imagen inferior que luego quede cacheada.
+  deriva Cuerpo mediante `linkPortraitReference` + Flux.2 Klein 4B. V16 usa un
+  master Frente 3/4 y una variante estricta de cabeza a rodillas; el Worker copia
+  literalmente persona, ropa, armas, colores y cicatrices y cambia SOLO cámara.
+  Ambas tomas son 512² (un tile en vez de 512×768) y no aparecen pies. Si Klein
+  agota cuota, el Worker cae a Schnell con el mismo prompt; nunca cachea una
+  imagen inferior. Mientras termina Cuerpo, `HeroAvatarImg.fallbackUrl` muestra
+  el master Frente ya listo en vez de mantener el spinner.
 - Cuerpo suma dos referencias estéticas JPEG comprimidas mediante
   `linkPortraitStyleReferences`: son STYLE ONLY (pincel, silueta elegante y ropa
   medieval), mientras Frente/colores/especie/cicatriz/armas mandan como identidad.
   No conectar estas referencias al Frente ni a NPCs: gastaría cuota y copiaría
   anatomía femenina/elfa donde no corresponde.
 - NPC `portraitUrl` se estampa en `forgeStory` desde `appearance + description`.
-  Son medallones 512×512: mismo detalle facial con menos generación desperdiciada.
+  Son medallones 448×448 y Schnell usa 6 pasos (héroe/escenas conservan 8): menos
+  píxeles y ~25% menos pasos sin perder detalle al tamaño máximo del lightbox.
 
 ## Lobby flow (4 steps — HERO FIRST since 2026-07-06 night; order changed twice that day, confirm with Fiamy before moving it again)
 
@@ -103,9 +106,10 @@ section** — an outdated map costs more than no map.
 - CTA gating: disabled until `lookComplete(draft)` (género+piel+ojos+pelo, los 4
   obligatorios) and hero saved (`!editingHero`). Without look, NO hero image is
   generated at all.
-- Two hero images: face (`characterPortraitUrl`) + fullbody (`fullBodyPortraitUrl`),
-  same seed; `shotToggle` switches preserving the seed (regex replace on the URL).
-  `avatarShot` lives in `Character.look`.
+- Two hero variants: face (`characterPortraitUrl`) + knee-up body
+  (`fullBodyPortraitUrl`), same seed; Body also references Face via img2img.
+  `shotToggle` only switches the frozen pair. `avatarShot` lives in
+  `Character.look`.
 - Quest temper: `getQuestTemper/applyQuestTemper` (engine `quest-temper.ts`) —
   +1 most-demanded stat, −1 least-demanded, from scenes' allowedStats; applied to
   a COPY at `startSolo` (draft untouched); shown as chips in `finalStep`.
@@ -227,10 +231,10 @@ acción y adoptan el estado.
   ya era opt-in. Compañeras: los PNG de /assets/companions fueron REPROCESADOS
   con máscara circular (transparente fuera del círculo del emblema) — no
   restaurar los viejos. `img.npcPortrait[src^="/assets/companions/"]` sin sombra.
-- Héroe (REVERTIDO 2026-07-10 tarde): Frente y Cuerpo son DOS generaciones con
-  el mismo seed/prompt raíz (characterPortraitUrl 3/4 cintura + fullBodyPortraitUrl
-  parado), SIEMPRE vía Pollinations flux — es EL estilo que Fiamy quiere (pintura
-  oscura al óleo). El experimento "frente = recorte CSS del cuerpo" se veía peor.
+- Héroe: Frente sigue siendo generación canónica 3/4 (no recorte CSS) y Cuerpo
+  es edición img2img del mismo master, ahora de cabeza a rodillas. Cloudflare es
+  la vía primaria; Pollinations queda como fallback. El par comparte identidad,
+  vestuario y seed pero conserva dos encuadres reales.
 - Teaser: emojis → iconos lucide (`.tIcon`, colores por card: misión dorado,
   en-juego turquesa, contra-vos rojo); título serif con llama. CTA social
   `.inviteCta` en el paso 4 (abre sala + código; usa onMultiplayerHost/mpBlocked).

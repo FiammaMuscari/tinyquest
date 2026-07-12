@@ -48,6 +48,7 @@ async function cfImage(request, env, ctx) {
   };
   const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
   const quotaError = (error) => /4006|daily free allocation|neurons/i.test(error instanceof Error ? error.message : String(error));
+  const fastMedallion = /^TINYQUEST (?:NPC PORTRAIT|CREATURE PORTRAIT|PHENOMENON) V15\b/.test(input.prompt);
   const runSchnell = async () => {
     try {
       const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
@@ -55,7 +56,10 @@ async function cfImage(request, env, ctx) {
         width: Math.min(2048, Math.max(256, Number(input.width) || 512)),
         height: Math.min(2048, Math.max(256, Number(input.height) || 512)),
         seed: Number(input.seed) || 0,
-        steps: 8
+        // Los medallones son 448² y se ven como máximo a ~420px: 6 pasos
+        // conservan el estilo/rasgos y reducen 25% la latencia frente a 8.
+        // El héroe y escenas mantienen 8 pasos porque se inspeccionan en grande.
+        steps: fastMedallion ? 6 : 8
       });
       if (result instanceof ReadableStream || result instanceof ArrayBuffer || ArrayBuffer.isView(result)) {
         return new Response(result, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
@@ -73,10 +77,10 @@ async function cfImage(request, env, ctx) {
     const form = new FormData();
     const styleStart = referenceImage ? 1 : 0;
     const styleInstruction = styleImages.length
-      ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful full-body silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.`
+      ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful knee-up silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.`
       : "";
     form.append("prompt", referenceImage
-      ? `Image 0 is the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry and weapons. ${styleInstruction} Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. Use a clean unobtrusive dark tonal gradient background; the character is the only subject. ${input.prompt.slice(0, 1300)}`
+      ? `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the EXACT same person, face, canonical species and non-human anatomy, skin color, iris color, hair color and scar. Copy the EXACT same garments: colors, materials, collar, sleeves, seams, armor pieces, jewelry, weapons and every visible accessory; never redesign or substitute clothing. ${styleInstruction} Change ONLY camera/framing to a medium-long KNEE-UP standing shot from head through both knees, knees touching the lower edge. Do not show lower legs, ankles, boots, feet or floor. Keep the same 30-degree three-quarter face angle with both eyes visible. Simple dark tonal gradient; one character only. ${input.prompt.slice(0, 1200)}`
       : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));
     form.append("height", String(Math.min(1920, Math.max(256, Number(input.height) || 768))));

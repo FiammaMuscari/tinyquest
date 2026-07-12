@@ -8,6 +8,7 @@ import ts from "typescript";
 const dir = await mkdtemp(join(tmpdir(), "tinyquest-portrait-prompts-"));
 const transpile = (source) => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
 const visualSource = await readFile(new URL("../apps/web/src/visual-identity.ts", import.meta.url), "utf8");
+const workerSource = await readFile(new URL("../apps/edge-worker/src/worker.js", import.meta.url), "utf8");
 let portraitSource = await readFile(new URL("../apps/web/src/portraits.ts", import.meta.url), "utf8");
 portraitSource = portraitSource
   .replace(/^import \{ useCallback[^\n]+\n/, "")
@@ -25,17 +26,36 @@ const appearance = "EXACT SKIN COLOR: light warm beige skin. EXACT IRIS COLOR: s
 const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""));
 
 test("Frente prioriza cámara e identidad antes del estilo", () => {
-  const prompt = promptFrom(portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2));
-  assert.ok(prompt.indexOf("CAMERA MANDATORY") < prompt.indexOf("IDENTITY LOCK"));
-  assert.match(prompt.slice(0, 500), /three-quarter profile.*VIOLET PURPLE/is);
+  const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
+  const prompt = promptFrom(url);
+  assert.ok(prompt.indexOf("CAMERA MANDATORY") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
+  assert.match(prompt.slice(0, 600), /three-quarter profile.*30 degrees.*VIOLET PURPLE/is);
+  assert.equal(new URL(url).searchParams.get("width"), "512");
+  assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.ok(prompt.length <= 1960, `prompt de frente truncable: ${prompt.length}`);
 });
 
-test("Cuerpo exige long shot y pies antes del límite del proveedor", () => {
-  const prompt = promptFrom(portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2));
-  assert.match(prompt.slice(0, 520), /FULL BODY LONG SHOT.*55 percent.*BOTH FEET/is);
-  assert.ok(prompt.indexOf("FULL BODY LONG SHOT") < prompt.indexOf("IDENTITY LOCK"));
+test("Cuerpo muestra cabeza a rodillas y excluye pies", () => {
+  const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
+  const prompt = promptFrom(url);
+  assert.match(prompt.slice(0, 760), /KNEE-UP.*head through BOTH KNEES.*DO NOT show lower legs, ankles, boots, feet or floor/is);
+  assert.ok(prompt.indexOf("KNEE-UP") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
+  assert.doesNotMatch(prompt, /head-to-feet|BOTH FEET FULLY VISIBLE/i);
+  assert.equal(new URL(url).searchParams.get("width"), "512");
+  assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
+});
+
+test("Worker deriva Cuerpo desde el master sin rediseñar persona o ropa", () => {
+  assert.match(workerSource, /IMMUTABLE canonical character and wardrobe master/);
+  assert.match(workerSource, /Copy the EXACT same garments: colors, materials, collar, sleeves, seams, armor pieces, jewelry, weapons/);
+  assert.match(workerSource, /KNEE-UP standing shot from head through both knees/);
+  assert.match(workerSource, /Do not show lower legs, ankles, boots, feet or floor/);
+});
+
+test("medallones NPC usan perfil rápido de seis pasos", () => {
+  assert.match(workerSource, /fastMedallion/);
+  assert.match(workerSource, /steps: fastMedallion \? 6 : 8/);
 });
 
 test("Portada prioriza leyes del mundo y fondo sin figuras", () => {
@@ -62,8 +82,8 @@ test("NPC combina apariencia y descripción en un medallón cuadrado", () => {
   );
   const prompt = promptFrom(url);
   assert.match(prompt, /mujer elfa adulta.*NARRATIVE DESCRIPTION TO MATCH VISUALLY.*llave de cobre/is);
-  assert.equal(new URL(url).searchParams.get("width"), "512");
-  assert.equal(new URL(url).searchParams.get("height"), "512");
+  assert.equal(new URL(url).searchParams.get("width"), "448");
+  assert.equal(new URL(url).searchParams.get("height"), "448");
 });
 
 test("una amenaza de viento genera fenómeno y no un rostro aleatorio", () => {
