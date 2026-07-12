@@ -32,7 +32,8 @@ test("los colores elegidos son restricciones no negociables", () => {
 test("criaturas no se humanizan por defecto y comparten el estilo visual", () => {
   const prompt = visual.creaturePortraitPrompt("Nacar", "quimera escamada de cuatro alas");
   assert.match(prompt, /not a human wearing a costume/i);
-  assert.match(prompt, /EXACT CANONICAL SPECIES.*dark fantasy semi-realistic painterly style.*premium RPG concept art and splash art/i);
+  assert.match(prompt, /EXACT CANONICAL SPECIES.*Classic hand-painted dark fantasy RPG character art.*romantic elegance/i);
+  assert.match(prompt, /PAINTERLY HIERARCHY.*background dissolves into large abstract charcoal/i);
   assert.match(prompt, /never normalize an elf, dwarf, dragon-marked being, undead, animal or creature into an ordinary human/i);
   assert.match(prompt, /No glossy CGI.*porcelain doll face.*no 3D render/i);
 });
