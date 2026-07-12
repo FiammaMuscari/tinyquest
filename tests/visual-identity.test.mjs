@@ -32,8 +32,8 @@ test("los colores elegidos son restricciones no negociables", () => {
 test("criaturas no se humanizan por defecto y comparten el estilo visual", () => {
   const prompt = visual.creaturePortraitPrompt("Nacar", "quimera escamada de cuatro alas");
   assert.match(prompt, /not a human wearing a costume/i);
-  assert.match(prompt, /dark fantasy RPG book illustration.*hand-painted oil portrait.*dramatic warm chiaroscuro/i);
-  assert.match(prompt, /NOT a photograph, NOT 3D, NOT anime/i);
+  assert.match(prompt, /RAW TRADITIONAL OIL PAINTING.*rough linen canvas.*visible layered brush strokes/i);
+  assert.match(prompt, /NO glossy digital concept art.*porcelain doll skin.*smooth CGI/i);
 });
 
 test("Marea de Ceniza prohíbe agua expuesta en imágenes exteriores", () => {

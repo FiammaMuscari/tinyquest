@@ -45,7 +45,7 @@ export function nameHash(name: string): number {
 // cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, appearance: string | undefined, styleHint: string) =>
-  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, eye color and hair color literally and consistently; do not recolor them because of species, mood or lighting`;
+  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark rough painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, eye color and hair color literally and consistently; do not recolor them because of species, mood or lighting. SAME PAINTER AND MEDIUM IN EVERY SHOT: rough traditional oil on linen, visible strokes, imperfect human features and warm lateral chiaroscuro; never switch the body shot to smooth glossy digital art`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
@@ -53,7 +53,7 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
   // Mantener EXACTO el prompt aprobado del avatar: recupera las imágenes previas
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
-  const prompt = `${heroPromptRoot}, three-quarter shot from the waist up, face clearly visible, closer camera${heroPromptTail(name, appearance, styleHint)}`;
+  const prompt = `${heroPromptRoot}, intimate three-quarter portrait from the waist up, face clearly visible, closer camera, unretouched natural face${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -67,7 +67,7 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
   // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
   // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
-  const prompt = `${heroPromptRoot}, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, standing pose${heroPromptTail(name, appearance, styleHint)}`;
+  const prompt = `${heroPromptRoot}, painted full-length character study, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, grounded relaxed standing pose, face retains natural proportions and painterly asymmetry, clothing rendered with broad visible oil strokes rather than glossy detail${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
