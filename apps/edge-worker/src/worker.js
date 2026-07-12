@@ -1,0 +1,75 @@
+const json = (value, status = 200) => new Response(JSON.stringify(value), {
+  status,
+  headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
+});
+
+async function llm(request, env, provider) {
+  const groq = provider === "groq";
+  const key = groq ? env.GROQ_API_KEY : env.GEMINI_API_KEY;
+  if (!key) return json({ error: { message: `Falta ${groq ? "GROQ_API_KEY" : "GEMINI_API_KEY"}` } }, 501);
+  const upstream = groq
+    ? "https://api.groq.com/openai/v1/chat/completions"
+    : "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  const body = await request.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", body);
+  const keyHex = [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, "0")).join("");
+  const cacheKey = new Request(`https://tinyquest.internal/llm/${provider}/${keyHex}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return new Response(cached.body, cached);
+  const response = await fetch(upstream, {
+    method: "POST",
+    headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+    body
+  });
+  const result = new Response(response.body, response);
+  if (response.ok) await caches.default.put(cacheKey, result.clone());
+  return result;
+}
+
+async function cfImage(request, env) {
+  if (!env.AI) return new Response("Cloudflare Workers AI no configurado", { status: 501 });
+  const input = await request.json();
+  if (typeof input.prompt !== "string" || !input.prompt.trim()) return new Response("prompt requerido", { status: 400 });
+  const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
+  const result = await env.AI.run(model, {
+    prompt: `${input.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
+    width: Math.min(2048, Math.max(256, Number(input.width) || 512)),
+    height: Math.min(2048, Math.max(256, Number(input.height) || 512)),
+    seed: Number(input.seed) || 0,
+    steps: 8
+  });
+  if (result instanceof ReadableStream || result instanceof ArrayBuffer || ArrayBuffer.isView(result)) {
+    return new Response(result, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
+  }
+  const encoded = result?.image;
+  if (typeof encoded !== "string") return new Response("respuesta sin imagen", { status: 502 });
+  const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+  return new Response(bytes, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
+}
+
+async function pollinations(url) {
+  const target = url.searchParams.get("u") || "";
+  let parsed;
+  try { parsed = new URL(target); } catch { return new Response("URL inválida", { status: 400 }); }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "image.pollinations.ai") {
+    return new Response("solo image.pollinations.ai", { status: 400 });
+  }
+  return fetch(parsed, { cf: { cacheEverything: true, cacheTtl: 31536000 } });
+}
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+    if (request.method !== "POST" && url.pathname !== "/api/pollinations") return new Response("Method not allowed", { status: 405 });
+    try {
+      if (url.pathname === "/api/groq/chat") return llm(request, env, "groq");
+      if (url.pathname === "/api/gemini/chat") return llm(request, env, "gemini");
+      if (url.pathname === "/api/cf-image") return cfImage(request, env);
+      if (url.pathname === "/api/pollinations") return pollinations(url);
+      return new Response("Not found", { status: 404 });
+    } catch (error) {
+      return json({ error: { message: error instanceof Error ? error.message : "Fallo del relay" } }, 502);
+    }
+  }
+};

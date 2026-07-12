@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "tinyquest",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "../../apps/web/dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "single-page-application"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "GROQ_MODEL": "llama-3.3-70b-versatile",
+    "CF_IMAGE_MODEL": "@cf/black-forest-labs/flux-1-schnell"
+  }
+}
