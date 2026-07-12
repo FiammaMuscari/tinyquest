@@ -16,7 +16,7 @@ const dir = join(tmpdir(), `tinyquest-improvised-${process.pid}`);
 await mkdir(dir, { recursive: true });
 await transpile("../packages/game-engine/src/campaigns.ts", join(dir, "campaigns.mjs"));
 
-const { buildImprovisedCampaign, IMPROVISED_CAMPAIGN_ID } = await import(`file://${join(dir, "campaigns.mjs")}`);
+const { buildImprovisedCampaign, canonicalVisualAppearance, IMPROVISED_CAMPAIGN_ID } = await import(`file://${join(dir, "campaigns.mjs")}`);
 
 const fullContent = {
   title: "El Faro que Come Nombres",
@@ -70,6 +70,25 @@ test("buildImprovisedCampaign produce una campaña jugable con la ficción del L
   assert.ok(campaign.enemies.length === 1 && campaign.enemies[0].vitality === 10);
   assert.equal(campaign.hiddenTruth, fullContent.hiddenTruth);
   assert.ok(campaign.twists?.[0]?.reveal.includes("inmortalidad"));
+});
+
+test("la apariencia literal de la amenaza llega al generador", () => {
+  const campaign = buildImprovisedCampaign({
+    ...fullContent,
+    threat: {
+      ...fullContent.threat,
+      appearance: "fenómeno incorpóreo: remolino azul sin rostro que abre exactamente tres portales"
+    }
+  });
+  assert.match(campaign.enemies[0].imagePrompt, /fenómeno incorpóreo.*sin rostro.*tres portales/i);
+});
+
+test("toda entidad recibe un tipo visual explícito sin humanizar criaturas o fenómenos", () => {
+  assert.match(canonicalVisualAppearance("", "anciana de pelo blanco", "Mara"), /^mujer:/i);
+  assert.match(canonicalVisualAppearance("", "minotauro con torso taurino", "Asterión"), /^híbrido:/i);
+  assert.match(canonicalVisualAppearance("", "dragón de seis patas", "Nácar"), /^mascota\/criatura:/i);
+  assert.match(canonicalVisualAppearance("", "corrientes de aire que abren grietas dimensionales", "Viento de los Portales"), /^fenómeno incorpóreo:/i);
+  assert.match(canonicalVisualAppearance("", "archivista sin rasgos de género", "Iriel"), /^andrógino\/intersexual:/i);
 });
 
 test("keywordsUsed conserva hasta ocho ideas completas para explicarlas en el lobby", () => {

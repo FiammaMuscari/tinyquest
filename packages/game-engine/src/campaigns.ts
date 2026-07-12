@@ -618,6 +618,32 @@ function clampText(value: unknown, fallback: string, max = 400): string {
   return `${cut.slice(0, lastSpace > max * 0.6 ? lastSpace : max).trimEnd()}.`;
 }
 
+const visualTypePattern = /\b(mujer|hombre\s+afeminado|hombre|andr[óo]gin[oa]|intersex(?:ual)?|hermafrodita|mascota|criatura|h[íi]brid[oa]|fen[óo]meno\s+incorp[óo]reo)\b/i;
+const hybridVisualPattern = /\b(h[íi]brid[oa]|centaur[oa]?|minotaur[oa]?|s[áa]tir[oa]?|faun[oa]?|sirena|trit[óo]n|lamia|harp[íi]a|mitad\s+(?:human[oa]|caballo|animal))\b/i;
+const phenomenonVisualPattern = /\b(fen[óo]meno|incorp[óo]re[oa]|sin\s+cuerpo|tormenta|tempestad|vendaval|viento|corrientes?\s+de\s+aire|remolino|niebla\s+(?:viviente|con|que|voraz|devoradora)|nube\s+viviente|llama\s+viviente|grieta\s+dimensional|anomal[íi]a)\b/i;
+const feminineVisualPattern = /\b(mujer|femenin[oa]|hembra|anciana|ni[ñn]a|muchacha|dama|reina|elfa|enana|bruja|sacerdotisa|guardiana)\b/i;
+const masculineVisualPattern = /\b(hombre|masculin[oa]|macho|anciano|ni[ñn]o|muchacho|var[óo]n|rey|elfo|enano|brujo|sacerdote|guardi[áa]n)\b/i;
+
+/** Completa una ficha visual incompleta sin inventarle una mujer humana a todo.
+ * La categoría queda escrita en los datos de campaña, no solo escondida en el
+ * prompt, y por eso la UI y el generador comparten una única realidad. */
+export function canonicalVisualAppearance(appearance: unknown, description: unknown, name = ""): string {
+  const exact = clampText(appearance, "", 280);
+  const narrative = clampText(description, "figura enigmática con una silueta distintiva", 240);
+  const source = exact || narrative;
+  const profile = `${name} ${source} ${narrative}`;
+  let type: string;
+  const stated = profile.match(visualTypePattern)?.[1];
+  if (stated) type = stated.toLowerCase();
+  else if (phenomenonVisualPattern.test(profile)) type = "fenómeno incorpóreo";
+  else if (hybridVisualPattern.test(profile)) type = "híbrido";
+  else if (looksLikeAnimal(profile)) type = "mascota/criatura";
+  else if (feminineVisualPattern.test(profile)) type = "mujer";
+  else if (masculineVisualPattern.test(profile)) type = "hombre";
+  else type = "andrógino/intersexual";
+  return `${type}: ${source}`;
+}
+
 // "Examinar Un farol..." → "Examinar un farol...": baja solo artículos iniciales,
 // sin tocar nombres propios.
 function asFragment(text: string): string {
@@ -654,7 +680,7 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
     secret: clampText(npc?.secret, "Protege una culpa antigua.", 220),
     desire: npc?.desire ? clampText(npc.desire, "", 160) : undefined,
     fear: npc?.fear ? clampText(npc.fear, "", 160) : undefined,
-    appearance: npc?.appearance ? clampText(npc.appearance, "", 180) : undefined,
+    appearance: canonicalVisualAppearance(npc?.appearance, npc?.description, npc?.name),
     bond: npc?.bond ? clampText(npc.bond, "", 90) : undefined,
     whyMightLie: npc?.whyMightLie ? clampText(npc.whyMightLie, "", 160) : undefined
   }));
@@ -709,7 +735,8 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
       defense: 13,
       dangerLevel: 3,
       weaknessStats: ["mind", "charm", "courage"],
-      specialMove: clampText(content.threat?.specialMove, "Escalar peligro y bloquear una ruta", 120)
+      specialMove: clampText(content.threat?.specialMove, "Escalar peligro y bloquear una ruta", 120),
+      imagePrompt: canonicalVisualAppearance(content.threat?.appearance, content.threat?.description, threatName)
     }],
     clues,
     possibleEndings: [

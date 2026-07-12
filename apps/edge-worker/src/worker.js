@@ -26,10 +26,26 @@ async function llm(request, env, provider) {
   return result;
 }
 
-async function cfImage(request, env) {
+async function cfImage(request, env, ctx) {
   if (!env.AI) return new Response("Cloudflare Workers AI no configurado", { status: 501 });
-  const input = await request.json();
+  const payload = await request.text();
+  let input;
+  try { input = JSON.parse(payload); } catch { return new Response("JSON inválido", { status: 400 }); }
   if (typeof input.prompt !== "string" || !input.prompt.trim()) return new Response("prompt requerido", { status: 400 });
+  // Caché global por payload: IndexedDB evita repetir dentro de un navegador;
+  // esto evita volver a gastar IA en otro dispositivo o después de limpiar datos.
+  // Incluye seed y referencias base64, por lo que dos identidades nunca colisionan.
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  const cacheId = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const cacheKey = new Request(`https://tinyquest.internal/image/${cacheId}`);
+  const cached = await caches.default.match(cacheKey);
+  if (cached) return new Response(cached.body, cached);
+  const cacheGenerated = (response) => {
+    if (response.ok && response.headers.get("content-type")?.startsWith("image/")) {
+      ctx?.waitUntil(caches.default.put(cacheKey, response.clone()));
+    }
+    return response;
+  };
   const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
   const quotaError = (error) => /4006|daily free allocation|neurons/i.test(error instanceof Error ? error.message : String(error));
   const runSchnell = async () => {
@@ -90,11 +106,11 @@ async function cfImage(request, env) {
     const output = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
     return new Response(output, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
   };
-  if (typeof input.referenceImage === "string" && input.referenceImage) {
-    return runKlein(input.referenceImage);
-  }
-  if (model.includes("flux-2-klein") || styleImages.length) return runKlein();
-  return runSchnell();
+  let response;
+  if (typeof input.referenceImage === "string" && input.referenceImage) response = await runKlein(input.referenceImage);
+  else if (model.includes("flux-2-klein") || styleImages.length) response = await runKlein();
+  else response = await runSchnell();
+  return cacheGenerated(response);
 }
 
 async function pollinations(url) {
@@ -108,14 +124,14 @@ async function pollinations(url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (request.method !== "POST" && url.pathname !== "/api/pollinations") return new Response("Method not allowed", { status: 405 });
     try {
       if (url.pathname === "/api/groq/chat") return llm(request, env, "groq");
       if (url.pathname === "/api/gemini/chat") return llm(request, env, "gemini");
-      if (url.pathname === "/api/cf-image") return cfImage(request, env);
+      if (url.pathname === "/api/cf-image") return cfImage(request, env, ctx);
       if (url.pathname === "/api/pollinations") return pollinations(url);
       return new Response("Not found", { status: 404 });
     } catch (error) {

@@ -15,8 +15,9 @@ export const improvisedStorySchema = z.object({
   threat: z.object({
     name: z.string().catch("Amenaza encubierta"),
     description: z.string().catch(""),
-    specialMove: z.string().catch("")
-  }).catch({ name: "Amenaza encubierta", description: "", specialMove: "" }),
+    specialMove: z.string().catch(""),
+    appearance: z.string().optional().catch(undefined)
+  }).catch({ name: "Amenaza encubierta", description: "", specialMove: "", appearance: undefined }),
   // buildImprovisedCampaign rellena títulos/nombres vacíos y usa solo las primeras
   // 4 escenas / 3 NPCs / 3 pistas: una entrada extra o incompleta no invalida la historia.
   scenes: z.array(z.object({

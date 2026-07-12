@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -944,7 +944,7 @@ export function App() {
     if (!room) return;
     const styleHint = `${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`;
     for (const npc of room.campaign.npcs) {
-      loadPortrait(npc.portraitUrl ?? beingPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)).catch(() => undefined);
+      loadPortrait(npc.portraitUrl ?? beingPortraitUrlWithContext(npc.name, npc.appearance, styleHint, { description: npc.description, role: npc.role })).catch(() => undefined);
     }
   }, [room?.selectedCampaignId]);
 
@@ -1248,7 +1248,7 @@ export function App() {
       // El LLM imaginó el aspecto de cada personaje: acá nace su retrato generado.
       const campaign: Campaign = {
         ...built,
-        npcs: built.npcs.map((npc) => ({ ...npc, portraitUrl: beingPortraitUrl(npc.name, npc.appearance ?? npc.description, `${world.era}, ${world.name}`) }))
+        npcs: built.npcs.map((npc) => ({ ...npc, portraitUrl: beingPortraitUrlWithContext(npc.name, npc.appearance, `${world.era}, ${world.name}`, { description: npc.description, role: npc.role }) }))
       };
       setImprovisedCampaign(campaign);
       setImprovisedWorldId(world.id);
@@ -1810,9 +1810,9 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                     type="button"
                     className="castChip threat castChipButton"
                     style={{ "--chip-i": improvisedCampaign.npcs.length } as CSSProperties}
-                    onClick={() => setCastPeek({ name: improvisedCampaign.enemies[0].name, description: improvisedCampaign.enemies[0].description, portraitUrl: beingPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`), threat: true, dangerLevel: improvisedCampaign.enemies[0].dangerLevel })}
+                    onClick={() => setCastPeek({ name: improvisedCampaign.enemies[0].name, description: improvisedCampaign.enemies[0].description, portraitUrl: beingPortraitUrlWithContext(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].imagePrompt, `${selectedWorld.era}, ${selectedWorld.name}`, { description: improvisedCampaign.enemies[0].description, role: "amenaza" }), threat: true, dangerLevel: improvisedCampaign.enemies[0].dangerLevel })}
                   >
-                    <NpcPortrait name={improvisedCampaign.enemies[0].name} role="amenaza" size={28} portraitUrl={beingPortraitUrl(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].description, `${selectedWorld.era}, ${selectedWorld.name}`)} />
+                    <NpcPortrait name={improvisedCampaign.enemies[0].name} role="amenaza" size={28} portraitUrl={beingPortraitUrlWithContext(improvisedCampaign.enemies[0].name, improvisedCampaign.enemies[0].imagePrompt, `${selectedWorld.era}, ${selectedWorld.name}`, { description: improvisedCampaign.enemies[0].description, role: "amenaza" })} />
                     <span className="castChipText">
                       <strong>{improvisedCampaign.enemies[0].name}</strong>
                       <small>La amenaza de esta historia</small>
@@ -2526,7 +2526,7 @@ function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcI
               {present.map((npc) => (
                 <div key={npc.id} className="castCard open">
                   <span className="castHead">
-                    <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl ?? beingPortraitUrl(npc.name, npc.appearance ?? npc.description, styleHint)} />
+                    <NpcPortrait name={npc.name} role={npc.role} portraitUrl={npc.portraitUrl ?? beingPortraitUrlWithContext(npc.name, npc.appearance, styleHint, { description: npc.description, role: npc.role })} />
                     <span className="castHeadText">
                       <strong>{npc.name}</strong>
                       {npc.role && <span className="castRole">{npc.role}</span>}

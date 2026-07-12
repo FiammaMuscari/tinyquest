@@ -48,17 +48,19 @@ section** — an outdated map costs more than no map.
   IndexedDB `tiny-quest-portraits` blob cache + fetch queue. `useGeneratedPortrait(url)`
   React hook (keeps prev image while a new one loads, background-retries every 30s
   up to 8 rounds while mounted). `medallionDataUri(name)` fallback placeholder.
-- **Tuning is load-bearing (measured 2026-07-06)**: queue concurrency MUST be 1
-  (Pollinations queues per IP — 2 parallel downloads both blow the timeout),
-  timeout 120s, retry series [0, 5s, 15s]. A fresh generation takes 20–90s under
-  load; after that it's instant forever (cache keyed by URL, survives restarts).
-  Don't "optimize" the prompt string in `characterPortraitUrl` — changing it
-  changes every URL and invalidates the whole portrait cache.
+- Cloudflare Schnell es la vía primaria; el Worker cachea globalmente cada imagen
+  por SHA-256 del payload completo (prompt+seed+referencias), y el navegador la
+  cachea además en IndexedDB. Pollinations es solo fallback: ahí la concurrencia
+  DEBE seguir en 1, timeout 120s y reintentos [0, 5s, 15s]. No "optimizar" un
+  prompt sin versión/migración: cambia la URL y su entrada de caché local.
 - Cast portraits are prefetched at game start (effect in `App()` keyed on
   `room?.selectedCampaignId`); its styleHint must stay identical to CastPanel's.
-- The forge prompt (`groq-dungeon-master.ts`, story-forge section) REQUIRES
-  `appearance` to state species/ethnicity, gender, apparent age, skin/features —
-  that's what makes portraits show niños/ancianas/vampiros/mestizos correctly.
+- La forja exige `appearance` con TIPO explícito (mujer, hombre, hombre
+  afeminado, andrógino/intersexual, criatura, híbrido o fenómeno). El motor lo
+  completa determinísticamente con `canonicalVisualAppearance` si el LLM lo
+  omite. `beingPortraitUrlWithContext` combina esa ficha con la descripción
+  visible y rutea humanos, criaturas/híbridos y fenómenos a prompts separados;
+  una amenaza como “Viento de los Portales” nunca recibe un rostro humano.
 - Hero look picker (`lookPicker` in CharacterDesigner): gender/skin/eyes stored in
   `Character.look` (optional, engine types.ts) — traits go FIRST in the prompt
   (`heroPortraitSpec`). Choosing a trait calls `onUnlockAutoPortrait` (exits
@@ -84,7 +86,8 @@ section** — an outdated map costs more than no map.
   medieval), mientras Frente/colores/especie/cicatriz/armas mandan como identidad.
   No conectar estas referencias al Frente ni a NPCs: gastaría cuota y copiaría
   anatomía femenina/elfa donde no corresponde.
-- NPC portraitUrl is stamped in `forgeStory` (App) from the LLM's `appearance`.
+- NPC `portraitUrl` se estampa en `forgeStory` desde `appearance + description`.
+  Son medallones 512×512: mismo detalle facial con menos generación desperdiciada.
 
 ## Lobby flow (4 steps — HERO FIRST since 2026-07-06 night; order changed twice that day, confirm with Fiamy before moving it again)
 

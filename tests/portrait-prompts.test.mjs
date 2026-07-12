@@ -52,3 +52,28 @@ test("Escena diferencia ambiente vacío de modo héroe", () => {
   assert.match(hero.slice(0, 900), /ABSOLUTE WORLD CONSTRAINTS.*SINGLE-SUBJECT FILM COMPOSITE/is);
   assert.ok(place.length <= 1960, `prompt de escena truncable: ${place.length}`);
 });
+
+test("NPC combina apariencia y descripción en un medallón cuadrado", () => {
+  const url = portraits.beingPortraitUrlWithContext(
+    "Dama Oria",
+    "mujer elfa adulta, piel oscura, ojos dorados, pelo blanco",
+    "castillo nocturno",
+    { description: "guardiana que lleva una llave de cobre", role: "aliada" }
+  );
+  const prompt = promptFrom(url);
+  assert.match(prompt, /mujer elfa adulta.*NARRATIVE DESCRIPTION TO MATCH VISUALLY.*llave de cobre/is);
+  assert.equal(new URL(url).searchParams.get("width"), "512");
+  assert.equal(new URL(url).searchParams.get("height"), "512");
+});
+
+test("una amenaza de viento genera fenómeno y no un rostro aleatorio", () => {
+  const url = portraits.beingPortraitUrlWithContext(
+    "Viento de los Portales",
+    undefined,
+    "fantasía oscura",
+    { description: "Corrientes de aire que abren grietas dimensionales y arrastran objetos", role: "amenaza" }
+  );
+  const prompt = promptFrom(url);
+  assert.match(prompt, /TINYQUEST PHENOMENON V15/i);
+  assert.match(prompt, /Absolutely no human, humanoid, face/i);
+});

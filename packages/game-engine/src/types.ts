@@ -1093,7 +1093,7 @@ export type ImprovisedStoryContent = {
   themeSkill: string;
   twist: string;
   stakes: string[];
-  threat: { name: string; description: string; specialMove: string };
+  threat: { name: string; description: string; specialMove: string; /** Ficha visual literal; también admite fenómenos sin cuerpo. */ appearance?: string };
   scenes: ImprovisedSceneContent[];
   npcs: ImprovisedNpcContent[];
   clues: Array<{ title: string; text: string; sceneIndex: number; isFalse?: boolean }>;

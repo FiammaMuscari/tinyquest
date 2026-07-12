@@ -16,6 +16,26 @@ test("una criatura sigue siendo no humana salvo indicación humanoide explícita
   assert.equal(visual.shouldRenderAsCreature("Syr", "dragón humanoide bípedo de tres ojos"), false);
 });
 
+test("clasifica humanos, híbridos, criaturas y fenómenos sin convertir todo en una mujer", () => {
+  assert.equal(visual.classifyBeingVisual("Mara", "mujer humana anciana"), "humanoid");
+  assert.equal(visual.classifyBeingVisual("Asterión", "híbrido minotauro con cabeza bovina"), "hybrid");
+  assert.equal(visual.classifyBeingVisual("Nácar", "dragón de seis patas"), "creature");
+  assert.equal(visual.classifyBeingVisual("Viento de los Portales", "corrientes de aire que abren grietas dimensionales", "amenaza"), "phenomenon");
+  assert.equal(visual.classifyBeingVisual("Oria", "mujer guardiana de los portales"), "humanoid");
+});
+
+test("un fenómeno incorpóreo jamás recibe cara humana", () => {
+  const prompt = visual.phenomenonPortraitPrompt("Viento de los Portales", "corrientes de aire que arrastran objetos");
+  assert.match(prompt, /incorporeal phenomenon, not a person and not a face/i);
+  assert.match(prompt, /Absolutely no human, humanoid, face, head, eyes, portrait or person/i);
+});
+
+test("si falta género humano, fija una presentación andrógina en vez de inventar mujer", () => {
+  const prompt = visual.humanoidPortraitPrompt("Iriel", "elfo adulto con túnica gris", "luna roja");
+  assert.match(prompt, /explicitly androgynous\/intersex presentation/i);
+  assert.match(prompt, /Do not silently default to a generic woman or man/i);
+});
+
 test("el retrato prioriza rostro completo y anatomía literal", () => {
   const prompt = visual.humanoidPortraitPrompt("Iria", "anciana de tres ojos con cicatriz", "luna roja");
   assert.match(prompt, /entire head visible|face centered|no cropped forehead/i);

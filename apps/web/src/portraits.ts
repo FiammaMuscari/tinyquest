@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { anatomyFidelityRules, creaturePortraitPrompt, humanoidPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
+import { anatomyFidelityRules, classifyBeingVisual, creaturePortraitPrompt, humanoidPortraitPrompt, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
 
 // ─── Retratos generados por IA, con caché persistente ────────────────────────
 // Pollinations (gratis, sin key) genera la imagen a partir de un prompt en la URL.
@@ -177,9 +177,30 @@ export function looksLikeCreature(...texts: Array<string | undefined>): boolean 
 // su aspecto lo delata como animal/criatura usa el prompt de bestia. Punto único
 // para que cast, portada y prefetch coincidan en la MISMA URL (misma caché).
 export function beingPortraitUrl(name: string, appearance: string | undefined, styleHint: string): string {
-  if (looksLikeCreature(name, appearance)) return petPortraitUrl(name, appearance ?? "");
-  const prompt = humanoidPortraitPrompt(name, appearance, styleHint);
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
+  return beingPortraitUrlWithContext(name, appearance, styleHint);
+}
+
+export type BeingPortraitContext = { description?: string; role?: string };
+
+/** Retrato canónico de cualquier entidad. `appearance` manda sobre la anatomía y
+ * `description` aporta la función visible; ambas viajan juntas para que la imagen
+ * no contradiga la ficha que ve la jugadora. */
+export function beingPortraitUrlWithContext(name: string, appearance: string | undefined, styleHint: string, context: BeingPortraitContext = {}): string {
+  const description = context.description?.trim();
+  const exact = appearance?.trim();
+  const visualSpec = [
+    exact,
+    description && description !== exact ? `NARRATIVE DESCRIPTION TO MATCH VISUALLY: ${description}` : undefined
+  ].filter(Boolean).join(". ") || undefined;
+  const kind = classifyBeingVisual(name, visualSpec, context.role);
+  const prompt = kind === "phenomenon"
+    ? phenomenonPortraitPrompt(name, visualSpec, styleHint)
+    : kind === "creature" || kind === "hybrid"
+      ? creaturePortraitPrompt(name, visualSpec, styleHint, kind)
+      : humanoidPortraitPrompt(name, visualSpec, styleHint);
+  // Los NPC se muestran como medallones: 512² conserva detalle facial y evita
+  // gastar tiempo/neuronas pintando piernas que el recorte circular nunca usa.
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
 }
 
 export function isGeneratedPortraitUrl(url: string | undefined): url is string {
