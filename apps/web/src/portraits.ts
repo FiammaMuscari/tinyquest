@@ -45,7 +45,7 @@ export function nameHash(name: string): number {
 // cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, appearance: string | undefined, styleHint: string) =>
-  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark rough painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, eye color and hair color literally and consistently; do not recolor them because of species, mood or lighting. SAME PAINTER AND MEDIUM IN EVERY SHOT: rough traditional oil on linen, visible strokes, imperfect human features and warm lateral chiaroscuro; never switch the body shot to smooth glossy digital art`;
+  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark rough painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, iris color and hair color literally and consistently in BOTH variants; both irises and a large clearly lit area of hair must visibly show the chosen colors. Never recolor, mute or shift them because of species, costume, mood, shadow, rim light or fantasy glow. SAME PAINTER AND MEDIUM IN EVERY SHOT: rough traditional oil on linen, visible strokes, imperfect human features and warm lateral chiaroscuro; never switch the body shot to smooth glossy digital art`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la

@@ -609,10 +609,11 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function forgeHeroPortraitPair(seedNonce: number) {
     const urls = heroImageUrls(draftRef.current, seedNonce);
-    // Se cachean las DOS imágenes ya mismo para que alternar sea instantáneo.
-    void loadPortrait(urls.face, { priority: true }).catch(() => undefined);
-    void loadPortrait(urls.fullbody, { priority: true }).catch(() => undefined);
-    const shot = draftRef.current.look?.avatarShot ?? "face";
+    const shot = draftRef.current.look?.avatarShot ?? "fullbody";
+    // Las DOS variantes se regeneran juntas, pero la elegida obtiene el primer
+    // lugar de la cola. Por defecto Cuerpo llega antes; Frente queda precargada.
+    void loadPortrait(urls[shot], { priority: true }).catch(() => undefined);
+    void loadPortrait(urls[shot === "face" ? "fullbody" : "face"], { priority: false }).catch(() => undefined);
     setDraft(createCharacter({
       ...draftRef.current,
       look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentity(draftRef.current) },
@@ -633,7 +634,7 @@ export function App() {
     const seed = stored.match(/seed=(\d+)$/)?.[1];
     const face = seed ? expected.face.replace(/seed=\d+$/, `seed=${seed}`) : expected.face;
     const fullbody = seed ? expected.fullbody.replace(/seed=\d+$/, `seed=${seed}`) : expected.fullbody;
-    const shot = current.look?.avatarShot ?? "face";
+    const shot = current.look?.avatarShot ?? "fullbody";
     void loadPortrait(face, { priority: true }).catch(() => undefined);
     void loadPortrait(fullbody, { priority: true }).catch(() => undefined);
     setDraft(createCharacter({
@@ -2311,14 +2312,15 @@ const statHints: Record<StatKey, string> = {
 function heroPortraitSpec(draft: Character): { name: string; appearance: string; styleHint: string } {
   const selectedSpecies = species.find((item) => item.name === draft.species);
   const look = draft.look ?? {};
-  const traits = [
-    look.gender,
-    selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : undefined,
+  const exactColors = [
     look.skinTone && `EXACT SKIN COLOR: ${lookSkinPrompt[look.skinTone] ?? look.skinTone}`,
     look.eyeColor && `EXACT IRIS COLOR: ${lookEyePrompt[look.eyeColor] ?? look.eyeColor}`,
     look.hairColor && `EXACT HAIR COLOR: ${lookHairPrompt[look.hairColor] ?? look.hairColor}`
   ].filter(Boolean).join(", ");
-  const appearance = [traits, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
+  const identity = [look.gender, selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : undefined].filter(Boolean).join(", ");
+  // Los tres colores abren Y cierran la descripción: Flux tiende a obedecer
+  // mejor las restricciones repetidas en ambos extremos de prompts largos.
+  const appearance = [exactColors, identity, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, selectedSpecies?.visualFlavor, draft.concept, `FINAL COLOR CHECK — ${exactColors}`].filter(Boolean).join(". ");
   return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
 }
 
@@ -2334,18 +2336,38 @@ const lookSkinOptions = [
   { label: "cenicienta", color: "#9aa0a8" }
 ] as const;
 const lookEyeOptions = [
+  { label: "negros", color: "#17151a" },
   { label: "marrones", color: "#6b4226" },
+  { label: "miel", color: "#b97832" },
   { label: "ámbar", color: "#d19a3d" },
+  { label: "dorados", color: "#f0c94c" },
   { label: "verdes", color: "#4e8d5b" },
   { label: "azules", color: "#4a7fc1" },
+  { label: "celestes", color: "#79c9e8" },
+  { label: "turquesa", color: "#32c9c1" },
+  { label: "aguamarina", color: "#74e0c1" },
   { label: "grises", color: "#9aa4ad" },
-  { label: "violetas", color: "#8a5fc1" }
+  { label: "morados", color: "#643a9b" },
+  { label: "violetas", color: "#8a5fc1" },
+  { label: "rojos", color: "#b92f35" },
+  { label: "naranjas", color: "#e8782f" },
+  { label: "rosas", color: "#e57ca7" }
 ] as const;
 const lookHairOptions = [
   { label: "negro", color: "#181820" },
   { label: "castaño", color: "#5d3a22" },
   { label: "rubio", color: "#d9b264" },
+  { label: "amarillo", color: "#f2d83f" },
+  { label: "dorado", color: "#d8a928" },
+  { label: "naranja", color: "#dc6d25" },
   { label: "rojo fuego", color: "#a83a20" },
+  { label: "azul", color: "#285db5" },
+  { label: "azul celeste", color: "#69bfe5" },
+  { label: "turquesa", color: "#28b9ae" },
+  { label: "verde", color: "#3f925b" },
+  { label: "morado", color: "#593385" },
+  { label: "violeta", color: "#8551ba" },
+  { label: "rosa", color: "#d66f9c" },
   { label: "blanco", color: "#e8e4da" },
   { label: "plateado", color: "#aab4c2" }
 ] as const;
@@ -2359,18 +2381,38 @@ const lookSkinPrompt: Record<string, string> = {
   "cenicienta": "cool ash-gray skin"
 };
 const lookEyePrompt: Record<string, string> = {
+  "negros": "near-black irises with a visible dark iris boundary",
   "marrones": "natural brown irises",
+  "miel": "warm honey-brown irises",
   "ámbar": "clear amber-gold irises",
+  "dorados": "luminous metallic golden irises",
   "verdes": "clear green irises",
   "azules": "clear blue irises",
+  "celestes": "bright pale sky-blue irises",
+  "turquesa": "saturated turquoise irises",
+  "aguamarina": "clear pale aquamarine irises",
   "grises": "clear gray irises",
-  "violetas": "clear violet irises"
+  "morados": "deep purple irises",
+  "violetas": "clear violet irises",
+  "rojos": "clear ruby-red irises",
+  "naranjas": "clear vivid orange irises",
+  "rosas": "clear rose-pink irises"
 };
 const lookHairPrompt: Record<string, string> = {
   "negro": "true black hair",
   "castaño": "natural chestnut brown hair",
   "rubio": "natural golden blonde hair",
+  "amarillo": "vivid saturated yellow hair, unmistakably yellow rather than blonde",
+  "dorado": "metallic warm golden hair, unmistakably gold",
+  "naranja": "vivid saturated orange hair, unmistakably orange",
   "rojo fuego": "vivid natural copper-red hair",
+  "azul": "vivid deep blue hair, unmistakably blue",
+  "azul celeste": "bright pale sky-blue hair",
+  "turquesa": "vivid turquoise hair, balanced blue-green",
+  "verde": "vivid emerald-green hair",
+  "morado": "deep saturated purple hair",
+  "violeta": "vivid violet hair",
+  "rosa": "vivid rose-pink hair",
   "blanco": "pure white hair",
   "plateado": "metallic silver-gray hair"
 };
@@ -3196,13 +3238,13 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   // Estado del retrato para avisar "personalizando…" (con prioridad: tu cara primero).
   const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
   const heroLookDone = lookComplete(draft);
-  const currentShot = draft.look?.avatarShot ?? "face";
+  const currentShot = draft.look?.avatarShot ?? "fullbody";
   const hasForgedPortrait = Boolean(draft.look?.faceUrl && draft.look?.fullBodyUrl && isGeneratedPortraitUrl(draft.avatarUrl));
   const portraitNeedsRefresh = !hasForgedPortrait || draft.look?.portraitIdentity !== heroPortraitIdentity(draft);
   const firstMissingLook = !draft.look?.gender ? "gender" : !draft.look?.skinTone ? "skin" : !draft.look?.eyeColor ? "eyes" : !draft.look?.hairColor ? "hair" : null;
   function chooseLook(patch: Partial<CharacterLook>) {
     onUnlockAutoPortrait?.();
-    setDraft(createCharacter({ ...draft, look: { ...draft.look, ...patch } }));
+    setDraft(createCharacter({ ...draft, look: { avatarShot: draft.look?.avatarShot ?? "fullbody", ...draft.look, ...patch } }));
   }
   // Precalienta el retrato de las OTRAS razas con tu apariencia actual: cambiar de
   // linaje actualiza la cara al instante (o casi) en vez de esperar una generación.
@@ -3274,7 +3316,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           <div className="heroPortraitColumn">
             <div className={`heroPortraitFrame ${currentShot === "fullbody" ? "fullbodyFrame" : ""}`}>
               <button type="button" className="heroPortraitZoomButton" onClick={() => heroLookDone && setHeroZoomed(true)} disabled={!heroLookDone} aria-label="Ver retrato en pantalla completa">
-                <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
+                <HeroAvatarImg key={draft.avatarUrl} url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
               </button>
               {heroLookDone && (
                 <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled} title={currentShot === "face" ? "Descargar la imagen de frente" : "Descargar la imagen de cuerpo entero"} aria-label="Descargar esta toma">
@@ -3336,7 +3378,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             {heroZoomed && (
               <div className="heroPortraitLightbox" role="presentation" onClick={() => setHeroZoomed(false)}>
                 <button type="button" onClick={() => setHeroZoomed(false)} aria-label="Cerrar imagen ampliada">
-                  <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className={currentShot === "fullbody" ? "zoomFullBody" : "zoomFace"} priority />
+                  <HeroAvatarImg key={draft.avatarUrl} url={draft.avatarUrl} name={draft.name} className={currentShot === "fullbody" ? "zoomFullBody" : "zoomFace"} priority />
                   <span>Click para cerrar</span>
                 </button>
               </div>
