@@ -34,7 +34,7 @@ async function cfImage(request, env) {
   const runKlein = async (referenceImage) => {
     const form = new FormData();
     form.append("prompt", referenceImage
-      ? `Use image 0 as the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and premium painterly splash-art style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. ${input.prompt.slice(0, 1500)}`
+      ? `Use image 0 as the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and premium painterly style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. Replace the entire background with a clean simple dark charcoal-to-black gradient: no scenery, no objects, no visible background brush marks. The character is the only subject. ${input.prompt.slice(0, 1500)}`
       : `${input.prompt.slice(0, 1900)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));
     form.append("height", String(Math.min(1920, Math.max(256, Number(input.height) || 768))));
