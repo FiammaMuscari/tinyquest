@@ -53,9 +53,14 @@ async function cfImage(request, env) {
       form.append(`input_image_${styleStart + index}`, new Blob([bytes], { type: style.type || "image/png" }), `style-${index}.png`);
     });
     const serialized = new Response(form);
-    const edited = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
-      multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") }
-    });
+    let edited;
+    try {
+      edited = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
+        multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") }
+      });
+    } catch (error) {
+      return json({ error: { message: error instanceof Error ? error.message : String(error), stage: "flux-2-klein" } }, 502);
+    }
     const encoded = edited?.image;
     if (typeof encoded !== "string") return new Response("respuesta de edición sin imagen", { status: 502 });
     const output = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
