@@ -14,6 +14,7 @@ import { shouldAdvanceScene, isFinalScene } from "./pacing";
 import { determineEnding } from "./endings";
 import { resolveEndingForRoom } from "./ending-resolution";
 import { regenerateRoundEnergy } from "./energy";
+import { createCustomActionChoice, decodeCustomAction } from "./custom-actions";
 import { createSessionForCampaign } from "./scenes";
 import { campaignToWorldTheme, defaultCampaign } from "./campaigns";
 import { getActivePlayer, getCurrentScene, getVisibleActionChoices } from "./room-state";
@@ -356,13 +357,17 @@ function buildCausalObligations(params: {
 export function resolvePlayerAction(room: GameRoom, action: string, selectedStat: StatKey, usePet = false): ActionResolution {
   const currentScene = getCurrentScene(room);
   const activePlayer = getActivePlayer(room);
+  const customAction = decodeCustomAction(action);
+  const resolvedAction = customAction ?? action;
 
   if (!currentScene.allowedStats.includes(selectedStat)) {
     throw new Error(`${selectedStat} is not allowed in ${currentScene.title}.`);
   }
 
-  const check = resolveCheck(activePlayer.character.stats, selectedStat, currentScene.difficulty, action, usePet);
-  const selectedChoice = findSceneChoiceForAction(getVisibleActionChoices(currentScene, room), action);
+  const check = resolveCheck(activePlayer.character.stats, selectedStat, currentScene.difficulty, resolvedAction, usePet);
+  const selectedChoice = customAction
+    ? createCustomActionChoice(customAction, selectedStat)
+    : findSceneChoiceForAction(getVisibleActionChoices(currentScene, room), resolvedAction);
   const consequence = check.outcome === "success" ? undefined : rollConsequence({
     actionType: selectedChoice?.actionType,
     targetKind: selectedChoice?.targetKind,
@@ -372,9 +377,9 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
     usedTexts: room.sessionLog.filter((event) => event.sceneId === currentScene.id && event.consequenceText).map((event) => event.consequenceText as string),
     campaignBank: room.campaign.consequenceBank
   });
-  const actionType = getNarrativeActionType(selectedChoice, action);
+  const actionType = getNarrativeActionType(selectedChoice, resolvedAction);
   const actionContract = narrativeDoDont(actionType);
-  const coherentFacts = resolveCoherentTurnFacts({ campaign: room.campaign, actor: activePlayer, choice: selectedChoice, rawAction: action, result: check.outcome });
+  const coherentFacts = resolveCoherentTurnFacts({ campaign: room.campaign, actor: activePlayer, choice: selectedChoice, rawAction: resolvedAction, result: check.outcome });
   const target = coherentFacts.target.label;
   const energyCost = getActionEnergyCost(selectedChoice);
   if (activePlayer.character.energy < energyCost) {
@@ -549,7 +554,7 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
     roomAfter: nextRoom,
     scene: currentScene,
     actor: activePlayer,
-    actionText: selectedChoice?.label ?? action,
+    actionText: selectedChoice?.label ?? resolvedAction,
     selectedStat,
     check,
     consequence,
@@ -601,7 +606,7 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
       activePlayer,
       party: players,
       character: players.find((player) => player.id === activePlayer.id)?.character ?? activePlayer.character,
-      rawAction: action,
+      rawAction: resolvedAction,
       selectedStat,
       skillUsed: activePlayer.character.abilityProgression.currentSkill,
       petUsed: usePet ? activePlayer.character.pet.name : undefined,

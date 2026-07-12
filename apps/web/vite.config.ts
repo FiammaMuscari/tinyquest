@@ -198,5 +198,17 @@ export default defineConfig({
     // Jugar con amigos por túnel: Vite rechaza Hosts desconocidos (protección
     // DNS-rebind), así que se permiten los dominios de túnel habituales.
     allowedHosts: [".devtunnels.ms", ".ngrok-free.app", ".ngrok.app", ".trycloudflare.com"]
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/react") || id.includes("node_modules/scheduler")) return "react-vendor";
+          if (id.includes("node_modules/lucide-react")) return "icons";
+          if (id.includes("node_modules/zod")) return "validation";
+          return undefined;
+        }
+      }
+    }
   }
 });

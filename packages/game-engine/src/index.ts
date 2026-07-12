@@ -3,6 +3,7 @@ export * from "./stats";
 export * from "./dice";
 export * from "./danger";
 export * from "./action-costs";
+export * from "./custom-actions";
 export * from "./action-outcomes";
 export * from "./combat";
 export * from "./checks";

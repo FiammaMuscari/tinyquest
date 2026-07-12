@@ -17,7 +17,9 @@ export type PlayerInfo = {
   isHost: boolean;
   connected: boolean;
   character: Character;
+  chatColor: string;
 };
+export type ChatMessage = { id: string; playerId: string; playerName: string; text: string; color: string; sentAt: number };
 
 // ─── Cliente → Servidor ──────────────────────────────────────────────────────
 
@@ -92,6 +94,9 @@ export type C2SMessage =
   | StartStoryMsg
   | BroadcastGameMsg
   | SubmitActionMsg
+  | { type: "send_chat"; roomCode: string; text: string }
+  | { type: "set_chat_color"; roomCode: string; color: string }
+  | { type: "kick_player"; roomCode: string; playerId: string }
   | { type: "ping" };
 
 // ─── Servidor → Cliente ──────────────────────────────────────────────────────
@@ -169,6 +174,9 @@ export type S2CMessage =
   | GuestActionMsg
   | { type: "room_options"; allowMidJoin: boolean }
   | { type: "narrating" }
+  | { type: "chat_message"; message: ChatMessage }
+  | { type: "player_updated"; players: PlayerInfo[] }
+  | { type: "player_kicked"; playerId: string; players: PlayerInfo[]; message: string }
   | { type: "pong" }
   | ErrorMsg;
 

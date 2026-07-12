@@ -71,6 +71,9 @@ export type CharacterLook = {
    * entre estas dos variables (mismo personaje garantizado), jamás regenera. */
   faceUrl?: string;
   fullBodyUrl?: string;
+  /** Firma de los rasgos usados al generar el par actual. Permite avisar que el
+   * retrato quedó desactualizado sin regenerarlo silenciosamente. */
+  portraitIdentity?: string;
 };
 
 export type Character = {
@@ -1137,7 +1140,7 @@ export type ImprovisedStoryRequest = {
   playerNames?: string[];
   worldContext?: ImprovisedWorldContext;
   /** El héroe ya forjado: la historia debe atarse a su identidad (nunca copiar su nombre en NPCs sin explicar el vínculo). */
-  hero?: { name: string; species: string; role: string; petName: string; concept: string; strengths?: string[]; weakness?: string };
+  hero?: { name: string; species: string; role: string; petName?: string; concept: string; strengths?: string[]; weakness?: string };
 };
 
 export interface DungeonMasterProvider {

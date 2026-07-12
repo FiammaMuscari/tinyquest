@@ -25,7 +25,7 @@ export function createCharacter(input: Partial<Character> = {}): Character {
     name: input.name ?? "Fiamy",
     species: selectedSpecies.name,
     role: selectedRole.name,
-    concept: input.concept ?? "una aventurera marcada por un juramento antiguo y seguida por un Alma Dracónica",
+    concept: input.concept ?? "una aventurera marcada por un juramento antiguo",
     visualStyle: input.visualStyle ?? "fantasía dungeon, luz de luna, tesoros, niebla y acero",
     personalityTraits: input.personalityTraits ?? ["curiosa", "dramática", "ingeniosa"],
     specialAbility: input.specialAbility ?? selectedRole.specialAbility,
@@ -39,4 +39,3 @@ export function createCharacter(input: Partial<Character> = {}): Character {
     abilityProgression: input.abilityProgression ?? createAbilityProgression(selectedRole)
   };
 }
-

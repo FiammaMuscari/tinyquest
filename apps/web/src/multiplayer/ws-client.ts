@@ -1,5 +1,5 @@
 import type { Character, GameRoom, StatKey } from "@tiny-quest/game-engine";
-import type { C2SMessage, GuestActionMsg, MultiplayerPhase, PlayerInfo, S2CMessage } from "./protocol";
+import type { C2SMessage, ChatMessage, GuestActionMsg, MultiplayerPhase, PlayerInfo, S2CMessage } from "./protocol";
 
 // Cliente de salas de Tiny Quest. Es transporte + estado; NO corre el juego.
 // El HOST usa startStory/broadcastState/signalNarrating tras resolver contra el
@@ -18,6 +18,8 @@ export type MultiplayerState = {
   allowMidJoin: boolean;
   errorMessage: string | null;
   lastEventSummary: string | null;
+  chatMessages: ChatMessage[];
+  kickedMessage: string | null;
 };
 
 export type MultiplayerEventMap = {
@@ -26,6 +28,7 @@ export type MultiplayerEventMap = {
   story_started: { state: GameRoom; activePlayerId: string; yourTurn: boolean };
   state_update: { state: GameRoom; activePlayerId: string; yourTurn: boolean; eventSummary?: string };
   error: string;
+  chat_message: ChatMessage;
 };
 
 type Handler<T> = (payload: T) => void;
@@ -61,6 +64,7 @@ const emptyState: MultiplayerState = {
   allowMidJoin: false,
   errorMessage: null,
   lastEventSummary: null
+  ,chatMessages: [], kickedMessage: null
 };
 
 export class MultiplayerClient {
@@ -206,6 +210,10 @@ export class MultiplayerClient {
     this.send({ type: "set_room_options", roomCode: this._state.roomCode, allowMidJoin });
   }
 
+  kickPlayer(playerId: string): void { if (this._state.roomCode) this.send({ type: "kick_player", roomCode: this._state.roomCode, playerId }); }
+  sendChat(text: string): void { if (this._state.roomCode && text.trim()) this.send({ type: "send_chat", roomCode: this._state.roomCode, text: text.trim().slice(0, 280) }); }
+  setChatColor(color: string): void { if (this._state.roomCode) this.send({ type: "set_chat_color", roomCode: this._state.roomCode, color }); }
+
   /** El host avisa a los invitados que está narrando (spinner). */
   signalNarrating(): void {
     if (!this._state.roomCode || !this._state.activePlayerId) return;
@@ -244,6 +252,23 @@ export class MultiplayerClient {
       case "player_left":
       case "player_reconnected":
         this.setState({ players: msg.players });
+        break;
+
+      case "player_updated":
+        this.setState({ players: msg.players });
+        break;
+
+      case "chat_message":
+        this.setState({ chatMessages: [...this._state.chatMessages, msg.message].slice(-50) });
+        this.emit("chat_message", msg.message);
+        break;
+
+      case "player_kicked":
+        if (msg.playerId === this._state.playerId) {
+          clearSeat();
+          this.setState({ phase: "lobby_guest", roomCode: null, players: [], gameRoom: null, kickedMessage: msg.message, errorMessage: msg.message });
+          if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
+        } else this.setState({ players: msg.players });
         break;
 
       case "story_started": {

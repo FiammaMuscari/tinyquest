@@ -271,7 +271,38 @@ export function isAcceptablePlayerNarration(_turn: TurnResolution, text: string)
   return true;
 }
 
+const MAX_PLAYER_NARRATION_CHARS = 1_500;
+const MAX_PLAYER_NARRATION_PARAGRAPHS = 4;
+
+function compactPlayerNarration(text: string): string {
+  const clean = text
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/^\s*(narraci[oó]n|resultado|sistema)\s*:\s*/gim, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  const seen = new Set<string>();
+  const paragraphs = clean.split(/\n\s*\n/).map((paragraph) => {
+    const sentences = paragraph.match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) ?? [paragraph];
+    return sentences.filter((sentence) => {
+      const key = normalize(sentence).replace(/[^a-z0-9áéíóúñ ]/gi, "").replace(/\s+/g, " ").trim();
+      if (key.length < 12 || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).join(" ").trim();
+  }).filter(Boolean).slice(0, MAX_PLAYER_NARRATION_PARAGRAPHS);
+  const compact = paragraphs.join("\n\n");
+  if (compact.length <= MAX_PLAYER_NARRATION_CHARS) return compact;
+  const cut = compact.slice(0, MAX_PLAYER_NARRATION_CHARS);
+  const sentenceEnd = Math.max(cut.lastIndexOf("."), cut.lastIndexOf("!"), cut.lastIndexOf("?"));
+  return `${(sentenceEnd > 900 ? cut.slice(0, sentenceEnd + 1) : cut.trimEnd()).trim()}…`;
+}
+
 export function buildCleanTurnNarration(turn: TurnResolution, sceneTitle: string, candidate?: string): string {
-  if (candidate && isAcceptablePlayerNarration(turn, candidate)) return candidate.trim();
+  if (candidate) {
+    const compact = compactPlayerNarration(candidate);
+    if (isAcceptablePlayerNarration(turn, compact)) return compact;
+  }
   return buildPlayerNarration(turn, sceneTitle);
 }

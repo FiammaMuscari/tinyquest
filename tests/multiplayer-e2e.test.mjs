@@ -107,6 +107,17 @@ test("party completa: crear → unirse → arrancar → turnos → relay", async
   assert.equal(ga.stat, "body");
   assert.equal(ga.usePet, true);
 
+  // 6) Chat compartido, color personal y expulsión del host.
+  guest.setChatColor("#ff66aa");
+  await waitState(guest, (s) => s.players.find((p) => p.id === guestId)?.chatColor === "#ff66aa");
+  const hostChat = waitEvent(host, "chat_message");
+  guest.sendChat("Hola desde el grupo");
+  const chat = await hostChat;
+  assert.equal(chat.text, "Hola desde el grupo");
+  assert.equal(chat.color, "#ff66aa");
+  host.kickPlayer(guestId);
+  await waitState(guest, (s) => s.kickedMessage && s.roomCode === null);
+
   host.disconnect();
   guest.disconnect();
 });

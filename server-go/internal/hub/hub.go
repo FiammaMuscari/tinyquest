@@ -102,6 +102,12 @@ func (h *Hub) handleMessage(c *Client, data []byte) {
 		h.broadcastGame(c, data)
 	case CSubmitAction:
 		h.submitAction(c, data)
+	case CSendChat:
+		h.sendChat(c, data)
+	case CSetChatColor:
+		h.setChatColor(c, data)
+	case CKickPlayer:
+		h.kickPlayer(c, data)
 	default:
 		c.sendError(ErrInvalidAction, "Tipo de mensaje desconocido: "+env.Type)
 	}
@@ -125,6 +131,7 @@ func (h *Hub) createRoom(c *Client, data []byte) {
 	host := &player{
 		id: genPlayerID(), name: msg.PlayerName, isHost: true,
 		character: msg.Character, client: c, connected: true, joinedAt: time.Now(),
+		chatColor: "#f5d77b",
 	}
 	room.players = append(room.players, host)
 	h.rooms[code] = room
@@ -157,11 +164,15 @@ func (h *Hub) joinRoom(c *Client, data []byte) {
 	guest := &player{
 		id: genPlayerID(), name: msg.PlayerName,
 		character: msg.Character, client: c, connected: true, joinedAt: time.Now(),
+		chatColor: "#8ff2e2",
 	}
 	room.players = append(room.players, guest)
 	room.touch()
 	players := room.snapshot()
 	c.enqueue(mustJSON(RoomJoinedMsg{Type: SRoomJoined, RoomCode: room.code, PlayerID: guest.id, Players: players}))
+	for _, entry := range room.chatMessages {
+		c.enqueue(mustJSON(ChatMessageMsg{Type: SChatMessage, Message: entry}))
+	}
 	// Llegada a mitad de partida (puerta abierta): el recién llegado recibe el
 	// estado vigente para mirar mientras el motor del host teje su entrada.
 	if room.status == statusActive && len(room.lastState) > 0 {
@@ -221,6 +232,9 @@ func (h *Hub) rejoinRoom(c *Client, data []byte) {
 	room.touch()
 	players := room.snapshot()
 	c.enqueue(mustJSON(RoomJoinedMsg{Type: SRoomJoined, RoomCode: room.code, PlayerID: p.id, Players: players}))
+	for _, entry := range room.chatMessages {
+		c.enqueue(mustJSON(ChatMessageMsg{Type: SChatMessage, Message: entry}))
+	}
 	if room.status == statusActive && len(room.lastState) > 0 {
 		c.enqueue(mustJSON(StateUpdateMsg{
 			Type: SStateUpdate, State: room.lastState, EventSummary: room.lastSummary,
@@ -353,6 +367,107 @@ func (h *Hub) submitAction(c *Client, data []byte) {
 	host.client.enqueue(mustJSON(GuestActionMsg{
 		Type: SActionRelay, PlayerID: p.id, Action: msg.Action, Stat: msg.Stat, UsePet: msg.UsePet,
 	}))
+}
+
+func validChatColor(value string) bool {
+	if len(value) != 7 || value[0] != '#' {
+		return false
+	}
+	for _, ch := range value[1:] {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func (h *Hub) sendChat(c *Client, data []byte) {
+	var msg SendChatMsg
+	if json.Unmarshal(data, &msg) != nil {
+		c.sendError(ErrInvalidAction, "Mensaje de chat inválido.")
+		return
+	}
+	room := h.rooms[strings.ToUpper(strings.TrimSpace(msg.RoomCode))]
+	if room == nil {
+		c.sendError(ErrRoomNotFound, "La sala ya no existe.")
+		return
+	}
+	p := room.findByClient(c)
+	text := strings.TrimSpace(msg.Text)
+	if p == nil || text == "" {
+		c.sendError(ErrInvalidAction, "El mensaje está vacío.")
+		return
+	}
+	if len([]rune(text)) > 280 {
+		c.sendError(ErrInvalidAction, "El mensaje supera 280 caracteres.")
+		return
+	}
+	entry := ChatMessage{ID: genPlayerID(), PlayerID: p.id, PlayerName: p.name, Text: text, Color: p.chatColor, SentAt: time.Now().UnixMilli()}
+	room.chatMessages = append(room.chatMessages, entry)
+	if len(room.chatMessages) > 50 {
+		room.chatMessages = room.chatMessages[len(room.chatMessages)-50:]
+	}
+	payload := mustJSON(ChatMessageMsg{Type: SChatMessage, Message: entry})
+	for _, other := range room.connectedClients() {
+		other.enqueue(payload)
+	}
+	room.touch()
+}
+
+func (h *Hub) setChatColor(c *Client, data []byte) {
+	var msg SetChatColorMsg
+	if json.Unmarshal(data, &msg) != nil || !validChatColor(msg.Color) {
+		c.sendError(ErrInvalidAction, "Color de chat inválido.")
+		return
+	}
+	room := h.rooms[strings.ToUpper(strings.TrimSpace(msg.RoomCode))]
+	if room == nil {
+		c.sendError(ErrRoomNotFound, "La sala ya no existe.")
+		return
+	}
+	p := room.findByClient(c)
+	if p == nil {
+		c.sendError(ErrRoomNotFound, "No estás en la sala.")
+		return
+	}
+	p.chatColor = msg.Color
+	payload := mustJSON(PlayerUpdatedMsg{Type: SPlayerUpdated, Players: room.snapshot()})
+	for _, other := range room.connectedClients() {
+		other.enqueue(payload)
+	}
+}
+
+func (h *Hub) kickPlayer(c *Client, data []byte) {
+	var msg KickPlayerMsg
+	if json.Unmarshal(data, &msg) != nil {
+		c.sendError(ErrInvalidAction, "kick_player inválido.")
+		return
+	}
+	room := h.roomOfHost(c, msg.RoomCode)
+	if room == nil {
+		return
+	}
+	target := room.findByID(msg.PlayerID)
+	if target == nil || target.isHost {
+		c.sendError(ErrInvalidAction, "No se puede expulsar a ese jugador.")
+		return
+	}
+	kept := room.players[:0]
+	for _, p := range room.players {
+		if p.id != target.id {
+			kept = append(kept, p)
+		}
+	}
+	room.players = kept
+	players := room.snapshot()
+	kicked := mustJSON(PlayerKickedMsg{Type: SPlayerKicked, PlayerID: target.id, Players: players, Message: "El anfitrión te expulsó de la sala."})
+	if target.client != nil {
+		target.client.enqueue(kicked)
+	}
+	update := mustJSON(PlayerKickedMsg{Type: SPlayerKicked, PlayerID: target.id, Players: players, Message: target.name + " fue expulsado."})
+	for _, other := range room.connectedClients() {
+		other.enqueue(update)
+	}
 }
 
 // ─── desconexión y gracia ────────────────────────────────────────────────────

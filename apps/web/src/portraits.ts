@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { anatomyFidelityRules, creaturePortraitPrompt, humanoidPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
 
 // ─── Retratos generados por IA, con caché persistente ────────────────────────
 // Pollinations (gratis, sin key) genera la imagen a partir de un prompt en la URL.
@@ -42,14 +43,16 @@ export function nameHash(name: string): number {
 // MISMO TRAZO en las dos tomas: la raíz del prompt es idéntica palabra por palabra
 // y solo cambia el ENCUADRE — frente = plano 3/4 (cintura hacia arriba, 4:5);
 // cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
-const heroPromptRoot = "Fantasy RPG book character illustration, dark moody lighting, natural proportions, detailed painting";
+const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, appearance: string | undefined, styleHint: string) =>
-  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred background`;
+  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark blurred painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, eye color and hair color literally and consistently; do not recolor them because of species, mood or lighting`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
   // mayor consistencia de personaje posible sin img2img (kontext es de pago).
   // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
+  // Mantener EXACTO el prompt aprobado del avatar: recupera las imágenes previas
+  // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   const prompt = `${heroPromptRoot}, three-quarter shot from the waist up, face clearly visible, closer camera${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
@@ -120,25 +123,28 @@ export function worldCardImageUrl(worldId: string, name: string, era: string, ta
 // creados interactuando. No es edición de la imagen del mundo (img2img no existe en
 // el tier gratis): es una generación nueva que hereda mundo + elenco, cacheada por
 // título. Cero uso de Gemini — las imágenes van siempre por Pollinations.
-export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, sceneHint?: string): string {
+export function storySceneImageUrl(storyTitle: string, worldName: string, era: string, sceneHint?: string, ambience = "", worldRules: string[] = []): string {
   // Fondo de PAISAJE/AMBIENTE, SIN personajes: encima se composita el retrato
   // REAL del héroe (el Frente/Cuerpo que eligió el jugador) con fundido elíptico.
   // Prompt idéntico al original: los fondos ya cacheados siguen siendo válidos.
   const where = sceneHint?.trim() ? ` Setting detail: ${sceneHint}.` : "";
-  const prompt = `Epic fantasy environment concept art, cinematic wide establishing shot of an empty dramatic location for the tale "${storyTitle}" in ${worldName} (${era}).${where} No people, no characters, no creatures — only the place: architecture, terrain, sky, atmosphere. Painted, dramatic light, rich detail, no text`;
+  const laws = worldImageConstraints(worldName, ambience, worldRules);
+  const prompt = `EMPTY LOCATION, ENVIRONMENT ONLY, ZERO FIGURES. ${sceneStylePrompt()}. ${laws} Wide establishing shot of a dramatic location for the tale "${storyTitle}" in ${worldName} (${era}).${where} The environment must visibly obey every world law. No people, no silhouettes, no characters, no creatures, no statues shaped like people — only architecture, terrain, sky and atmosphere. No text, no watermark. EMPTY LOCATION WITH ZERO FIGURES.`;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1120&height=480&nologo=true&model=flux&seed=${nameHash(storyTitle) % 100000}`;
 }
 
 // Imagen de escena VIVA durante la partida: se genera con la historia real y se
 // renueva al cambiar de escena. El jugador elige el encuadre: lugar, héroe o ambiente.
 export type SceneImageMode = "place" | "hero" | "mood";
-export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string): string {
+export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string, ambience = "", worldRules: string[] = []): string {
   const base = mode === "hero"
     ? `Fantasy story illustration: the hero (${heroLine}) inside the scene "${sceneTitle}", taking action. ${objective}.`
     : mode === "mood"
       ? `Atmospheric fantasy ambience illustration, abstract cinematic mood for "${sceneTitle}". ${objective}.`
       : `Fantasy environment concept art, atmospheric wide view of "${sceneTitle}". ${objective}.`;
-  const prompt = `${base} World: ${worldName} (${era}). Tale: ${campaignTitle}. Painted, dramatic light, rich detail, no text`;
+  const identity = mode === "hero" ? ` ${anatomyFidelityRules(heroLine)}` : "";
+  const laws = worldImageConstraints(worldName, ambience, worldRules);
+  const prompt = `${sceneStylePrompt()}. ${laws} ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. World laws override visual clichés and the objective text. The character and environment must look painted by the same artist, with matching light and color; integrate the figure naturally into scene light, ground contact and atmosphere. No text, no watermark.`;
   const seed = nameHash(campaignTitle + sceneTitle + mode) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
 }
@@ -148,7 +154,7 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
 // Template original (clave de cache). La criatura se pinta como bestia — el
 // ruteo por aspecto vive en beingPortraitUrl (un gato NPC entra por acá).
 export function petPortraitUrl(name: string, description: string): string {
-  const prompt = `Fantasy RPG magical creature companion portrait, adorable but epic, full body, dark moody lighting, detailed illustration: ${name}, ${description}. Dark blurred background`;
+  const prompt = creaturePortraitPrompt(name, description);
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
 }
 
@@ -156,10 +162,9 @@ export function petPortraitUrl(name: string, description: string): string {
 // retratos deben pintarse como bestia, no como persona. Se chequea SOLO sobre
 // nombre + aspecto/descripción (nunca el styleHint del mundo, que puede decir
 // "Marcado por Dragón" sin que el personaje sea un dragón).
-const CREATURE_HINT = /\b(animal|bestia|criatura|no\s*human[oa]|cuadr[úu]pedo|felin[oa]|gat[oa]|minino|perr[oa]|canino|sabueso|lob[oa]|zorr[oa]|os[oa]|drag[óo]n|drac[óo]nic|serpiente|reptil|lagart|salamandra|ave|p[áa]jaro|cuervo|b[úu]ho|halc[óo]n|[áa]guila|caballo|corcel|potro|ciervo|conejo|rat[óo]n|murci[ée]lago|ara[ñn]a|insecto|escarabaj|tigre|le[óo]n|pantera|lince|nutria|hur[óo]n|comadreja|mono|simio|quimera|grifo|f[ée]nix|hocico|pelaje|plumas|escamas|colmillos|bigotes|cat|kitten|kitty|feline|hound|wolf|fox|beast|creature|dragon|serpent|feathers|fur|whiskers?)\b/i;
-
 export function looksLikeCreature(...texts: Array<string | undefined>): boolean {
-  return CREATURE_HINT.test(texts.filter(Boolean).join(" "));
+  const [name = "", ...description] = texts;
+  return shouldRenderAsCreature(name, description.filter(Boolean).join(" "));
 }
 
 // Retrato de un personaje del elenco (NPC o enemigo): humano por defecto, pero si
@@ -167,7 +172,8 @@ export function looksLikeCreature(...texts: Array<string | undefined>): boolean 
 // para que cast, portada y prefetch coincidan en la MISMA URL (misma caché).
 export function beingPortraitUrl(name: string, appearance: string | undefined, styleHint: string): string {
   if (looksLikeCreature(name, appearance)) return petPortraitUrl(name, appearance ?? "");
-  return characterPortraitUrl(name, appearance, styleHint);
+  const prompt = humanoidPortraitPrompt(name, appearance, styleHint);
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${nameHash(name) % 100000}`;
 }
 
 export function isGeneratedPortraitUrl(url: string | undefined): url is string {
@@ -206,6 +212,19 @@ async function idbPut(key: string, blob: Blob): Promise<void> {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
+}
+
+/** Cachea arte derivado (por ejemplo la portada ya compuesta) en el mismo
+ * almacén persistente que las generaciones. La clave lleva un namespace para
+ * no confundirse con una URL de proveedor. */
+export async function getCachedImage(key: string): Promise<string | null> {
+  const blob = await idbGet(`derived:${key}`).catch(() => undefined);
+  return blob ? URL.createObjectURL(blob) : null;
+}
+
+export async function cacheImage(key: string, blob: Blob): Promise<string> {
+  await idbPut(`derived:${key}`, blob);
+  return URL.createObjectURL(blob);
 }
 
 // ─── Cola de descargas con reintentos ─────────────────────────────────────────

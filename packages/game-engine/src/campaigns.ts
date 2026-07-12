@@ -736,7 +736,7 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
         timeLimit: content.summary.timeLimit ? clampText(content.summary.timeLimit, "", 110) : undefined
       } : undefined,
       keywordsUsed: Array.isArray(content.keywordsUsed)
-        ? content.keywordsUsed.slice(0, 6).map((item) => ({ idea: clampText(item?.idea, "", 40), how: clampText(item?.how, "", 90) })).filter((item) => item.idea && item.how)
+        ? content.keywordsUsed.slice(0, 8).map((item) => ({ idea: clampText(item?.idea, "", 180), how: clampText(item?.how, "", 260) })).filter((item) => item.idea && item.how)
         : undefined,
       heroBond: content.heroBond ? clampText(content.heroBond, "", 220) : undefined,
       evidence: Array.isArray(content.evidence) ? content.evidence.slice(0, 3).map((item) => clampText(item, "", 140)).filter(Boolean) : undefined

@@ -185,7 +185,10 @@ Each turn produces up to 8 `EmbeddedMemory` records (fact, clue, npc\_memory, mo
 - **5%** recency + type boost
 - Penalties for resolved/forbidden memories
 
-The `MockEmbeddingProvider` is deterministic (hash-based, no network) so the full pipeline runs offline.
+`LocalEmbeddingProvider` genera vectores normalizados de palabras, bigramas y
+trigramas morfológicos con feature hashing. Corre sin red y hace que el scoring
+híbrido compare similitud textual real. `MockEmbeddingProvider` queda como alias
+compatible para tests e integraciones anteriores.
 
 ### Narrative memory primitives
 

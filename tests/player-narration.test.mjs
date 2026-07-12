@@ -69,6 +69,15 @@ test("visibleConsequence es corta y no repite playerNarration", () => {
   assert.notEqual(consequence, player);
 });
 
+test("limpia salida extensa, repetida o con bloques técnicos", () => {
+  const repeated = "Miri encuentra una marca concreta en la cuerda. ".repeat(20);
+  const candidate = `<think>razonamiento privado</think>\n\nNarración: ${repeated}\n\n${repeated}\n\n\`\`\`json\n{\"statePatch\":true}\n\`\`\``;
+  const text = narration.buildCleanTurnNarration(turn({ result: "success" }), "El Molino", candidate);
+  assert.ok(text.length <= 1501, `largo inesperado: ${text.length}`);
+  assert.doesNotMatch(text, /think|statePatch|```/i);
+  assert.equal((text.match(/marca concreta/g) ?? []).length, 1);
+});
+
 
 test("playerNarration no contiene frases abstractas prohibidas nuevas", () => {
   const text = narration.buildPlayerNarration(turn({ campaignActionType: "investigar_objeto", result: "success", target: { id: "moon-bell-seal", label: "Sello lunar de la campana", kind: "object" } }), "La Campana de Luna");

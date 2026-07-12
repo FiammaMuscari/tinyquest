@@ -29,7 +29,10 @@ const (
 	CStartStory     = "start_story"      // (host) la historia main está forjada; a jugar
 	CBroadcastGame  = "broadcast_game"   // (host) difunde el estado autoritativo del juego
 	CSubmitAction   = "submit_action"    // (invitado) manda su acción de turno al host
-	CTurnResult     = "turn_result"      // (host) resultado del turno + de quién es el próximo
+	CSendChat       = "send_chat"
+	CSetChatColor   = "set_chat_color"
+	CKickPlayer     = "kick_player"
+	CTurnResult     = "turn_result" // (host) resultado del turno + de quién es el próximo
 	CPing           = "ping"
 )
 
@@ -88,6 +91,18 @@ type SubmitActionMsg struct {
 	Stat     string `json:"stat"`
 	UsePet   bool   `json:"usePet"`
 }
+type SendChatMsg struct {
+	RoomCode string `json:"roomCode"`
+	Text     string `json:"text"`
+}
+type SetChatColorMsg struct {
+	RoomCode string `json:"roomCode"`
+	Color    string `json:"color"`
+}
+type KickPlayerMsg struct {
+	RoomCode string `json:"roomCode"`
+	PlayerID string `json:"playerId"`
+}
 
 // TurnResultMsg — atajo opcional: el host manda el resultado de un turno puntual.
 // Equivale a un BroadcastGame; se mantiene por claridad de intención.
@@ -96,18 +111,21 @@ type TurnResultMsg = BroadcastGameMsg
 // ─── Servidor → Cliente ──────────────────────────────────────────────────────
 
 const (
-	SRoomCreated  = "room_created"
-	SRoomJoined   = "room_joined"   // al invitado: entraste, esperá el arranque
-	SPlayerJoined = "player_joined" // a todos: fulano entró con su héroe
-	SPlayerLeft   = "player_left"
-	SPlayerBack   = "player_reconnected"
-	SStoryStarted = "story_started" // a todos: la historia arrancó, estado inicial
-	SStateUpdate  = "state_update"  // a todos: nuevo estado del juego
-	SRoomOptions  = "room_options"  // a todos: la puerta se abrió/cerró
-	SNarrating    = "narrating"     // a todos: el host está narrando
-	SActionRelay  = "guest_action"  // AL HOST: un invitado pidió esta acción
-	SError        = "error"
-	SPong         = "pong"
+	SRoomCreated   = "room_created"
+	SRoomJoined    = "room_joined"   // al invitado: entraste, esperá el arranque
+	SPlayerJoined  = "player_joined" // a todos: fulano entró con su héroe
+	SPlayerLeft    = "player_left"
+	SPlayerBack    = "player_reconnected"
+	SStoryStarted  = "story_started" // a todos: la historia arrancó, estado inicial
+	SStateUpdate   = "state_update"  // a todos: nuevo estado del juego
+	SRoomOptions   = "room_options"  // a todos: la puerta se abrió/cerró
+	SNarrating     = "narrating"     // a todos: el host está narrando
+	SActionRelay   = "guest_action"  // AL HOST: un invitado pidió esta acción
+	SChatMessage   = "chat_message"
+	SPlayerUpdated = "player_updated"
+	SPlayerKicked  = "player_kicked"
+	SError         = "error"
+	SPong          = "pong"
 )
 
 // PlayerInfo es la vista pública de un jugador (sin ws).
@@ -117,6 +135,30 @@ type PlayerInfo struct {
 	IsHost    bool            `json:"isHost"`
 	Connected bool            `json:"connected"`
 	Character json.RawMessage `json:"character"`
+	ChatColor string          `json:"chatColor"`
+}
+
+type ChatMessage struct {
+	ID         string `json:"id"`
+	PlayerID   string `json:"playerId"`
+	PlayerName string `json:"playerName"`
+	Text       string `json:"text"`
+	Color      string `json:"color"`
+	SentAt     int64  `json:"sentAt"`
+}
+type ChatMessageMsg struct {
+	Type    string      `json:"type"`
+	Message ChatMessage `json:"message"`
+}
+type PlayerUpdatedMsg struct {
+	Type    string       `json:"type"`
+	Players []PlayerInfo `json:"players"`
+}
+type PlayerKickedMsg struct {
+	Type     string       `json:"type"`
+	PlayerID string       `json:"playerId"`
+	Players  []PlayerInfo `json:"players"`
+	Message  string       `json:"message"`
 }
 
 type RoomCreatedMsg struct {
@@ -204,6 +246,7 @@ const (
 	ErrGameEnded     = "game_ended"
 	ErrStoryStarted  = "story_started"
 	ErrNotHost       = "not_host"
+	ErrKicked        = "kicked"
 	ErrInternal      = "internal"
 )
 

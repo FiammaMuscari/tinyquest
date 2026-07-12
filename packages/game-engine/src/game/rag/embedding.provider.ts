@@ -19,20 +19,42 @@ function normalizeVector(v: number[]): number[] {
   return v.map((x) => x / mag);
 }
 
-export class MockEmbeddingProvider implements EmbeddingProvider {
-  readonly name = "mock";
+/** Embedding local por feature hashing. A diferencia del mock histórico que
+ * convertía el texto completo en ruido, palabras compartidas y trigramas
+ * morfológicos aterrizan en las mismas dimensiones; por eso el coseno expresa
+ * similitud real sin red, claves ni IO. */
+export class LocalEmbeddingProvider implements EmbeddingProvider {
+  readonly name: string = "local-feature-hash-v1";
   readonly dimensions: number;
 
-  constructor(dimensions = 64) {
+  constructor(dimensions = 256) {
     this.dimensions = dimensions;
   }
 
   async embed(text: string): Promise<number[]> {
-    const normalized = text.toLowerCase().trim();
-    const raw = Array.from({ length: this.dimensions }, (_, i) => {
-      const h = hashText(normalized, i * 2654435761);
-      return (((h >>> 16) ^ (h & 0xffff)) / 0xffff) * 2 - 1;
-    });
-    return normalizeVector(raw);
+    const words = text.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")
+      .match(/[a-z0-9_]{2,}/g) ?? [];
+    const vector = Array.from({ length: this.dimensions }, () => 0);
+    const add = (feature: string, weight: number) => {
+      const hash = hashText(feature, 2166136261);
+      const index = hash % this.dimensions;
+      vector[index] += (hash & 0x80000000 ? -1 : 1) * weight;
+    };
+    for (const word of words) {
+      add(`w:${word}`, 1);
+      const padded = `^${word}$`;
+      for (let i = 0; i <= padded.length - 3; i += 1) add(`g:${padded.slice(i, i + 3)}`, 0.22);
+    }
+    for (let i = 0; i < words.length - 1; i += 1) add(`b:${words[i]}_${words[i + 1]}`, 0.45);
+    return normalizeVector(vector);
+  }
+}
+
+/** Compatibilidad con tests e integraciones anteriores. */
+export class MockEmbeddingProvider extends LocalEmbeddingProvider {
+  readonly name = "mock-compatible-local-feature-hash-v1";
+
+  constructor(dimensions = 64) {
+    super(dimensions);
   }
 }

@@ -257,3 +257,40 @@ func TestGuestCannotStartStory(t *testing.T) {
 		t.Fatalf("esperaba not_host: %+v", e)
 	}
 }
+
+func TestSharedChatColorAndHostKick(t *testing.T) {
+	srv := newServer(t)
+	host := dial(t, srv)
+	defer host.Close()
+	send(t, host, map[string]any{"type": "create_room", "playerName": "Host", "character": map[string]any{}})
+	created := waitFor(t, host, SRoomCreated)
+	code := created["roomCode"].(string)
+	guest := dial(t, srv)
+	defer guest.Close()
+	send(t, guest, map[string]any{"type": "join_room", "roomCode": code, "playerName": "Luna", "character": map[string]any{}})
+	joined := waitFor(t, guest, SRoomJoined)
+	guestID := joined["playerId"].(string)
+	waitFor(t, host, SPlayerJoined)
+
+	send(t, guest, map[string]any{"type": CSetChatColor, "roomCode": code, "color": "#ff66aa"})
+	waitFor(t, guest, SPlayerUpdated)
+	waitFor(t, host, SPlayerUpdated)
+	send(t, guest, map[string]any{"type": CSendChat, "roomCode": code, "text": "Hola party"})
+	chatHost := waitFor(t, host, SChatMessage)
+	chatGuest := waitFor(t, guest, SChatMessage)
+	for _, got := range []map[string]any{chatHost, chatGuest} {
+		message := got["message"].(map[string]any)
+		if message["text"] != "Hola party" || message["color"] != "#ff66aa" {
+			t.Fatalf("chat inválido: %+v", got)
+		}
+	}
+
+	send(t, guest, map[string]any{"type": CKickPlayer, "roomCode": code, "playerId": created["playerId"]})
+	if waitFor(t, guest, SError)["code"] != ErrNotHost {
+		t.Fatal("un invitado no debería poder expulsar")
+	}
+	send(t, host, map[string]any{"type": CKickPlayer, "roomCode": code, "playerId": guestID})
+	if waitFor(t, guest, SPlayerKicked)["playerId"] != guestID {
+		t.Fatal("el invitado no recibió la expulsión")
+	}
+}

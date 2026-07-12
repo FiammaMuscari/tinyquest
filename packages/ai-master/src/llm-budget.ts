@@ -26,15 +26,15 @@ export interface LlmBudgetState {
 
 export const DEFAULT_CHEAP_LLM_POLICY: LlmBudgetPolicy = {
   enabled: true,
-  maxCallsPerRun: 24,
-  maxCallsPerScene: 8,
-  maxPromptChars: 3200,
-  maxOutputChars: 3200,
+  maxCallsPerRun: 18,
+  maxCallsPerScene: 6,
+  maxPromptChars: 2800,
+  maxOutputChars: 2400,
   useGroqForPlayerTurns: true,
-  useGroqForBotTurns: true,
+  useGroqForBotTurns: false,
   useGroqForMajorMomentsOnly: false,
   cacheEnabled: true,
-  retryOnInvalidJson: true
+  retryOnInvalidJson: false
 };
 
 export function createLlmBudgetState(initial: Partial<LlmBudgetState> = {}): LlmBudgetState {
@@ -82,7 +82,7 @@ function short(value: string | undefined, max = 220) {
 export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_CHEAP_LLM_POLICY.maxPromptChars, input?: NarrationRequest, bundle?: NarrativeIngredientBundle) {
   // Recent LLM narration paragraphs — the story so far, LLM must continue from here
   const storyLast = (input?.recentSessionLog ?? [])
-    .slice(0, 3)
+    .slice(0, 2)
     .map((e) => e.narration ?? "")
     .filter((n) => n.length > 20)
     .map((n) => short(n, 300) ?? n);
@@ -201,7 +201,7 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     noRepeat: noRepeat.length ? noRepeat : undefined,
     optionsToLabel: optionsToLabel.length ? optionsToLabel : undefined,
     rules: [
-      "narration: 2-4 párrafos RICOS, entre 130 y 240 palabras — la historia se despliega como un libro, no se apura. Detalle sensorial, la reacción de los personajes presentes, el subtexto de la escena y un hilo que queda tenso para el próximo turno. Nunca cierres la historia ni la escena en un solo turno; cada turno es un capítulo que continúa.",
+      "narration: 2-3 párrafos concretos, entre 110 y 180 palabras. Cada párrafo debe avanzar un hecho: acción, reacción y consecuencia. Incluí un detalle sensorial y un hilo abierto; no repitas el resumen, la acción ni imágenes de turnos anteriores. Nunca cierres la historia ni la escena en un solo turno.",
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
       ...(npcs.some((n) => "hiddenTies" in n && n.hiddenTies)

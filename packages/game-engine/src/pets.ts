@@ -2,6 +2,16 @@
 
 export const legendaryPets: LegendaryPet[] = [
   {
+    id: "none",
+    name: "Sin mascota",
+    species: "ninguna",
+    description: "Empezás sin compañera animal. Una criatura puede vincularse más adelante si la historia lo merece.",
+    passiveAbility: "Sin bonus pasivo de mascota.",
+    activeAbility: "No hay mascota disponible todavía.",
+    preferredStat: "focus",
+    cooldownTurns: 0
+  },
+  {
     id: "soul-wyrm",
     name: "Alma Dracónica",
     species: "espíritu dracónico menor",

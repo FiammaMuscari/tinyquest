@@ -4,8 +4,9 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, characterPortraitUrl, fullBodyPortraitUrl, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
+import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
 // Play/pausa del ambiente (song-of-the-north) — vive en los popups de ayuda y ajustes.
 function AmbientRow() {
@@ -40,6 +41,10 @@ import {
   getRoomScenes,
   canPayActionEnergy,
   getActionEnergyCost,
+  CUSTOM_ACTION_ENERGY_COST,
+  createCustomActionChoice,
+  decodeCustomAction,
+  encodeCustomAction,
   getDangerLabel,
   getVisibleActionChoices,
   legendaryPets,
@@ -48,7 +53,7 @@ import {
   shouldGrantCreativeBonus,
   species,
   totalExtraPoints,
-  MockEmbeddingProvider,
+  LocalEmbeddingProvider,
   InMemoryVectorStore,
   NarrativeMemoryIndex,
   buildEmbeddedMemoriesFromTurn,
@@ -610,7 +615,7 @@ export function App() {
     const shot = draftRef.current.look?.avatarShot ?? "face";
     setDraft(createCharacter({
       ...draftRef.current,
-      look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody },
+      look: { ...draftRef.current.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentity(draftRef.current) },
       avatarUrl: urls[shot]
     }));
   }
@@ -640,14 +645,7 @@ export function App() {
   useEffect(() => {
     const current = draftRef.current.avatarUrl;
     if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
-    if (manualAvatarRef.current) return;
-    // La primera selección (género/piel/ojos/pelo) es obligatoria; y si ya existe
-    // un retrato generado, acá no se toca nada (solo Reimaginar lo cambia).
-    if (!lookComplete(draftRef.current)) return;
-    if (isGeneratedPortraitUrl(draftRef.current.avatarUrl)) return;
-    const timer = setTimeout(() => forgeHeroPortraitPair(0), 400);
-    return () => clearTimeout(timer);
-  }, [draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor]);
+  }, [draft.avatarUrl]);
   function reimagineHeroPortrait(seedNonce: number) {
     if (!lookComplete(draftRef.current)) return;
     manualAvatarRef.current = false;
@@ -673,12 +671,14 @@ export function App() {
   const [room, setRoom] = useState<GameRoom | null>(null);
   const sceneList = useMemo(() => room ? getRoomScenes(room) : createScenesForCampaign(selectedCampaign), [room?.selectedCampaignId, selectedCampaign.id]);
   const [selectedActionDraftId, setSelectedActionDraftId] = useState(sceneList[0].actionChoices[0].id);
+  const [customAction, setCustomAction] = useState("");
+  const [usingCustomAction, setUsingCustomAction] = useState(false);
   const [selectedStat, setSelectedStat] = useState<StatKey>(() => readStoredStat());
   const [usePet, setUsePet] = useState(false);
   const [dice, setDice] = useState<DiceSnapshot | null>(null);
   const [currentNarration, setCurrentNarration] = useState("Narración: La aventura espera. Elegí una campaña y armá tu personaje para que el narrador abra la primera escena. Consecuencia: el reloj de peligro todavía está quieto. Opciones: investiga, habla o toma un riesgo.");
   const [npcDialogue, setNpcDialogue] = useState<string[]>([]);
-  const [nextOptions, setNextOptions] = useState<string[]>(["Seguir el objetivo.", "Investigar una pista.", "Usar habilidad o mascota."]);
+  const [nextOptions, setNextOptions] = useState<string[]>(["Seguir el objetivo.", "Investigar una pista.", "Usar una habilidad."]);
   const [enrichedChoiceLabels, setEnrichedChoiceLabels] = useState<Record<string, string>>({});
   const [dmSections, setDmSections] = useState<NarrationResponse["sections"]>();
   const [plotBeat, setPlotBeat] = useState<NarrationResponse["plotBeat"]>();
@@ -777,6 +777,23 @@ export function App() {
       }
     }
   }, [mpState.players, room]);
+
+  // Si el host expulsa a alguien durante la partida, también lo retira del
+  // estado autoritativo del motor y difunde la party saneada de inmediato.
+  useEffect(() => {
+    if (!mpState.isHost || !mpState.roomCode || !room || room.sessionComplete) return;
+    const memberIds = new Set(mpState.players.map((player) => player.id));
+    const removed = room.players.filter((player) => !memberIds.has(player.id));
+    if (!removed.length) return;
+    const activeId = room.players[room.activePlayerIndex]?.id;
+    const players = room.players.filter((player) => memberIds.has(player.id));
+    if (!players.length) return;
+    const retainedActiveIndex = players.findIndex((player) => player.id === activeId);
+    const activePlayerIndex = retainedActiveIndex >= 0 ? retainedActiveIndex : Math.min(room.activePlayerIndex, players.length - 1);
+    const cleanedRoom = { ...room, players, activePlayerIndex };
+    setRoom(cleanedRoom);
+    multiplayerClient.broadcastState(cleanedRoom, players[activePlayerIndex].id, `${removed.map((player) => player.name).join(", ")} salió de la party.`);
+  }, [mpState.players, mpState.isHost, mpState.roomCode, room]);
   function integrateArrivals(current: GameRoom): GameRoom {
     if (!mpRef.current.isHost || pendingSeatsRef.current.length === 0) return current;
     let result = current;
@@ -838,7 +855,7 @@ export function App() {
   }
   const liveSceneImage = useGeneratedPortrait(
     room && !room.sessionComplete
-      ? liveSceneImageUrl(sceneImageMode, room.campaign.title, scene.title, scene.objective, selectedWorld.name, selectedWorld.era, heroPortraitSpec(draft).appearance)
+      ? liveSceneImageUrl(sceneImageMode, room.campaign.title, scene.title, scene.objective, selectedWorld.name, selectedWorld.era, heroPortraitSpec(draft).appearance, selectedWorld.ambience, selectedWorld.worldRules)
       : undefined
   );
   // Galería de la historia: cada imagen de escena generada se ACUMULA — se puede
@@ -869,6 +886,14 @@ export function App() {
   const [isAudioPlaying, setAudioPlaying] = useState(false);
   const [volume, setVolume] = useState(() => Number(localStorage.getItem("tiny-quest-volume") ?? "0.35"));
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const musicState = useMemo(() => deriveMusicState({
+    danger: room?.dangerClock ?? 0,
+    phase: room?.phase,
+    sceneText: `${scene.title} ${scene.objective} ${scene.atmosphere.ambientSoundPrompt}`,
+    narrativeText: `${room?.memorySummary.lastBeat ?? ""} ${room?.memorySummary.currentTwist ?? ""} ${room?.sessionLog[0]?.narration ?? ""}`,
+    outcome: room?.sessionLog[0]?.outcome
+  }), [room?.dangerClock, room?.phase, room?.sessionLog.length, room?.memorySummary.lastBeat, room?.memorySummary.currentTwist, scene.id]);
+  const musicPreset = MUSIC_PRESETS[musicState];
   const atmosphereCacheRef = useRef(new Map<string, { imageUrl: string; audioUrl: string; mood: string }>());
 
   function chooseSceneAction(choiceId: string) {
@@ -1021,12 +1046,15 @@ export function App() {
     if (!audio) return;
     audio.volume = volume;
     audio.loop = true;
+    audio.playbackRate = musicPreset.playbackRate;
+    audio.preservesPitch = true;
+    audio.volume = Math.min(1, volume * musicPreset.volumeScale);
     if (isAudioPlaying) {
       audio.play().catch(() => setAudioPlaying(false));
     } else {
       audio.pause();
     }
-  }, [isAudioPlaying, sceneAudioUrl, volume]);
+  }, [isAudioPlaying, sceneAudioUrl, volume, musicPreset.playbackRate, musicPreset.volumeScale]);
 
   // Un solo click: si el mundo elegido todavía no tiene historia (o la forja previa
   // falló), forja y ARRANCA apenas termina — sin pedir un segundo click.
@@ -1045,7 +1073,7 @@ export function App() {
     // El lobby suelta su ambiente: en partida manda el reproductor por escena.
     stopAmbient();
     narrativeIndexRef.current = new NarrativeMemoryIndex({
-      embeddingProvider: new MockEmbeddingProvider(),
+      embeddingProvider: new LocalEmbeddingProvider(),
       store: new InMemoryVectorStore()
     });
     // El temple de la quest: copia del héroe con +1/−1 según lo que exige ESTA historia.
@@ -1074,7 +1102,7 @@ export function App() {
   function launchMultiplayerRoom(mpRoom: GameRoom) {
     stopAmbient();
     narrativeIndexRef.current = new NarrativeMemoryIndex({
-      embeddingProvider: new MockEmbeddingProvider(),
+      embeddingProvider: new LocalEmbeddingProvider(),
       store: new InMemoryVectorStore()
     });
     setRoom(mpRoom);
@@ -1172,7 +1200,7 @@ export function App() {
           name: draft.name,
           species: draft.species,
           role: draft.role,
-          petName: draft.pet.name,
+          petName: draft.pet.id === "none" ? undefined : draft.pet.name,
           concept: draft.concept,
           strengths: topTwoStats(draft.stats).map((stat) => statLabels[stat]),
           weakness: statLabels[lowStat(draft.stats)]
@@ -1310,8 +1338,10 @@ export function App() {
 
   // Invitado: manda su acción; el host la resuelve y difunde el resultado.
   function runMultiplayerTurn() {
-    if (!selectedActionDraft || !mpState.yourTurn || mpState.phase !== "active") return;
-    multiplayerClient.submitAction(selectedActionDraft.action, selectedStat, usePet);
+    if (!mpState.yourTurn || mpState.phase !== "active") return;
+    const action = usingCustomAction ? encodeCustomAction(customAction) : selectedActionDraft?.action;
+    if (!action) return;
+    multiplayerClient.submitAction(action, selectedStat, usePet);
   }
 
   async function runTurn(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean) {
@@ -1327,12 +1357,12 @@ export function App() {
     try {
       active = room.players[room.activePlayerIndex];
       if (active.status === "dead") return;
-      const chosenAction = botAction ?? selectedActionDraft?.action;
+      const chosenAction = botAction ?? (usingCustomAction ? encodeCustomAction(customAction) : selectedActionDraft?.action);
       if (!chosenAction) return;
       const chosenChoice = scene.actionChoices.find((choice) => choice.action === chosenAction || chosenAction.includes(choice.action));
       const turnAction = chosenAction;
-      const displayAction = chosenChoice?.label ?? cleanActionText(turnAction);
-      const petActive = (overrideUsePet ?? usePet) && active.type === "human";
+      const displayAction = chosenChoice?.label ?? decodeCustomAction(turnAction) ?? cleanActionText(turnAction);
+      const petActive = (overrideUsePet ?? usePet) && active.type === "human" && hasPet(active.character);
       const turnStat = botStat ?? selectedStat;
       const actionCountInScene = room.sessionLog.filter((event) =>
         event.sceneId === scene.id && (event.actionLabel === displayAction || cleanActionText(event.action) === displayAction)
@@ -1581,18 +1611,19 @@ export function App() {
           ["--col-right" as string]: gameCols.right ? `${gameCols.right}px` : undefined
         } as React.CSSProperties}
       >
-        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={soundMood} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
+        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={`${musicPreset.label} · ${soundMood}`} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
         {/* La narración vive en la pista central ancha; elección y dados en la columna derecha. */}
         <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} sceneImage={galleryView?.src ?? liveSceneImage.src ?? sceneImageUrl} sceneForging={liveSceneImage.status === "loading" && galleryIndex < 0} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} imageNav={galleryNav} imageLabel={galleryView?.label} />
         <section className="centerColumn actionColumn">
           {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
           {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} styleHint={`${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`} />}
-          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} />}
+          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} customAction={customAction} setCustomAction={setCustomAction} usingCustomAction={usingCustomAction} setUsingCustomAction={setUsingCustomAction} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
         </section>
         <div className="colHandle colHandleLeft" role="separator" aria-orientation="vertical" title="Arrastrá para redimensionar · doble click restablece" onPointerDown={(event) => startColumnDrag("left", event)} onDoubleClick={() => resetColumn("left")} />
         <div className="colHandle colHandleRight" role="separator" aria-orientation="vertical" title="Arrastrá para redimensionar · doble click restablece" onPointerDown={(event) => startColumnDrag("right", event)} onDoubleClick={() => resetColumn("right")} />
       </section>
+      {isMultiplayer && mpState.roomCode && <PartyChat mpState={mpState} />}
     </main>
   );
 }
@@ -1648,7 +1679,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
-                <span className="heroSummaryPet" style={{ color: petTheme(draft.pet.name).color, borderColor: petTheme(draft.pet.name).border, background: petTheme(draft.pet.name).bg, boxShadow: `0 0 10px ${petTheme(draft.pet.name).glow}` }}><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={22} /> {draft.pet.name}</span>
+                {hasPet(draft) && <span className="heroSummaryPet" style={{ color: petTheme(draft.pet.name).color, borderColor: petTheme(draft.pet.name).border, background: petTheme(draft.pet.name).bg, boxShadow: `0 0 10px ${petTheme(draft.pet.name).glow}` }}><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={22} /> {draft.pet.name}</span>}
               </div>
               <div className="heroSummaryActions">
                 <button className="ghostButton framedButton" type="button" onClick={() => setEditingHero(true)}><img className="uiIcon" src={uiIcon("editar_heroe")} alt="" /> Editar héroe</button>
@@ -1720,7 +1751,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   <summary><Lightbulb size={14} className="tIcon" /> Cómo se usaron tus ideas</summary>
                   <div>
                     {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
-                      <span key={keyword.idea}>{normalizeUiText(keyword.idea)}: {normalizeUiText(keyword.how)}</span>
+                      <article key={keyword.idea}><strong>{normalizeUiText(keyword.idea)}</strong><p>{normalizeUiText(keyword.how)}</p></article>
                     ))}
                   </div>
                 </details>
@@ -1824,7 +1855,7 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
             <div className="avatar"><HeroAvatarImg url={player.type === "bot" ? characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía") : player.character.avatarUrl} name={player.name} priority={player.type === "human"} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
             <div><strong>{player.name}</strong><span>{player.character.species} · {player.character.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
-            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span><span><NpcPortrait name={player.character.pet.name} portraitUrl={petImage(player.character.pet)} size={14} /> {player.character.pet.name}</span></div>
+            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span>{player.character.pet.id !== "none" && <span><NpcPortrait name={player.character.pet.name} portraitUrl={petImage(player.character.pet)} size={14} /> {player.character.pet.name}</span>}</div>
           </article>
         );
       })}
@@ -2014,22 +2045,15 @@ function unifyCover(ctx: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 // Portada de la historia: escena del mundo (sin gente, Pollinations flux) + TU
-// imagen REAL del héroe — el Frente o Cuerpo que elegiste como avatar — fundida
-// con elipse, AL FRENTE y grande, flanqueada por 1-2 personajes secundarios del
-// elenco (más chicos y oscurecidos = atrás, en escena). Cada figura usa el mismo
-// fundido elíptico: leen como tapa de libro con reparto, no como recortes pegados.
+// imagen REAL del héroe — el Frente o Cuerpo elegido — fundida sobre el entorno.
+// La portada tiene UNA sola figura: el protagonista. El resto se descubre jugando.
 function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
-  const sceneHint = campaign.scenes[0]?.title;
-  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint));
+  const sceneHint = [campaign.scenes[0]?.title, campaign.scenes[0]?.objective].filter(Boolean).join(" — ");
+  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint, world.ambience, world.worldRules));
   // La imagen elegida por el jugador manda: su avatar actual (Frente o Cuerpo).
   const avatarUrl: string = hero.avatarUrl;
   const heroShotUrl = isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : hero.look?.fullBodyUrl ?? null;
-  // Hasta 2 secundarios con retrato ya generado: acompañan al héroe en la portada.
-  const castShotUrls = (campaign.npcs ?? [])
-    .map((npc) => npc.portraitUrl)
-    .filter(isGeneratedPortraitUrl)
-    .slice(0, 2);
-  const castKey = castShotUrls.join("|");
+  const coverCacheKey = `cover-v2:${campaign.id}:${world.id}:${heroShotUrl ?? "scene-only"}`;
   const [composed, setComposed] = useState<string | null>(null);
   const ready = composed !== null || (Boolean(src) && !heroShotUrl);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
@@ -2038,29 +2062,22 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
     let alive = true;
     void (async () => {
       try {
+        const cached = await getCachedImage(coverCacheKey);
+        if (cached) {
+          if (alive) setComposed(cached);
+          return;
+        }
         const scene = await loadImg(src);
-        const hasCast = castShotUrls.length > 0;
-        // El héroe se centra (0.5) SIEMPRE que la historia tenga elenco, aunque los
-        // NPCs todavía no hayan cargado: así reserva su lugar y no salta cuando llegan.
-        const heroX = hasCast ? 0.5 : 0.72;
-        const castSlots: Array<{ x: number; h: number; dim: number }> = [
-          { x: 0.17, h: 0.92, dim: 0.42 },
-          { x: 0.85, h: 0.96, dim: 0.36 }
-        ];
-        // Redibuja la portada completa con lo que haya cargado hasta el momento.
-        const render = (heroImg: HTMLImageElement | null, castImgs: Array<HTMLImageElement | null>) => {
+        const render = async (heroImg: HTMLImageElement | null) => {
           const canvas = document.createElement("canvas");
           canvas.width = 1120; canvas.height = 480;
           const ctx2d = canvas.getContext("2d");
           if (!ctx2d) return;
           ctx2d.drawImage(scene, 0, 0, canvas.width, canvas.height);
-          castImgs.forEach((img, i) => {
-            const slot = castSlots[i];
-            if (img && slot) drawFadedFigure(ctx2d, img, slot.x, slot.h, canvas.width, canvas.height, slot.dim);
-          });
-          if (heroImg) drawFadedFigure(ctx2d, heroImg, heroX, 1.08, canvas.width, canvas.height);
+          if (heroImg) drawFadedFigure(ctx2d, heroImg, 0.62, 1.08, canvas.width, canvas.height);
           unifyCover(ctx2d, canvas.width, canvas.height); // viñeta + grano: funde todo
-          if (alive) setComposed(canvas.toDataURL("image/jpeg", 0.92));
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+          if (blob && alive) setComposed(await cacheImage(coverCacheKey, blob));
         };
         const load = (url: string, priority: boolean) => loadPortrait(url, { priority }).then(loadImg).catch(() => null);
         // FASE 1 — portada rápida con el héroe (prioritario). Si tarda mucho, race
@@ -2069,22 +2086,13 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
           load(heroShotUrl, true),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000))
         ]);
-        render(heroImg, []);
-        if (!hasCast) return;
-        // FASE 2 — los secundarios cargan SIN timeout que los descarte (Pollinations
-        // tarda en la primera generación); cuando terminan, la portada se rearma con
-        // el elenco. loadPortrait ya reintenta y cachea, así que llegan aunque tarden.
-        const [heroReady, ...castImgs] = await Promise.all([
-          heroImg ? Promise.resolve(heroImg) : load(heroShotUrl, true),
-          ...castShotUrls.map((url) => load(url, false))
-        ]);
-        if (alive && castImgs.some(Boolean)) render(heroReady, castImgs);
+        await render(heroImg ?? await load(heroShotUrl, true));
       } catch {
         if (alive) setComposed(null); // sin héroe listo: queda la escena sola
       }
     })();
     return () => { alive = false; };
-  }, [src, heroShotUrl, castKey]);
+  }, [src, heroShotUrl, coverCacheKey]);
   if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
   if (!src) return null;
   const cover = composed ?? src;
@@ -2123,7 +2131,8 @@ const worldArt: Record<string, string> = { veldaran: "/assets/worlds/veldaran.we
 const worldEmblems: Record<string, string> = { veldaran: uiIcon("shield_medieval"), "marea-ceniza": uiIcon("skull_apocalyptic"), "islas-juramento": uiIcon("tridente_mitologico") };
 const companionLogos: Record<string, string> = { "Alma Dracónica": "/assets/companions/alma-draconica.png", "Polilla de Cripta": "/assets/companions/polilla-de-cripta.png", "Sabueso del Umbral": "/assets/companions/sabueso-del-umbral.png" };
 // Los 3 compañeros base tienen su logo del pack de diseño; uno futuro cae al retrato IA.
-const petImage = (pet: { name: string; description: string }) => companionLogos[pet.name] ?? petPortraitUrl(pet.name, pet.description);
+const hasPet = (character: Character) => character.pet.id !== "none";
+const petImage = (pet: { id?: string; name: string; description: string }) => pet.id === "none" ? medallionDataUri("—") : companionLogos[pet.name] ?? petPortraitUrl(pet.name, pet.description);
 
 // Cada compañera viste su color de leyenda, tomado de su propia imagen:
 // dragón turquesa, polilla VIOLETA, sabueso DORADO. El borde, la sombra y el
@@ -2171,6 +2180,12 @@ type CastPeek = { name: string; role?: string; description: string; desire?: str
 // La personalización física del héroe es obligatoria antes de forjar su retrato.
 function lookComplete(draft: Character): boolean {
   return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
+}
+
+function heroPortraitIdentity(draft: Character): string {
+  return [draft.species, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor]
+    .map((value) => value?.trim().toLocaleLowerCase() ?? "")
+    .join("|");
 }
 
 // Las dos imágenes del héroe con el MISMO seed y prompt raíz (solo cambia el
@@ -2248,8 +2263,8 @@ const raceLook: Record<string, string> = {
   "duskelder": "elfo de orejas puntiagudas y rasgos finos",
   "rune-dwarf": "enano fornido de baja estatura y barba trenzada",
   "road-halfling": "mediano pequeño de rostro pícaro",
-  "dragon-marked": "humano con escamas dracónicas sutiles e iris dorado",
-  "grave-touched": "humano pálido espectral de mirada fría"
+  "dragon-marked": "humano con escamas dracónicas sutiles, sin alterar el color de ojos elegido",
+  "grave-touched": "humano de aura espectral y mirada fría, sin alterar el tono de piel elegido"
 };
 
 // La stat dominante también se ve: el cuerpo cuenta la build del personaje.
@@ -2295,9 +2310,9 @@ function heroPortraitSpec(draft: Character): { name: string; appearance: string;
   const traits = [
     look.gender,
     selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : undefined,
-    look.skinTone && `piel ${look.skinTone}`,
-    look.eyeColor && `ojos ${look.eyeColor}`,
-    look.hairColor && `pelo ${look.hairColor}`
+    look.skinTone && `EXACT SKIN COLOR: ${lookSkinPrompt[look.skinTone] ?? look.skinTone}`,
+    look.eyeColor && `EXACT IRIS COLOR: ${lookEyePrompt[look.eyeColor] ?? look.eyeColor}`,
+    look.hairColor && `EXACT HAIR COLOR: ${lookHairPrompt[look.hairColor] ?? look.hairColor}`
   ].filter(Boolean).join(", ");
   const appearance = [traits, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, selectedSpecies?.visualFlavor, draft.concept].filter(Boolean).join(". ");
   return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
@@ -2330,6 +2345,31 @@ const lookHairOptions = [
   { label: "blanco", color: "#e8e4da" },
   { label: "plateado", color: "#aab4c2" }
 ] as const;
+
+const lookSkinPrompt: Record<string, string> = {
+  "pálida": "very pale ivory skin",
+  "clara": "light warm beige skin",
+  "trigueña": "warm olive tan skin",
+  "morena": "medium deep brown skin",
+  "oscura": "deep dark brown skin",
+  "cenicienta": "cool ash-gray skin"
+};
+const lookEyePrompt: Record<string, string> = {
+  "marrones": "natural brown irises",
+  "ámbar": "clear amber-gold irises",
+  "verdes": "clear green irises",
+  "azules": "clear blue irises",
+  "grises": "clear gray irises",
+  "violetas": "clear violet irises"
+};
+const lookHairPrompt: Record<string, string> = {
+  "negro": "true black hair",
+  "castaño": "natural chestnut brown hair",
+  "rubio": "natural golden blonde hair",
+  "rojo fuego": "vivid natural copper-red hair",
+  "blanco": "pure white hair",
+  "plateado": "metallic silver-gray hair"
+};
 
 // Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
 // medallón data-URI de placeholder (sigue siendo un <img>, así hereda el CSS
@@ -2534,12 +2574,14 @@ function AmbienceControl({ audioRef, audioUrl, ambienceName, mood, isPlaying, se
   );
 }
 
-function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void; multiplayerBlock?: boolean }) {
+function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void; multiplayerBlock?: boolean; customAction: string; setCustomAction: (value: string) => void; usingCustomAction: boolean; setUsingCustomAction: (value: boolean) => void }) {
   const allowedStats = Array.from(new Set(props.sceneChoices.flatMap((choice) => choice.recommendedStats)));
   const isBot = props.activeType === "bot";
-  const willRollD4 = !isBot && props.selectedChoice ? shouldGrantCreativeBonus(props.selectedChoice.action, props.selectedStat, props.usePet) : false;
-  const selectedEnergyCost = getActionEnergyCost(props.selectedChoice);
-  const canPaySelectedAction = isBot || canPayActionEnergy(props.character.energy, props.selectedChoice);
+  const petAvailable = hasPet(props.character);
+  const willRollD4 = !isBot && props.selectedChoice ? shouldGrantCreativeBonus(props.selectedChoice.action, props.selectedStat, petAvailable && props.usePet) : false;
+  const effectiveChoice = props.usingCustomAction ? createCustomActionChoice(props.customAction, props.selectedStat) : props.selectedChoice;
+  const canPaySelectedAction = isBot || (Boolean(effectiveChoice) && canPayActionEnergy(props.character.energy, effectiveChoice));
+  const customReady = !props.usingCustomAction || props.customAction.trim().length >= 3;
   const blocked = props.multiplayerBlock && !isBot;
   return (
     <section className="panel actionComposer compactAction">
@@ -2549,14 +2591,15 @@ function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "
           {isBot && !blocked && <p className="empty">Turno bot: leé la escena y hacé clic para continuar.</p>}
           {blocked && <p className="empty">Turno de tu oponente — esperando su acción…</p>}
           <div className="actionCompactGrid">
+            {!isBot && !blocked && <div className="customActionRow"><label><input type="checkbox" checked={props.usingCustomAction} onChange={(event) => props.setUsingCustomAction(event.target.checked)} disabled={props.busy} /> Escribir mi propia acción <span><Zap size={11} /> {CUSTOM_ACTION_ENERGY_COST}</span></label>{props.usingCustomAction && <input value={props.customAction} maxLength={180} onChange={(event) => props.setCustomAction(event.target.value)} placeholder="¿Qué intentás hacer?" disabled={props.busy} />}</div>}
             <div className="actionCompactText">
               <small>{isBot ? "Agente automático" : "Acción elegida"}</small>
-              <strong>{isBot ? props.character.name : props.selectedChoice?.label ?? "Elegí una acción"}</strong>
-              <span>{isBot ? "El motor elegirá acción, stat y bonus sin input humano." : props.selectedChoice?.action ?? "Seleccioná una opción de escena."}</span>
+              <strong>{isBot ? props.character.name : props.usingCustomAction ? props.customAction || "Tu propia acción" : props.selectedChoice?.label ?? "Elegí una acción"}</strong>
+              <span>{isBot ? "El motor elegirá acción, stat y bonus sin input humano." : props.usingCustomAction ? "Más libertad a cambio de más energía." : props.selectedChoice?.action ?? "Seleccioná una opción de escena."}</span>
             </div>
             <label className="statSelectCompact">Stat<select value={props.selectedStat} onChange={(event) => props.setSelectedStat(event.target.value as StatKey)} disabled={isBot || props.busy || blocked}>{allowedStats.map((stat) => <option key={stat} value={stat}>{statLabels[stat]} +{props.character.stats[stat]}</option>)}</select></label>
-            <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy || blocked} /> Mascota d4</label>
-            <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={blocked || (!isBot && (props.busy || !canPaySelectedAction))}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Narrando..." : blocked ? "Esperar turno" : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : "Tirar dados"}</button>
+            {petAvailable ? <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy || blocked} /> Mascota d4</label> : <span className="noPetHint">Sin mascota vinculada</span>}
+            <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={blocked || (!isBot && (props.busy || !canPaySelectedAction || !customReady))}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Narrando..." : blocked ? "Esperar turno" : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : !customReady ? "Escribí tu acción" : "Tirar dados"}</button>
           </div>
           {props.turnError && <p className="turnError">{props.turnError}</p>}
         </>
@@ -2960,24 +3003,26 @@ function NarrativeHistory({ room }: { room: GameRoom }) {
       </div>
       <div className="historyTurnList" ref={scrollRef}>
         {visibleEvents.length === 0 && <p className="historyEmpty">Todavía no hay turnos{onlyMine ? ` de ${humanPlayer.name}` : ""}.</p>}
-        {visibleEvents.map((event) => {
+        {visibleEvents.map((event, index) => {
           const campaignScene = room.campaign.scenes.find((s) => s.id === event.sceneId);
           const actionOption = campaignScene?.multipleChoiceOptions.find((o) => o.id === event.actionId);
-          const energyCost = getActionEnergyCost(actionOption);
+          const energyCost = event.actionId?.startsWith("custom:") ? CUSTOM_ACTION_ENERGY_COST : getActionEnergyCost(actionOption);
           return (
-            <article key={event.id} className={`historyTurnEntry ${event.isBot ? "historyBot" : "historyHuman"}`}>
-              <div className="historyTurnMeta">
+            <details key={event.id} className={`historyTurnEntry ${event.isBot ? "historyBot" : "historyHuman"}`} open={index === 0}>
+              <summary className="historyTurnMeta">
                 <span className={`historyBadge ${event.isBot ? "bot" : "human"}`}>{event.isBot ? "BOT" : "VOS"}</span>
                 <span className="historyTurnLabel">T{event.turnNumber ?? event.turn + 1}</span>
                 <span className="historySceneName">{event.sceneTitle}</span>
                 <span className={`historyOutcomePill ${event.outcome}`}>{translateOutcome(event.outcome)}</span>
+              </summary>
+              <div className="historyTurnBody">
+                <div className="historyChoiceLine">
+                  <span>{event.actionLabel ?? cleanActionText(event.action)}</span>
+                  {energyCost > 0 && <span className="historyCost"><Zap size={10} /> {energyCost}</span>}
+                </div>
+                <p className="historyNarration">{event.narration}</p>
               </div>
-              <div className="historyChoiceLine">
-                <span>{event.actionLabel ?? cleanActionText(event.action)}</span>
-                {energyCost > 0 && <span className="historyCost"><Zap size={10} /> {energyCost}</span>}
-              </div>
-              <p className="historyNarration">{event.narration}</p>
-            </article>
+            </details>
           );
         })}
       </div>
@@ -3136,6 +3181,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   const selectedPet = legendaryPets.find((pet) => pet.id === draft.pet.id) ?? legendaryPets[0];
   const [selectedTalent, setSelectedTalent] = useState<string>(characterTalentAssets[0].id);
   const [builderTab, setBuilderTab] = useState<BuilderTab>("species");
+  const [heroZoomed, setHeroZoomed] = useState(false);
   const speciesAffinity = Object.keys(selectedSpecies.statBonus ?? {})[0] as StatKey | undefined;
   const tabValue: Record<BuilderTab, string> = { species: selectedSpecies.name, role: selectedRole.name, pet: selectedPet.name };
   function updateStats(stat: StatKey, delta: number) {
@@ -3147,6 +3193,9 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
   const heroLookDone = lookComplete(draft);
   const currentShot = draft.look?.avatarShot ?? "face";
+  const hasForgedPortrait = Boolean(draft.look?.faceUrl && draft.look?.fullBodyUrl && isGeneratedPortraitUrl(draft.avatarUrl));
+  const portraitNeedsRefresh = !hasForgedPortrait || draft.look?.portraitIdentity !== heroPortraitIdentity(draft);
+  const firstMissingLook = !draft.look?.gender ? "gender" : !draft.look?.skinTone ? "skin" : !draft.look?.eyeColor ? "eyes" : !draft.look?.hairColor ? "hair" : null;
   function chooseLook(patch: Partial<CharacterLook>) {
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { ...draft.look, ...patch } }));
@@ -3220,7 +3269,9 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
         <div className="heroIdentity">
           <div className="heroPortraitColumn">
             <div className={`heroPortraitFrame ${currentShot === "fullbody" ? "fullbodyFrame" : ""}`}>
-              <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
+              <button type="button" className="heroPortraitZoomButton" onClick={() => heroLookDone && setHeroZoomed(true)} disabled={!heroLookDone} aria-label="Ver retrato en pantalla completa">
+                <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="heroPortrait" priority />
+              </button>
               {heroLookDone && (
                 <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled} title={currentShot === "face" ? "Descargar la imagen de frente" : "Descargar la imagen de cuerpo entero"} aria-label="Descargar esta toma">
                   <Download size={14} />
@@ -3235,8 +3286,8 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
-              <button type="button" className="reimagineButton" onClick={() => onReimagine(1 + Math.floor(Math.random() * 9000))} disabled={disabled || !heroLookDone} title={heroLookDone ? "La IA imagina otra cara para la misma identidad" : "Elegí género, piel, ojos y pelo primero"}>
-                <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> Reimaginar héroe
+              <button type="button" className={`reimagineButton ${heroLookDone && portraitNeedsRefresh ? "forgeAttention" : ""}`} onClick={() => onReimagine(hasForgedPortrait ? 1 + Math.floor(Math.random() * 9000) : 0)} disabled={disabled || !heroLookDone} title={heroLookDone ? (hasForgedPortrait ? "La IA imagina otra cara respetando tu identidad" : "Crear retrato con los rasgos elegidos") : "Elegí género, piel, ojos y pelo primero"}>
+                <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> {hasForgedPortrait ? "Reimaginar héroe" : "Imaginar héroe"}
               </button>
             )}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
@@ -3244,8 +3295,8 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
           </div>
           <div className="heroIdentityFields">
             <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
-            <div className="lookPicker">
-              <div className="lookGroup">
+            <div className={`lookPicker ${!heroLookDone ? "lookRequired" : ""}`}>
+              <div className={`lookGroup ${firstMissingLook === "gender" ? "requiredNext" : ""}`}>
                 <span>Género</span>
                 <div className="lookPills">
                   {lookGenderOptions.map((option) => (
@@ -3253,7 +3304,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                   ))}
                 </div>
               </div>
-              <div className="lookGroup">
+              <div className={`lookGroup ${firstMissingLook === "skin" ? "requiredNext" : ""}`}>
                 <span>Piel</span>
                 <div className="lookSwatches">
                   {lookSkinOptions.map((option) => (
@@ -3261,7 +3312,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                   ))}
                 </div>
               </div>
-              <div className="lookGroup">
+              <div className={`lookGroup ${firstMissingLook === "eyes" ? "requiredNext" : ""}`}>
                 <span>Ojos</span>
                 <div className="lookSwatches">
                   {lookEyeOptions.map((option) => (
@@ -3269,7 +3320,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                   ))}
                 </div>
               </div>
-              <div className="lookGroup">
+              <div className={`lookGroup ${firstMissingLook === "hair" ? "requiredNext" : ""}`}>
                 <span>Pelo</span>
                 <div className="lookSwatches">
                   {lookHairOptions.map((option) => (
@@ -3278,9 +3329,17 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 </div>
               </div>
             </div>
+            {heroZoomed && (
+              <div className="heroPortraitLightbox" role="presentation" onClick={() => setHeroZoomed(false)}>
+                <button type="button" onClick={() => setHeroZoomed(false)} aria-label="Cerrar imagen ampliada">
+                  <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className={currentShot === "fullbody" ? "zoomFullBody" : "zoomFace"} priority />
+                  <span>Click para cerrar</span>
+                </button>
+              </div>
+            )}
             {/* La compañera se elige acá mismo, con su propia imagen (reemplaza a los avatares fijos). */}
             <div className="petPicker">
-              <span>Tu compañera de aventuras</span>
+              <span>Compañera al comenzar (opcional)</span>
               <div className="petPickerRow">
                 {legendaryPets.map((pet) => (
                   <button key={pet.id} type="button" className={draft.pet.id === pet.id ? "selected" : ""} style={petThemeVars(pet.name)} onClick={() => setDraft(createCharacter({ ...draft, pet }))} disabled={disabled} title={`${pet.name} — ${pet.description}`}>
@@ -3366,7 +3425,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             </div>
             <div className="builderDetail petDetail" style={{ ...petThemeVars(selectedPet.name), borderColor: petTheme(selectedPet.name).border, boxShadow: `inset 0 0 26px ${petTheme(selectedPet.name).glow}` }}>
               {/* La compañera tiene SU retrato generado, separado del héroe. */}
-              <NpcPortrait name={selectedPet.name} portraitUrl={petImage(selectedPet)} size={72} />
+              {selectedPet.id !== "none" && <NpcPortrait name={selectedPet.name} portraitUrl={petImage(selectedPet)} size={72} />}
               <div className="petDetailText">
                 <p><strong>Pasiva</strong>{selectedPet.passiveAbility}</p>
                 <p><strong>Activa</strong>{selectedPet.activeAbility}</p>
@@ -3412,8 +3471,8 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
         </div>
         <div className="heroSheet">
           <h3>Ficha viva</h3>
-          <p className="sheetBlock who"><strong>Quién sos</strong>{draft.name || "Tu héroe"}, {selectedSpecies.name.toLowerCase()} y {selectedRole.name.toLowerCase()}, junto a {selectedPet.name}.{draft.look?.gender ? ` ${draft.look.gender}, piel ${draft.look.skinTone ?? "?"}, ojos ${draft.look.eyeColor ?? "?"}, pelo ${draft.look.hairColor ?? "?"}.` : ""}</p>
-          <p className="sheetBlock helps"><strong>Qué te ayuda</strong>{selectedSpecies.passiveTrait} {selectedRole.specialAbility} {selectedPet.activeAbility}</p>
+          <p className="sheetBlock who"><strong>Quién sos</strong>{draft.name || "Tu héroe"}, {selectedSpecies.name.toLowerCase()} y {selectedRole.name.toLowerCase()}{hasPet(draft) ? `, junto a ${selectedPet.name}` : ", sin mascota al comenzar"}.{draft.look?.gender ? ` ${draft.look.gender}, piel ${draft.look.skinTone ?? "?"}, ojos ${draft.look.eyeColor ?? "?"}, pelo ${draft.look.hairColor ?? "?"}.` : ""}</p>
+          <p className="sheetBlock helps"><strong>Qué te ayuda</strong>{selectedSpecies.passiveTrait} {selectedRole.specialAbility} {hasPet(draft) ? selectedPet.activeAbility : "Podés vincular una criatura si aparece durante la aventura."}</p>
           <p className="sheetBlock trouble"><strong>Qué te complica</strong>{selectedSpecies.quirk} {selectedRole.limitation}</p>
           <p className="sheetBlock story"><strong>En la historia</strong>Tus fuertes: {topTwoStats(draft.stats).map((stat) => statLabels[stat]).join(" y ")}. Tu flanco débil: {statLabels[lowStat(draft.stats)]}. El narrador los va a usar.</p>
         </div>
@@ -3466,7 +3525,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
       <div className="mpHeroInfo">
         <strong>{draft.name}</strong>
         <small>{draft.species} · {draft.role}</small>
-        <small className="mpHeroPet"><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={16} /> {draft.pet.name}</small>
+        {hasPet(draft) && <small className="mpHeroPet"><NpcPortrait name={draft.pet.name} portraitUrl={petImage(draft.pet)} size={16} /> {draft.pet.name}</small>}
       </div>
       <span className="mpHeroTag">Tu héroe</span>
     </div>
@@ -3480,6 +3539,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
           <strong style={{ color: "#fff" }}>{p.name}</strong>
           {p.isHost && <span style={{ color: "#ffd77b", fontSize: 12 }}>· anfitrión</span>}
           {p.id === mpState.playerId && <span style={{ color: "#888", fontSize: 12 }}>· vos</span>}
+          {mpState.isHost && !p.isHost && <button className="mpKickButton" type="button" onClick={() => multiplayerClient.kickPlayer(p.id)} title={`Expulsar a ${p.name}`}><X size={12} /> Echar</button>}
         </li>
       ))}
     </ul>
@@ -3502,6 +3562,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
                     {roomCode}
                   </div>
                   {playerList}
+                  <PartyChat mpState={mpState} embedded />
                   <button
                     className="soloButton"
                     style={{ width: "100%", marginBottom: 10 }}
@@ -3518,6 +3579,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
             <>
               <h2 style={{ fontSize: 22, marginBottom: 8 }}>En la sala {roomCode}</h2>
               {playerList}
+              <PartyChat mpState={mpState} embedded />
               <p style={{ color: "#888", fontSize: 13 }}>Esperando que el anfitrión forje la historia y arranque…</p>
             </>
           ) : (
@@ -3552,6 +3614,33 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
         </button>
       </section>
     </main>
+  );
+}
+
+function PartyChat({ mpState, embedded = false }: { mpState: MultiplayerState; embedded?: boolean }) {
+  const [text, setText] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const me = mpState.players.find((player) => player.id === mpState.playerId);
+  const color = me?.chatColor || "#f5d77b";
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [mpState.chatMessages.length]);
+  function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!text.trim()) return;
+    multiplayerClient.sendChat(text);
+    setText("");
+  }
+  return (
+    <aside className={`partyChat ${embedded ? "partyChatEmbedded" : "partyChatFloating"}`} aria-label="Chat de la party">
+      <header><strong>Chat de la party</strong><button type="button" onClick={() => setSettingsOpen((open) => !open)} title="Ajustes del chat">⚙</button></header>
+      {settingsOpen && <div className="partyChatSettings"><label>Color de tu letra <input type="color" value={color} onChange={(event) => multiplayerClient.setChatColor(event.target.value)} /></label></div>}
+      <div className="partyChatMessages" ref={listRef}>
+        {mpState.chatMessages.length === 0 && <p>La conversación todavía está vacía.</p>}
+        {mpState.chatMessages.map((message) => <div key={message.id} className="partyChatMessage"><strong style={{ color: message.color }}>{message.playerName}</strong><span style={{ color: message.color }}>{message.text}</span></div>)}
+      </div>
+      <form onSubmit={submit}><input value={text} maxLength={280} onChange={(event) => setText(event.target.value)} placeholder="Escribí a la party…" /><button type="submit" disabled={!text.trim()}>Enviar</button></form>
+      {!embedded && mpState.isHost && <details className="partyPlayers"><summary>Participantes ({mpState.players.length})</summary>{mpState.players.filter((player) => !player.isHost).map((player) => <div key={player.id}><span>{player.name}</span><button type="button" onClick={() => multiplayerClient.kickPlayer(player.id)}><X size={11} /> Echar</button></div>)}</details>}
+    </aside>
   );
 }
 

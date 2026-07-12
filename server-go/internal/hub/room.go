@@ -34,6 +34,7 @@ type player struct {
 	client    *Client // puede ser nil si está desconectado (en gracia)
 	connected bool
 	joinedAt  time.Time
+	chatColor string
 }
 
 // Room es una sala multi-jugador. El HOST es autoritativo del estado de juego.
@@ -55,8 +56,9 @@ type Room struct {
 	lastActivity time.Time
 	// lastState/lastSummary: última difusión autoritativa del host. Se guarda para
 	// re-sincronizar a un jugador que reconecta a media partida.
-	lastState   json.RawMessage
-	lastSummary string
+	lastState    json.RawMessage
+	lastSummary  string
+	chatMessages []ChatMessage
 }
 
 func newRoom(code string) *Room {
@@ -65,6 +67,7 @@ func newRoom(code string) *Room {
 		code:         code,
 		status:       statusWaiting,
 		players:      make([]*player, 0, maxPlayers),
+		chatMessages: make([]ChatMessage, 0, 50),
 		createdAt:    now,
 		lastActivity: now,
 	}
@@ -104,6 +107,7 @@ func (r *Room) snapshot() []PlayerInfo {
 		out = append(out, PlayerInfo{
 			ID: p.id, Name: p.name, IsHost: p.isHost,
 			Connected: p.connected, Character: p.character,
+			ChatColor: p.chatColor,
 		})
 	}
 	return out

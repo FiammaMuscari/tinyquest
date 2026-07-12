@@ -72,6 +72,17 @@ test("buildImprovisedCampaign produce una campaña jugable con la ficción del L
   assert.ok(campaign.twists?.[0]?.reveal.includes("inmortalidad"));
 });
 
+test("keywordsUsed conserva hasta ocho ideas completas para explicarlas en el lobby", () => {
+  const ideas = Array.from({ length: 8 }, (_, index) => ({
+    idea: `Idea ${index + 1}: ${"detalle importante ".repeat(5)}`,
+    how: `Función jugable ${index + 1}: ${"consecuencia concreta y visible ".repeat(5)}`
+  }));
+  const campaign = buildImprovisedCampaign({ ...fullContent, keywordsUsed: ideas });
+  assert.equal(campaign.forgeNotes?.keywordsUsed?.length, 8);
+  assert.ok(campaign.forgeNotes.keywordsUsed[0].idea.length > 40);
+  assert.ok(campaign.forgeNotes.keywordsUsed[0].how.length > 90);
+});
+
 test("buildImprovisedCampaign resiste contenido incompleto del LLM", () => {
   const campaign = buildImprovisedCampaign({
     title: "Historia rota",
