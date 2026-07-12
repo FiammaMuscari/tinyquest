@@ -1,6 +1,8 @@
 // ADN del avatar protagonista original aprobado. NPCs, criaturas y escenas deben
 // acercarse A ESTE estilo; nunca al revés.
-export const TINY_QUEST_VISUAL_STYLE = "RAW TRADITIONAL OIL PAINTING on rough linen canvas, dark fantasy novel cover portrait, old-master fantasy realism, strongly visible layered brush strokes and broken painted edges, tactile pigment texture, subtle canvas grain, dramatic warm Rembrandt side light, deep imperfect shadows, muted earthy colors with restrained warm highlights, angular expressive face with natural asymmetry, authentic skin texture and pores, mature believable anatomy, individual loose hair strands painted by hand, atmospheric charcoal-gray painted background. Museum-quality fantasy oil illustration, detailed through brushwork rather than digital sharpness. ABSOLUTELY NO glossy digital concept art, no airbrushed or porcelain doll skin, no beauty-filter face, no plastic 3D render, no smooth CGI, no anime, no cartoon, no glamour studio lighting, no oversaturated colors, no text, no signature, no watermark";
+export const TINY_QUEST_VISUAL_STYLE = "Painterly dark fantasy RPG character concept illustration, elegant semi-realistic fantasy book art, loose confident visible brushwork, softly modeled expressive face, natural slight facial asymmetry, graceful believable anatomy, subdued earthy palette, dramatic warm rim light and deep cool shadows, strands of hair catching light, simple charcoal-and-oil painted background, refined detail around eyes and costume with broad painterly edges elsewhere. Illustration with the classic hand-painted fantasy concept-art finish, not a photograph. No glossy CGI, no porcelain doll face, no beauty filter, no hyperreal skin pores, no 3D render, no anime, no cartoon, no glamour studio lighting, no text, no signature, no watermark";
+
+export const TINY_QUEST_SCENE_STYLE = "Wide cinematic dark fantasy environment concept painting, EMPTY landscape and architecture, broad matte-painting brushwork, atmospheric perspective, subdued earthy palette, dramatic natural light, layered terrain and readable depth, fantasy book illustration, no portrait composition, no close-up face, no focal person, no characters, no silhouettes, no creatures, no text, no watermark";
 
 const CREATURE_HINT = /\b(animal|bestia|criatura|no\s*human[oa]|cuadr[úu]pedo|felin[oa]|gat[oa]|minino|perr[oa]|canino|sabueso|lob[oa]|zorr[oa]|os[oa]|drag[óo]n|drac[óo]nic|serpiente|reptil|lagart|salamandra|ave|p[áa]jaro|cuervo|b[úu]ho|halc[óo]n|[áa]guila|caballo|corcel|potro|ciervo|conejo|rat[óo]n|murci[ée]lago|ara[ñn]a|insecto|escarabaj|tigre|le[óo]n|pantera|lince|nutria|hur[óo]n|comadreja|mono|simio|quimera|grifo|f[ée]nix|hocico|pelaje|plumas|escamas|colmillos|bigotes|cat|kitten|kitty|feline|hound|wolf|fox|beast|creature|dragon|serpent|feathers|fur|whiskers?)\b/i;
 const EXPLICIT_HUMANOID_HINT = /\b(humanoid[ea]?|antropomorf[oa]|forma humana|cuerpo humano|torso humano|b[íi]ped[oa]|human-like|human shaped|anthropomorphic)\b/i;
@@ -24,7 +26,7 @@ export function creaturePortraitPrompt(name: string, appearance: string | undefi
 }
 
 export function sceneStylePrompt(): string {
-  return `${TINY_QUEST_VISUAL_STYLE}, cinematic environment painting with the same brushwork, contrast and dark moody lighting as the protagonist portrait`;
+  return TINY_QUEST_SCENE_STYLE;
 }
 
 export function worldImageConstraints(worldName: string, ambience: string, rules: string[]): string {

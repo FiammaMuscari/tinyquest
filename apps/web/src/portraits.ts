@@ -53,7 +53,7 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
   // Mantener EXACTO el prompt aprobado del avatar: recupera las imágenes previas
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
-  const prompt = `${heroPromptRoot}, intimate three-quarter portrait from the waist up, face clearly visible, closer camera, unretouched natural face${heroPromptTail(name, appearance, styleHint)}`;
+  const prompt = `${heroPromptRoot}, three-quarter portrait from the waist up, face clearly visible, closer camera, natural expressive face${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -67,7 +67,7 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
   // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
   // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
-  const prompt = `${heroPromptRoot}, painted full-length character study, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, grounded relaxed standing pose, face retains natural proportions and painterly asymmetry, clothing rendered with broad visible oil strokes rather than glossy detail${heroPromptTail(name, appearance, styleHint)}`;
+  const prompt = `${heroPromptRoot}, painted full-length fantasy character study, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, grounded relaxed standing pose, elegant natural proportions, face retains the same painterly character identity, clothing and background rendered with loose broad visible strokes${heroPromptTail(name, appearance, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }

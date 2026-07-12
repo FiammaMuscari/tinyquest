@@ -2048,12 +2048,16 @@ function unifyCover(ctx: CanvasRenderingContext2D, w: number, h: number) {
 // imagen REAL del héroe — el Frente o Cuerpo elegido — fundida sobre el entorno.
 // La portada tiene UNA sola figura: el protagonista. El resto se descubre jugando.
 function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campaign; world: WorldEra; hero: Character; onReady?: (ready: boolean) => void }) {
-  const sceneHint = [campaign.scenes[0]?.title, campaign.scenes[0]?.objective].filter(Boolean).join(" — ");
-  const { src, status } = useGeneratedPortrait(storySceneImageUrl(campaign.title, world.name, world.era, sceneHint, world.ambience, world.worldRules));
+  // La portada pide solo el NOMBRE del lugar/escena. El objetivo suele mencionar
+  // personas y hacía que Flux pintara un rostro gigante en el fondo que debe
+  // quedar vacío para compositar al héroe real.
+  const sceneHint = campaign.scenes[0]?.title ?? "";
+  const backgroundUrl = storySceneImageUrl(campaign.title, world.name, world.era, sceneHint, world.ambience, world.worldRules);
+  const { src, status } = useGeneratedPortrait(backgroundUrl);
   // La imagen elegida por el jugador manda: su avatar actual (Frente o Cuerpo).
   const avatarUrl: string = hero.avatarUrl;
   const heroShotUrl = isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : hero.look?.fullBodyUrl ?? null;
-  const coverCacheKey = `cover-v2:${campaign.id}:${world.id}:${heroShotUrl ?? "scene-only"}`;
+  const coverCacheKey = `cover-v3:${campaign.id}:${world.id}:${nameHash(backgroundUrl)}:${heroShotUrl ?? "scene-only"}`;
   const [composed, setComposed] = useState<string | null>(null);
   const ready = composed !== null || (Boolean(src) && !heroShotUrl);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);

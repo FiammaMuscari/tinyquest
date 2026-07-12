@@ -1,8 +1,9 @@
 # Set dorado visual
 
-`fiamy-frente-reference.png` fija el contrato de estilo para protagonistas,
-NPC y avatares: ilustración editorial dark-fantasy pintada, rostro detallado,
-claroscuro cálido, anatomía natural y fondo oscuro con pincel visible.
+`fiamy-frente-reference.png`, `fiamy-cuerpo-reference-1.png` y
+`fiamy-cuerpo-reference-2.png` fijan el contrato de estilo para protagonistas,
+NPC y avatares: concept art dark-fantasy pintado, rostro suavemente modelado,
+anatomía elegante, fondo oscuro y pinceladas amplias claramente visibles.
 
 `fiamy-cuerpo-rejected.png` es el anti-ejemplo: piel de muñeca suavizada,
 iluminación de estudio, acabado CGI brillante y facciones idealizadas. Ninguna
