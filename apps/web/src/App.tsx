@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -609,6 +609,9 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function forgeHeroPortraitPair(seedNonce: number) {
     const urls = heroImageUrls(draftRef.current, seedNonce);
+    // Frente fija cara + colores; Cuerpo se genera como EDICIÓN de esa imagen
+    // mediante Flux.2, no como otra tirada de texto independiente.
+    linkPortraitReference(urls.fullbody, urls.face);
     const shot = draftRef.current.look?.avatarShot ?? "fullbody";
     // Las DOS variantes se regeneran juntas, pero la elegida obtiene el primer
     // lugar de la cola. Por defecto Cuerpo llega antes; Frente queda precargada.
@@ -1689,7 +1692,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                 </button>
               </div>
             </div>
-            {!heroLookDone && <p className="startHint">Tu héroe todavía no tiene cara: entrá a <strong>Editar héroe</strong> y elegí género, piel, ojos y pelo para forjar su retrato.</p>}
+            {!heroLookDone && <button type="button" className="startHint heroBuildCta" onClick={() => setEditingHero(true)}><strong>✨ Tu héroe espera una identidad</strong><span>Elegí linaje, piel, ojos, pelo y cicatrices para imaginarlo.</span><b>Armar mi héroe →</b></button>}
             {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
           </section>
         )}
@@ -2188,7 +2191,7 @@ function lookComplete(draft: Character): boolean {
 }
 
 function heroPortraitIdentity(draft: Character): string {
-  return [draft.species, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor]
+  return [draft.species, draft.look?.gender, draft.look?.skinTone, draft.look?.eyeColor, draft.look?.hairColor, draft.look?.scar ?? "sin cicatrices"]
     .map((value) => value?.trim().toLocaleLowerCase() ?? "")
     .join("|");
 }
@@ -2317,10 +2320,16 @@ function heroPortraitSpec(draft: Character): { name: string; appearance: string;
     look.eyeColor && `EXACT IRIS COLOR: ${lookEyePrompt[look.eyeColor] ?? look.eyeColor}`,
     look.hairColor && `EXACT HAIR COLOR: ${lookHairPrompt[look.hairColor] ?? look.hairColor}`
   ].filter(Boolean).join(", ");
+  const exactScar = look.scar && look.scar !== "sin cicatrices"
+    ? `EXACT PERMANENT SCAR: ${lookScarPrompt[look.scar] ?? look.scar}; keep identical in both shots`
+    : "NO SCARS anywhere on face or body";
   const identity = [look.gender, selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : undefined].filter(Boolean).join(", ");
   // Los tres colores abren Y cierran la descripción: Flux tiende a obedecer
   // mejor las restricciones repetidas en ambos extremos de prompts largos.
-  const appearance = [exactColors, identity, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, selectedSpecies?.visualFlavor, draft.concept, `FINAL COLOR CHECK — ${exactColors}`].filter(Boolean).join(". ");
+  // `visualFlavor` queda afuera a propósito: algunos linajes traen defaults como
+  // "ojos plateados", "iris dorado" o "piel fría" que competían con la elección
+  // del usuario. La anatomía racial vive en raceLook; el color lo decide SOLO UI.
+  const appearance = [exactColors, exactScar, identity, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, draft.concept, `FINAL IDENTITY CHECK — ${exactColors}; ${exactScar}`].filter(Boolean).join(". ");
   return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
 }
 
@@ -2371,6 +2380,7 @@ const lookHairOptions = [
   { label: "blanco", color: "#e8e4da" },
   { label: "plateado", color: "#aab4c2" }
 ] as const;
+const lookScarOptions = ["sin cicatrices", "ceja izquierda", "ceja derecha", "mejilla izquierda", "mejilla derecha", "puente de la nariz", "labio", "ojo izquierdo", "ojo derecho"] as const;
 
 const lookSkinPrompt: Record<string, string> = {
   "pálida": "very pale ivory skin",
@@ -2415,6 +2425,16 @@ const lookHairPrompt: Record<string, string> = {
   "rosa": "vivid rose-pink hair",
   "blanco": "pure white hair",
   "plateado": "metallic silver-gray hair"
+};
+const lookScarPrompt: Record<string, string> = {
+  "ceja izquierda": "one fine healed scar crossing the LEFT eyebrow",
+  "ceja derecha": "one fine healed scar crossing the RIGHT eyebrow",
+  "mejilla izquierda": "one fine healed diagonal scar on the LEFT cheek",
+  "mejilla derecha": "one fine healed diagonal scar on the RIGHT cheek",
+  "puente de la nariz": "one fine healed scar across the bridge of the nose",
+  "labio": "one small healed vertical scar crossing the lip",
+  "ojo izquierdo": "one distinctive healed scar passing over the LEFT eye, eye intact",
+  "ojo derecho": "one distinctive healed scar passing over the RIGHT eye, eye intact"
 };
 
 // Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
@@ -3351,7 +3371,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 </div>
               </div>
               <div className={`lookGroup ${firstMissingLook === "skin" ? "requiredNext" : ""}`}>
-                <span>Piel</span>
+                <span>Piel<small>{draft.look?.skinTone}</small></span>
                 <div className="lookSwatches">
                   {lookSkinOptions.map((option) => (
                     <button key={option.label} type="button" title={`Piel ${option.label}`} aria-label={`Piel ${option.label}`} className={draft.look?.skinTone === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ skinTone: draft.look?.skinTone === option.label ? undefined : option.label })} disabled={disabled} />
@@ -3359,7 +3379,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 </div>
               </div>
               <div className={`lookGroup ${firstMissingLook === "eyes" ? "requiredNext" : ""}`}>
-                <span>Ojos</span>
+                <span>Ojos<small>{draft.look?.eyeColor}</small></span>
                 <div className="lookSwatches">
                   {lookEyeOptions.map((option) => (
                     <button key={option.label} type="button" title={`Ojos ${option.label}`} aria-label={`Ojos ${option.label}`} className={draft.look?.eyeColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ eyeColor: draft.look?.eyeColor === option.label ? undefined : option.label })} disabled={disabled} />
@@ -3367,10 +3387,18 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 </div>
               </div>
               <div className={`lookGroup ${firstMissingLook === "hair" ? "requiredNext" : ""}`}>
-                <span>Pelo</span>
+                <span>Pelo<small>{draft.look?.hairColor}</small></span>
                 <div className="lookSwatches">
                   {lookHairOptions.map((option) => (
                     <button key={option.label} type="button" title={`Pelo ${option.label}`} aria-label={`Pelo ${option.label}`} className={draft.look?.hairColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ hairColor: draft.look?.hairColor === option.label ? undefined : option.label })} disabled={disabled} />
+                  ))}
+                </div>
+              </div>
+              <div className="lookGroup scarLookGroup">
+                <span>Cicatriz<small>{draft.look?.scar ?? "sin cicatrices"}</small></span>
+                <div className="lookPills">
+                  {lookScarOptions.map((option) => (
+                    <button key={option} type="button" className={(draft.look?.scar ?? "sin cicatrices") === option ? "selected" : ""} onClick={() => chooseLook({ scar: option })} disabled={disabled}>{option}</button>
                   ))}
                 </div>
               </div>

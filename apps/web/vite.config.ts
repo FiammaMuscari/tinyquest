@@ -127,25 +127,37 @@ function llmProxyPlugin(): Plugin {
         request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
         request.on("end", async () => {
           try {
-            const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { prompt?: string; width?: number; height?: number; seed?: number };
+            const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { prompt?: string; width?: number; height?: number; seed?: number; referenceImage?: string; referenceType?: string };
             if (!body.prompt) {
               response.statusCode = 400;
               response.end("prompt requerido");
               return;
             }
-            const model = env.CF_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning";
-            const upstream = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/ai/run/${model}`, {
-              method: "POST",
-              headers: { "Authorization": `Bearer ${env.CF_AI_TOKEN}`, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                // El sufijo anti-firma va SOLO acá (server-side): la URL que
-                // hace de clave de caché en el cliente no cambia.
+            const model = body.referenceImage ? "@cf/black-forest-labs/flux-2-klein-4b" : (env.CF_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning");
+            let upstreamBody: BodyInit;
+            let upstreamContentType = "application/json";
+            if (body.referenceImage) {
+              const form = new FormData();
+              form.append("prompt", `Use image 0 as the canonical character identity. Preserve EXACT face, species, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and delicate oil-painted style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. ${body.prompt.slice(0, 1500)}`);
+              form.append("width", String(Math.min(1920, Math.max(256, body.width ?? 512))));
+              form.append("height", String(Math.min(1920, Math.max(256, body.height ?? 768))));
+              form.append("seed", String(body.seed ?? 0));
+              form.append("input_image_0", new Blob([Buffer.from(body.referenceImage, "base64")], { type: body.referenceType || "image/jpeg" }), "hero-reference.jpg");
+              upstreamBody = form;
+              upstreamContentType = ""; // fetch agrega boundary multipart
+            } else {
+              upstreamBody = JSON.stringify({
                 prompt: `${body.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
                 width: Math.min(2048, Math.max(256, body.width ?? 512)),
                 height: Math.min(2048, Math.max(256, body.height ?? 512)),
                 seed: body.seed,
                 ...(model.includes("flux") ? { steps: 8 } : {})
-              }),
+              });
+            }
+            const upstream = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/ai/run/${model}`, {
+              method: "POST",
+              headers: { "Authorization": `Bearer ${env.CF_AI_TOKEN}`, ...(upstreamContentType ? { "Content-Type": upstreamContentType } : {}) },
+              body: upstreamBody,
               signal: AbortSignal.timeout(45000)
             });
             const contentType = upstream.headers.get("content-type") ?? "";

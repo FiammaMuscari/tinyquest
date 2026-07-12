@@ -44,8 +44,8 @@ export function nameHash(name: string): number {
 // y solo cambia el ENCUADRE — frente = plano 3/4 (cintura hacia arriba, 4:5);
 // cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
-const heroPromptTail = (name: string, appearance: string | undefined, styleHint: string) =>
-  `: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. Setting: ${styleHint}. Dark rough painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, iris color and hair color literally and consistently in BOTH variants; both irises and a large clearly lit area of hair must visibly show the chosen colors. Never recolor, mute or shift them because of species, costume, mood, shadow, rim light or fantasy glow. SAME PAINTER AND MEDIUM IN EVERY SHOT: rough traditional oil on linen, visible strokes, imperfect human features and warm lateral chiaroscuro; never switch the body shot to smooth glossy digital art`;
+const heroPromptTail = (name: string, styleHint: string) =>
+  `: ${name}. Setting: ${styleHint}. Dark rough painted background. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, iris color and hair color literally and consistently in BOTH variants; both irises and a large clearly lit area of hair must visibly show the chosen colors. Never recolor, mute or shift them because of species, costume, mood, shadow, rim light or fantasy glow. SAME PAINTER AND MEDIUM IN EVERY SHOT: visible strokes, imperfect human features and warm lateral chiaroscuro; never switch the body shot to smooth glossy digital art`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
@@ -53,7 +53,9 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
   // Mantener EXACTO el prompt aprobado del avatar: recupera las imágenes previas
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
-  const prompt = `${heroPromptRoot}, three-quarter portrait from the waist up, face clearly visible, closer camera, natural expressive face${heroPromptTail(name, appearance, styleHint)}`;
+  // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
+  // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
+  const prompt = `HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: close three-quarter PROFILE VIEW from the waist up, head turned 30 to 45 degrees away from camera, one cheek more prominent, both eyes still visible, entire head visible, natural expressive face. Preserve exact canonical medieval clothing, jewelry, weapons and scars${heroPromptTail(name, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -67,7 +69,7 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
   // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
   // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
-  const prompt = `${heroPromptRoot}, painted full-length fantasy character study, wide full body shot from a distance, entire figure visible from head to feet with space above the head and below the feet, grounded relaxed standing pose, elegant natural proportions, face retains the same painterly character identity, clothing and background rendered with loose broad visible strokes${heroPromptTail(name, appearance, styleHint)}`;
+  const prompt = `HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: distant full-length character study, entire standing figure visible from top of head to both feet, generous space above head and below feet, no crop, grounded relaxed standing pose. Preserve the EXACT SAME face, medieval clothing, jewelry, weapons, scars and colors as the canonical character; elegant natural proportions, loose broad visible oil strokes${heroPromptTail(name, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -257,7 +259,23 @@ function sleep(ms: number): Promise<void> {
 // está configurado (501) se apaga para la sesión; ante cualquier fallo se cae a
 // Pollinations como siempre. Las imágenes ya cacheadas no se regeneran nunca.
 let cfImageAvailable = true;
-async function fetchViaCloudflare(url: string): Promise<Blob | null> {
+const portraitReferences = new Map<string, string>();
+
+/** Declara que una variante debe editarse desde otra imagen canónica. Se llama
+ * antes de montar el <img>, evitando que una carrera dispare text-to-image. */
+export function linkPortraitReference(targetUrl: string, referenceUrl: string): void {
+  portraitReferences.set(targetUrl, referenceUrl);
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  return btoa(binary);
+}
+
+async function fetchViaCloudflare(url: string, referenceUrl?: string): Promise<Blob | null> {
   if (!cfImageAvailable || !url.startsWith("https://image.pollinations.ai/")) return null;
   try {
     const parsed = new URL(url);
@@ -275,10 +293,18 @@ async function fetchViaCloudflare(url: string): Promise<Blob | null> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 50_000);
     try {
+      let referenceImage: string | undefined;
+      let referenceType: string | undefined;
+      if (referenceUrl) {
+        const referenceSrc = await loadPortrait(referenceUrl, { priority: true });
+        const referenceBlob = await fetch(referenceSrc).then((result) => result.blob());
+        referenceImage = await blobToBase64(referenceBlob);
+        referenceType = referenceBlob.type || "image/jpeg";
+      }
       const response = await fetch("/api/cf-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, width, height, seed }),
+        body: JSON.stringify({ prompt, width, height, seed, referenceImage, referenceType }),
         signal: controller.signal
       });
       if (response.status === 501 || response.status === 404 || response.status === 405) {
@@ -310,7 +336,7 @@ function portraitFetchTarget(url: string): string {
 }
 
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
-  const fast = await fetchViaCloudflare(url);
+  const fast = await fetchViaCloudflare(url, portraitReferences.get(url));
   if (fast) return fast;
   let lastError: unknown = new Error("portrait fetch failed");
   // Pollinations 2026-07: cola por IP de UN solo pedido — cualquier extra rebota

@@ -44,6 +44,8 @@ export const legendaryPets: LegendaryPet[] = [
 ];
 
 export function defaultPet() {
-  return legendaryPets[0];
+  // La forja arranca con una compañera interesante y jugable; "Sin mascota"
+  // sigue disponible como elección explícita.
+  return legendaryPets.find((pet) => pet.id === "soul-wyrm") ?? legendaryPets[1];
 }
 
