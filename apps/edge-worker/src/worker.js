@@ -31,11 +31,16 @@ async function cfImage(request, env) {
   const input = await request.json();
   if (typeof input.prompt !== "string" || !input.prompt.trim()) return new Response("prompt requerido", { status: 400 });
   const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
+  const styleImages = Array.isArray(input.styleImages) ? input.styleImages.filter((item) => typeof item?.data === "string").slice(0, 2) : [];
   const runKlein = async (referenceImage) => {
     const form = new FormData();
+    const styleStart = referenceImage ? 1 : 0;
+    const styleInstruction = styleImages.length
+      ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY: copy their beautiful classic oil technique, elegant proportions, delicate facial rendering, muted palette and restrained tonal background, but NEVER copy their person, elf anatomy, gender, colors, clothing or pose.`
+      : "";
     form.append("prompt", referenceImage
-      ? `Use image 0 as the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and premium painterly style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. Replace the entire background with a clean simple dark charcoal-to-black gradient: no scenery, no objects, no visible background brush marks. The character is the only subject. ${input.prompt.slice(0, 1500)}`
-      : `${input.prompt.slice(0, 1900)}, no text, no signature, no watermark`);
+      ? `Image 0 is the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry and weapons. ${styleInstruction} Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. Use a clean unobtrusive dark tonal gradient background; the character is the only subject. ${input.prompt.slice(0, 1300)}`
+      : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));
     form.append("height", String(Math.min(1920, Math.max(256, Number(input.height) || 768))));
     form.append("seed", String(Number(input.seed) || 0));
@@ -43,6 +48,10 @@ async function cfImage(request, env) {
       const bytes = Uint8Array.from(atob(referenceImage), (char) => char.charCodeAt(0));
       form.append("input_image_0", new Blob([bytes], { type: input.referenceType || "image/jpeg" }), "hero-reference.jpg");
     }
+    styleImages.forEach((style, index) => {
+      const bytes = Uint8Array.from(atob(style.data), (char) => char.charCodeAt(0));
+      form.append(`input_image_${styleStart + index}`, new Blob([bytes], { type: style.type || "image/png" }), `style-${index}.png`);
+    });
     const serialized = new Response(form);
     const edited = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
       multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") }
@@ -55,7 +64,7 @@ async function cfImage(request, env) {
   if (typeof input.referenceImage === "string" && input.referenceImage) {
     return runKlein(input.referenceImage);
   }
-  if (model.includes("flux-2-klein")) return runKlein();
+  if (model.includes("flux-2-klein") || styleImages.length) return runKlein();
   const result = await env.AI.run(model, {
     prompt: `${input.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
     width: Math.min(2048, Math.max(256, Number(input.width) || 512)),

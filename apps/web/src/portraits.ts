@@ -260,11 +260,16 @@ function sleep(ms: number): Promise<void> {
 // Pollinations como siempre. Las imágenes ya cacheadas no se regeneran nunca.
 let cfImageAvailable = true;
 const portraitReferences = new Map<string, string>();
+const portraitStyleReferences = new Map<string, string[]>();
 
 /** Declara que una variante debe editarse desde otra imagen canónica. Se llama
  * antes de montar el <img>, evitando que una carrera dispare text-to-image. */
 export function linkPortraitReference(targetUrl: string, referenceUrl: string): void {
   portraitReferences.set(targetUrl, referenceUrl);
+}
+
+export function linkPortraitStyleReferences(targetUrl: string, styleUrls: string[]): void {
+  portraitStyleReferences.set(targetUrl, [...styleUrls]);
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -275,7 +280,7 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-async function fetchViaCloudflare(url: string, referenceUrl?: string): Promise<Blob | null> {
+async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls: string[] = []): Promise<Blob | null> {
   if (!cfImageAvailable || !url.startsWith("https://image.pollinations.ai/")) return null;
   try {
     const parsed = new URL(url);
@@ -301,10 +306,17 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string): Promise<B
         referenceImage = await blobToBase64(referenceBlob);
         referenceType = referenceBlob.type || "image/jpeg";
       }
+      const styleImages = await Promise.all(styleUrls.map(async (styleUrl) => {
+        const blob = await fetch(styleUrl).then((result) => {
+          if (!result.ok) throw new Error(`style reference HTTP ${result.status}`);
+          return result.blob();
+        });
+        return { data: await blobToBase64(blob), type: blob.type || "image/png" };
+      }));
       const response = await fetch("/api/cf-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, width, height, seed, referenceImage, referenceType }),
+        body: JSON.stringify({ prompt, width, height, seed, referenceImage, referenceType, styleImages }),
         signal: controller.signal
       });
       if (response.status === 501 || response.status === 404 || response.status === 405) {
@@ -336,7 +348,7 @@ function portraitFetchTarget(url: string): string {
 }
 
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
-  const fast = await fetchViaCloudflare(url, portraitReferences.get(url));
+  const fast = await fetchViaCloudflare(url, portraitReferences.get(url), portraitStyleReferences.get(url));
   if (fast) return fast;
   let lastError: unknown = new Error("portrait fetch failed");
   // Pollinations 2026-07: cola por IP de UN solo pedido — cualquier extra rebota

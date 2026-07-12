@@ -127,7 +127,7 @@ function llmProxyPlugin(): Plugin {
         request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
         request.on("end", async () => {
           try {
-            const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { prompt?: string; width?: number; height?: number; seed?: number; referenceImage?: string; referenceType?: string };
+            const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { prompt?: string; width?: number; height?: number; seed?: number; referenceImage?: string; referenceType?: string; styleImages?: Array<{ data: string; type?: string }> };
             if (!body.prompt) {
               response.statusCode = 400;
               response.end("prompt requerido");
@@ -138,13 +138,17 @@ function llmProxyPlugin(): Plugin {
             let upstreamContentType = "application/json";
             if (body.referenceImage || model.includes("flux-2-klein")) {
               const form = new FormData();
+              const styles = (body.styleImages ?? []).filter((item) => item?.data).slice(0, 2);
+              const styleStart = body.referenceImage ? 1 : 0;
+              const styleInstruction = styles.length ? `Images ${styleStart}-${styleStart + styles.length - 1} are STYLE REFERENCES ONLY: copy their beautiful classic oil technique, elegant proportions, delicate facial rendering, muted palette and restrained tonal background, but NEVER copy their person, elf anatomy, gender, colors, clothing or pose.` : "";
               form.append("prompt", body.referenceImage
-                ? `Use image 0 as the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry, weapons and premium painterly style. Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. Replace the entire background with a clean simple dark charcoal-to-black gradient: no scenery, no objects, no visible background brush marks. The character is the only subject. ${body.prompt.slice(0, 1500)}`
-                : `${body.prompt.slice(0, 1900)}, no text, no signature, no watermark`);
+                ? `Image 0 is the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry and weapons. ${styleInstruction} Change ONLY the camera/framing to a distant full-body standing composition, entire head-to-feet figure visible. Use a clean unobtrusive dark tonal gradient background; the character is the only subject. ${body.prompt.slice(0, 1300)}`
+                : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${body.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
               form.append("width", String(Math.min(1920, Math.max(256, body.width ?? 512))));
               form.append("height", String(Math.min(1920, Math.max(256, body.height ?? 768))));
               form.append("seed", String(body.seed ?? 0));
               if (body.referenceImage) form.append("input_image_0", new Blob([Buffer.from(body.referenceImage, "base64")], { type: body.referenceType || "image/jpeg" }), "hero-reference.jpg");
+              styles.forEach((style, index) => form.append(`input_image_${styleStart + index}`, new Blob([Buffer.from(style.data, "base64")], { type: style.type || "image/png" }), `style-${index}.png`));
               upstreamBody = form;
               upstreamContentType = ""; // fetch agrega boundary multipart
             } else {

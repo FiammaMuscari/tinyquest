@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -609,6 +609,9 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function forgeHeroPortraitPair(seedNonce: number) {
     const urls = heroImageUrls(draftRef.current, seedNonce);
+    const styleReferences = ["/assets/style/hero-oil-reference-1.png", "/assets/style/hero-oil-reference-2.png"];
+    linkPortraitStyleReferences(urls.face, styleReferences);
+    linkPortraitStyleReferences(urls.fullbody, styleReferences);
     // Frente fija cara + colores; Cuerpo se genera como EDICIÓN de esa imagen
     // mediante Flux.2, no como otra tirada de texto independiente.
     linkPortraitReference(urls.fullbody, urls.face);
