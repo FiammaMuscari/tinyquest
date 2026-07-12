@@ -609,9 +609,8 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function forgeHeroPortraitPair(seedNonce: number) {
     const urls = heroImageUrls(draftRef.current, seedNonce);
-    const styleReferences = ["/assets/style/hero-oil-reference-1.png", "/assets/style/hero-oil-reference-2.png"];
-    linkPortraitStyleReferences(urls.face, styleReferences);
-    linkPortraitStyleReferences(urls.fullbody, styleReferences);
+    linkPortraitStyleReferences(urls.face, ["/assets/style/hero-oil-reference-face.png"]);
+    linkPortraitStyleReferences(urls.fullbody, ["/assets/style/hero-oil-reference-1.png", "/assets/style/hero-oil-reference-2.png"]);
     // Frente fija cara + colores; Cuerpo se genera como EDICIÓN de esa imagen
     // mediante Flux.2, no como otra tirada de texto independiente.
     linkPortraitReference(urls.fullbody, urls.face);
