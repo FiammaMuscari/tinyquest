@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrl, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -47,6 +47,7 @@ import {
   encodeCustomAction,
   getDangerLabel,
   getVisibleActionChoices,
+  sceneImageBeat,
   legendaryPets,
   roles,
   resolvePlayerAction,
@@ -609,11 +610,10 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function forgeHeroPortraitPair(seedNonce: number) {
     const urls = heroImageUrls(draftRef.current, seedNonce);
-    // Frente y Cuerpo son DOS generaciones text-to-image independientes con el
-    // MISMO seed y el mismo prompt raíz (solo cambia el encuadre): misma persona,
-    // dos tomas de verdad. NO se deriva el cuerpo como edición img2img de la cara
-    // (flux-2-klein devolvía casi la misma imagen → "cuerpo == frente", el bug
-    // que reportó Fiamy). La receta gemela con seed compartido se ve mucho mejor.
+    // Frente fija identidad y Cuerpo usa esa imagen como referencia. V14 pone el
+    // LONG SHOT al principio (antes quedaba truncado y Klein repetía el frente).
+    // Validado contra el Worker real: figura completa + cara/ropa coherentes.
+    linkPortraitReference(urls.fullbody, urls.face);
     const shot = draftRef.current.look?.avatarShot ?? "fullbody";
     // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
     // primer lugar de la cola; la otra queda precargada para el toggle instantáneo.
@@ -878,7 +878,7 @@ export function App() {
   }
   const liveSceneImage = useGeneratedPortrait(
     room && !room.sessionComplete
-      ? liveSceneImageUrl(sceneImageMode, room.campaign.title, scene.title, scene.objective, selectedWorld.name, selectedWorld.era, heroPortraitSpec(draft).appearance, selectedWorld.ambience, selectedWorld.worldRules)
+      ? liveSceneImageUrl(sceneImageMode, room.campaign.title, scene.title, scene.objective, selectedWorld.name, selectedWorld.era, heroPortraitSpec(draft).appearance, selectedWorld.ambience, selectedWorld.worldRules, sceneImageBeat(room) ?? undefined)
       : undefined
   );
   // Galería de la historia: cada imagen de escena generada se ACUMULA — se puede
@@ -2414,18 +2414,18 @@ const lookEyePrompt: Record<string, string> = {
   "marrones": "natural brown irises",
   "miel": "warm honey-brown irises",
   "ámbar": "clear amber-gold irises",
-  "dorados": "luminous metallic golden irises",
+  "dorados": "strongly saturated metallic GOLD irises, hex #F0C94C, NOT brown or amber",
   "verdes": "clear green irises",
   "azules": "clear blue irises",
   "celestes": "bright pale sky-blue irises",
-  "turquesa": "saturated turquoise irises",
-  "aguamarina": "clear pale aquamarine irises",
+  "turquesa": "strongly saturated TURQUOISE blue-green irises, hex #32C9C1, NOT blue or green",
+  "aguamarina": "clear pale AQUAMARINE irises, hex #74E0C1",
   "grises": "clear gray irises",
-  "morados": "deep purple irises",
-  "violetas": "clear violet irises",
-  "rojos": "clear ruby-red irises",
-  "naranjas": "clear vivid orange irises",
-  "rosas": "clear rose-pink irises"
+  "morados": "strongly saturated deep PURPLE irises, hex #643A9B, NOT blue",
+  "violetas": "strongly saturated VIOLET PURPLE irises, hex #8A5FC1, NOT blue or gray",
+  "rojos": "strongly saturated RUBY RED irises, hex #B92F35, NOT brown",
+  "naranjas": "strongly saturated vivid ORANGE irises, hex #E8782F, NOT brown",
+  "rosas": "strongly saturated ROSE PINK irises, hex #E57CA7"
 };
 const lookHairPrompt: Record<string, string> = {
   "negro": "true black hair",

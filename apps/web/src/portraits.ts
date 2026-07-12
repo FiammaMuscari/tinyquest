@@ -45,7 +45,7 @@ export function nameHash(name: string): number {
 // cuerpo = figura entera de lejos (2:3). Si el estilo diverge, flux pinta otro personaje.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, styleHint: string) =>
-  `: ${name}. Setting: ${styleHint}. SIMPLE DARK NEUTRAL GRADIENT BACKGROUND ONLY, clean and smooth, no brush marks and no environment. NON-NEGOTIABLE COLOR LOCK: reproduce the explicitly selected skin tone, iris color and hair color literally and consistently in BOTH variants; both irises and a large clearly lit area of hair must visibly show the chosen colors. Never recolor, mute or shift them because of species, costume, mood, shadow, rim light or fantasy glow. SAME PAINTER AND MEDIUM IN EVERY SHOT: visible strokes on the CHARACTER only, imperfect natural features and warm lateral chiaroscuro; never switch the body shot to smooth glossy digital art`;
+  ` Character: ${name}. ${styleHint}. COLOR LOCK: exact selected skin, iris and hair colors, unaffected by species or lighting. Same canonical clothing, weapons, jewelry and scars in both shots. Simple dark tonal gradient only.`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
@@ -55,7 +55,7 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST PORTRAIT RENDER V13. HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: close three-quarter PROFILE VIEW from the waist up, head turned 30 to 45 degrees away from camera, one cheek more prominent, both eyes still visible, entire head visible, natural expressive face. Preserve exact canonical medieval clothing, jewelry, weapons and scars${heroPromptTail(name, styleHint)}`;
+  const prompt = `TINYQUEST PORTRAIT V14. CAMERA MANDATORY: close three-quarter profile portrait from waist up, head turned 30 degrees, both eyes visible, entire head and shoulders visible. IDENTITY LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)}`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -69,7 +69,7 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // "wide shot from a distance… space above and below" fuerza cuerpo ENTERO de
   // lejos (sin esto flux devolvía un frente 3/4); "portrait" queda fuera porque
   // empuja al encuadre de busto. 512×768: a menos resolución flux deforma cuerpos.
-  const prompt = `TINYQUEST PORTRAIT RENDER V13. HIGHEST PRIORITY CHARACTER IDENTITY — ${appearance?.trim() || "mysterious fantasy hero"}. The selected skin, iris and hair colors must be plainly visible and exact. ${heroPromptRoot}. REQUIRED CAMERA: distant full-length character study, entire standing figure visible from top of head to both feet, generous space above head and below feet, no crop, grounded relaxed standing pose. Preserve the EXACT SAME face, medieval clothing, jewelry, weapons, scars and colors as the canonical character; elegant natural proportions, loose broad visible oil strokes${heroPromptTail(name, styleHint)}`;
+  const prompt = `TINYQUEST PORTRAIT V14. FULL BODY LONG SHOT. CAMERA 8 METERS AWAY. Standing character occupies only 55 percent of canvas height. Show complete body from head through legs to BOTH FEET, visible floor beneath boots and large empty margins. NO close-up, portrait, waist-up or crop. IDENTITY LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} BOTH FEET FULLY VISIBLE.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -138,7 +138,7 @@ export function storySceneImageUrl(storyTitle: string, worldName: string, era: s
 // Imagen de escena VIVA durante la partida: se genera con la historia real y se
 // renueva al cambiar de escena. El jugador elige el encuadre: lugar, héroe o ambiente.
 export type SceneImageMode = "place" | "hero" | "mood";
-export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string, ambience = "", worldRules: string[] = []): string {
+export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string, ambience = "", worldRules: string[] = [], beat?: string): string {
   const base = mode === "hero"
     ? `Fantasy story illustration: the hero (${heroLine}) inside the scene "${sceneTitle}", taking action. ${objective}.`
     : mode === "mood"
@@ -146,8 +146,9 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
       : `Fantasy environment concept art, atmospheric wide view of "${sceneTitle}". ${objective}.`;
   const identity = mode === "hero" ? ` ${anatomyFidelityRules(heroLine)}` : "";
   const laws = worldImageConstraints(worldName, ambience, worldRules);
-  const prompt = `${sceneStylePrompt()}. ${laws} ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. World laws override visual clichés and the objective text. The character and environment must look painted by the same artist, with matching light and color; integrate the figure naturally into scene light, ground contact and atmosphere. No text, no watermark.`;
-  const seed = nameHash(campaignTitle + sceneTitle + mode) % 100000;
+  const storyBeat = beat?.trim() ? `CURRENT CONFIRMED STORY BEAT: ${beat.trim()} ` : "";
+  const prompt = `${storyBeat}${sceneStylePrompt()}. ${laws} ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. Show the current confirmed beat visually without inventing new people, objects or facts. World laws override visual clichés and the objective text. The character and environment must look painted by the same artist, with matching light and color; integrate the figure naturally into scene light, ground contact and atmosphere. No text, no watermark.`;
+  const seed = nameHash(campaignTitle + sceneTitle + mode + (beat ?? "")) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
 }
 

@@ -24,18 +24,17 @@ test("el retrato prioriza rostro completo y anatomía literal", () => {
 
 test("los colores elegidos son restricciones no negociables", () => {
   const prompt = visual.humanoidPortraitPrompt("Fiamy", "EXACT SKIN COLOR: warm olive tan skin. EXACT IRIS COLOR: clear green irises. EXACT HAIR COLOR: true black hair", "aventura");
-  assert.match(prompt, /NON-NEGOTIABLE identity constraint/i);
-  assert.match(prompt, /never replace it with a fantasy stereotype/i);
+  assert.match(prompt, /colors are NON-NEGOTIABLE and override fantasy stereotypes/i);
   assert.match(prompt, /warm olive tan skin.*clear green irises.*true black hair/i);
 });
 
 test("criaturas no se humanizan por defecto y comparten el estilo visual", () => {
   const prompt = visual.creaturePortraitPrompt("Nacar", "quimera escamada de cuatro alas");
-  assert.match(prompt, /not a human wearing a costume/i);
-  assert.match(prompt, /EXACT CANONICAL SPECIES.*Classic hand-painted dark fantasy RPG character art.*romantic elegance/i);
-  assert.match(prompt, /CHARACTER IS THE ONLY SUBJECT.*BACKGROUND CONTRACT.*clean, simple, unobtrusive dark neutral gradient/i);
-  assert.match(prompt, /never normalize an elf, dwarf, dragon-marked being, undead, animal or creature into an ordinary human/i);
-  assert.match(prompt, /No glossy CGI.*porcelain doll face.*no 3D render/i);
+  assert.match(prompt, /actual species, never a human in costume/i);
+  assert.match(prompt, /Classic hand-painted dark-fantasy RPG oil illustration.*premium old fantasy novel concept art/i);
+  assert.match(prompt, /exact canonical species.*simple unobtrusive charcoal-to-black tonal gradient/i);
+  assert.match(prompt, /Never normalize unusual anatomy into an ordinary human face/i);
+  assert.match(prompt, /No anime, manga, cartoon, CGI, doll face, plastic skin/i);
 });
 
 test("el arte de portada es un ambiente y nunca hereda lenguaje de retrato", () => {
