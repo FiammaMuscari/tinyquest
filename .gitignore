@@ -6,3 +6,4 @@ dist
 coverage
 *.log
 scripts/.shots/
+apps/edge-worker/.wrangler/

@@ -343,6 +343,14 @@ export class MultiplayerClient {
   }
 }
 
-// Singleton para App.tsx.
-const wsUrl = (typeof import.meta !== "undefined" && (import.meta as { env?: Record<string, string> }).env?.VITE_WS_URL) || "ws://localhost:8787";
+// Singleton para App.tsx. En desarrollo conserva el relay Go local; en el build
+// publicado usa /ws en el mismo Worker (wss:// automáticamente, sin CORS ni una
+// VITE_WS_URL compilada). VITE_WS_URL sigue permitiendo apuntar a otro relay.
+const viteEnv = typeof import.meta !== "undefined"
+  ? (import.meta as { env?: { VITE_WS_URL?: string; PROD?: boolean } }).env
+  : undefined;
+const productionWsUrl = viteEnv?.PROD && typeof window !== "undefined"
+  ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`
+  : null;
+const wsUrl = viteEnv?.VITE_WS_URL || productionWsUrl || "ws://localhost:8787";
 export const multiplayerClient = new MultiplayerClient(wsUrl);

@@ -1,3 +1,5 @@
+export { RoomHub } from "./room-hub.js";
+
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
@@ -130,6 +132,12 @@ async function pollinations(url) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === "/ws") {
+      if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
+        return new Response("WebSocket upgrade required", { status: 426 });
+      }
+      return env.ROOMS.getByName("tinyquest-global-v1").fetch(request);
+    }
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (request.method !== "POST" && url.pathname !== "/api/pollinations") return new Response("Method not allowed", { status: 405 });
     try {
