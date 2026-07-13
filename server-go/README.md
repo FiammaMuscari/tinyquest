@@ -21,11 +21,13 @@ crea sala y la otra se une con el código.
 ## Protocolo (JSON sobre WebSocket)
 
 Cliente → servidor: `create_room`, `join_room`, `rejoin_room`, `start_story`,
-`broadcast_game`, `submit_action`, `ping`.
+`broadcast_game`, `submit_action`, `send_chat`, `set_chat_color`,
+`set_player_avatar`, `kick_player`, `ping`.
 
 Servidor → cliente: `room_created`, `room_joined`, `player_joined`,
 `player_left`, `player_reconnected`, `story_started`, `state_update`,
-`narrating`, `guest_action` (solo al host), `error`, `pong`.
+`narrating`, `guest_action` (solo al host), `chat_message`, `player_updated`,
+`player_kicked`, `error`, `pong`.
 
 Debe quedar sincronizado con `apps/web/src/multiplayer/protocol.ts` — mismos
 nombres de tipo y campos. El test `tests/multiplayer-e2e.test.mjs` levanta este
@@ -48,4 +50,7 @@ internal/hub/hub_test.go  → tests de integración del hub
 - Máximo 5 jugadores (host + 4 amigos). TTL de sala 2 h. Gracia de reconexión 5 min.
 - Con invitados el motor alarga la historia (`scalePartySession`: ≥20 rondas totales).
 - Si el host se cae y no vuelve en la gracia, la sala se cierra.
+- Cada asiento conserva un único `character.avatarUrl`; los cambios de avatar se
+  difunden con `player_updated`, sin sortear Frente/Cuerpo en ningún cliente.
+- Los colores del chat son únicos por sala y deben cumplir contraste WCAG 4.5:1.
 - El estado del juego (`GameRoom`) viaja como JSON opaco (≤ 1 MiB).

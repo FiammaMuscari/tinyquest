@@ -1,6 +1,7 @@
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Brain, Dices, Download, Flame, Heart, HelpCircle, Hourglass, Lightbulb, Pause, Play, Sparkles, Target, UserPlus, Users, Wand2, X, Zap } from "lucide-react";
 import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-client";
+import { canonicalMultiplayerCharacter, multiplayerAvatarSignature, validateChatColor } from "./multiplayer/session-style";
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
@@ -865,6 +866,37 @@ export function App() {
     multiplayerClient.on("state_change", handler);
     return () => multiplayerClient.off("state_change", handler);
   }, []);
+
+  // El asiento del relay es la única fuente de verdad visual. Si el héroe local
+  // cambia su toma guardada, se publica una vez y todos reciben player_updated.
+  useEffect(() => {
+    if (!mpState.roomCode || !mpState.playerId) return;
+    const seat = mpState.players.find((player) => player.id === mpState.playerId);
+    if (!seat || multiplayerAvatarSignature(seat.character) === multiplayerAvatarSignature(draft)) return;
+    multiplayerClient.setPlayerAvatar(canonicalMultiplayerCharacter(draft));
+  }, [draft.avatarUrl, draft.look?.avatarShot, draft.look?.faceUrl, draft.look?.fullBodyUrl, draft.look?.portraitIdentity, draft.look?.portraitNonce, mpState.roomCode, mpState.playerId, mpState.players]);
+
+  // El GameRoom del host también adopta la foto canónica para que el próximo
+  // broadcast no reintroduzca una variante vieja. Solo cambia campos visuales.
+  useEffect(() => {
+    if (!room || !mpState.roomCode || mpState.players.length === 0) return;
+    let changed = false;
+    const players = room.players.map((player) => {
+      if (player.type !== "human") return player;
+      const seat = mpState.players.find((candidate) => candidate.id === player.id);
+      if (!seat || multiplayerAvatarSignature(seat.character) === multiplayerAvatarSignature(player.character)) return player;
+      changed = true;
+      return {
+        ...player,
+        character: {
+          ...player.character,
+          avatarUrl: seat.character.avatarUrl,
+          look: seat.character.look ? { ...seat.character.look } : seat.character.look
+        }
+      };
+    });
+    if (changed) setRoom({ ...room, players });
+  }, [mpState.players, mpState.roomCode]);
 
   // Invitado: el host arrancó la historia. Adoptamos el GameRoom recibido y
   // montamos la apertura local (misma que en solo, derivada de la campaña).
@@ -1748,7 +1780,7 @@ export function App() {
           ["--col-right" as string]: gameCols.right ? `${gameCols.right}px` : undefined
         } as React.CSSProperties}
       >
-        <TurnQueue room={room} draft={draft} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={`${musicPreset.label} · ${soundMood}`} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
+        <TurnQueue room={room} draft={draft} multiplayerPlayers={isMultiplayer ? mpState.players : undefined} localPlayerId={mpState.playerId} audioRef={audioRef} audioUrl={sceneAudioUrl} ambienceName={scene.title} mood={`${musicPreset.label} · ${soundMood}`} isPlaying={isAudioPlaying} setPlaying={setAudioPlaying} volume={volume} setVolume={setVolume} journey={{ worldName: selectedWorld.name, scenes: sceneList.map((item) => item.title), currentIndex: room.currentSceneIndex, laws: selectedWorld.worldRules.slice(0, room.currentSceneIndex), totalLaws: selectedWorld.worldRules.length }} />
         {/* La narración vive en la pista central ancha; elección y dados en la columna derecha. */}
         <DungeonMasterPanel room={room} narration={currentNarration} latestTurnNarration={latestTurnNarration} dice={dice} botTurnPaused={!isMultiplayer && botTurnPaused} onContinueBot={runBotTurn} sections={dmSections} plotBeat={plotBeat} dialogue={npcDialogue} finalRecap={room?.finalRecap} warnings={atmosphereEnv.warnings} sceneImage={galleryView?.src ?? liveSceneImage.src ?? sceneImageUrl} sceneForging={liveSceneImage.status === "loading" && galleryIndex < 0} imageMode={sceneImageMode} onImageMode={chooseSceneImageMode} imageNav={galleryNav} imageLabel={galleryView?.label} />
         <section className="centerColumn actionColumn">
@@ -2012,7 +2044,7 @@ function StatusPill({ label, value, accent = false }: { label: string; value: st
 
 type JourneyInfo = { worldName: string; scenes: string[]; currentIndex: number; laws: string[]; totalLaws: number };
 
-function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume, journey }: { room: GameRoom | null; draft: Character; audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (v: boolean) => void; volume: number; setVolume: (v: number) => void; journey?: JourneyInfo }) {
+function TurnQueue({ room, draft, multiplayerPlayers, localPlayerId, audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume, journey }: { room: GameRoom | null; draft: Character; multiplayerPlayers?: MultiplayerState["players"]; localPlayerId?: string | null; audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (v: boolean) => void; volume: number; setVolume: (v: number) => void; journey?: JourneyInfo }) {
   const players = room?.players ?? [{ id: "preview", name: draft.name, type: "human" as const, character: draft, temporaryItems: [] }];
   return (
     <aside className="panel turnQueue">
@@ -2020,11 +2052,12 @@ function TurnQueue({ room, draft, audioRef, audioUrl, ambienceName, mood, isPlay
       {players.map((player, index) => {
         const active = room?.activePlayerIndex === index;
         const next = room && (room.activePlayerIndex + 1) % players.length === index;
+        const syncedCharacter = player.type === "human" ? multiplayerPlayers?.find((seat) => seat.id === player.id)?.character ?? player.character : player.character;
         return (
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
-            <div className="avatar"><HeroAvatarImg url={player.type === "bot" ? characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía") : player.character.avatarUrl} name={player.name} priority={player.type === "human"} /><span>{player.type === "bot" ? "BOT" : "TU"}</span></div>
-            <div><strong>{player.name}</strong><span>{player.character.species} · {player.character.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
-            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span>{player.character.pet.id !== "none" && <span><NpcPortrait name={player.character.pet.name} portraitUrl={petImage(player.character.pet)} size={14} /> {player.character.pet.name}</span>}</div>
+            <div className="avatar">{player.type === "bot" ? <HeroAvatarImg url={characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía")} name={player.name} /> : <MultiplayerAvatarImg character={syncedCharacter} name={player.name} priority />}<span>{player.type === "bot" ? "BOT" : player.id === localPlayerId ? "TÚ" : "PARTY"}</span></div>
+            <div><strong>{player.name}</strong><span>{syncedCharacter.species} · {syncedCharacter.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
+            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span>{syncedCharacter.pet.id !== "none" && <span><NpcPortrait name={syncedCharacter.pet.name} portraitUrl={petImage(syncedCharacter.pet)} size={14} /> {syncedCharacter.pet.name}</span>}</div>
           </article>
         );
       })}
@@ -2661,6 +2694,14 @@ function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false }: 
   // Cargando: spinner sobre fondo gris; si falló del todo, medallón procedural.
   if (status === "failed") return <img className={className} src={medallionDataUri(name)} alt={name} />;
   return <img className={`${className ?? ""} imgLoadingBg`} src={loadingSpinnerDataUri} alt={`Generando retrato de ${name}`} />;
+}
+
+function MultiplayerAvatarImg({ character, name, className, priority = false }: { character: Character; name: string; className?: string; priority?: boolean }) {
+  // No se sortea una toma: avatarUrl es exactamente la elección sincronizada.
+  // La referencia solo permite reconstruir esa misma Frente desde su Cuerpo master.
+  if (character.look?.faceUrl && character.look.fullBodyUrl) linkPortraitReference(character.look.faceUrl, character.look.fullBodyUrl);
+  const fallbackUrl = character.avatarUrl === character.look?.faceUrl ? character.look?.fullBodyUrl : undefined;
+  return <HeroAvatarImg url={character.avatarUrl} fallbackUrl={fallbackUrl} name={name} className={className} priority={priority} />;
 }
 
 function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcIds: string[]; npcs: CampaignNPC[]; styleHint: string }) {
@@ -3779,7 +3820,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
   // El héroe que traés a la sala, a la vista: entrás CON tu personaje.
   const heroCard = (
     <div className="mpHeroCard">
-      <HeroAvatarImg url={draft.avatarUrl} name={draft.name} className="mpHeroPortrait" />
+      <MultiplayerAvatarImg character={draft} name={draft.name} className="mpHeroPortrait" />
       <div className="mpHeroInfo">
         <strong>{draft.name}</strong>
         <small>{draft.species} · {draft.role}</small>
@@ -3790,9 +3831,10 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
   );
 
   const playerList = mpState.players.length > 0 && (
-    <ul style={{ listStyle: "none", padding: 0, margin: "0 0 18px", textAlign: "left" }}>
+    <ul className="mpPlayerList">
       {mpState.players.map((p) => (
-        <li key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", marginBottom: 6, background: "rgba(255,255,255,0.04)", borderRadius: 8, opacity: p.connected ? 1 : 0.5 }}>
+        <li className="mpPlayerRow" key={p.id} style={{ opacity: p.connected ? 1 : 0.5 }}>
+          <MultiplayerAvatarImg character={p.character} name={p.name} className="mpPlayerAvatar" />
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.connected ? "#7fff90" : "#888", flexShrink: 0 }} />
           <strong style={{ color: "#fff" }}>{p.name}</strong>
           {p.isHost && <span style={{ color: "#ffd77b", fontSize: 12 }}>· anfitrión</span>}
@@ -3804,8 +3846,8 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
   );
 
   return (
-    <main className="appShell lobbyShell" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh" }}>
-      <section className="panel" style={{ maxWidth: 480, width: "100%", textAlign: "center", padding: "36px 32px" }}>
+    <main className="appShell lobbyShell mpLobbyScreen" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100dvh" }}>
+      <section className="panel mpLobbyPanel" style={{ maxWidth: 480, width: "100%", textAlign: "center", padding: "36px 32px" }}>
         <div style={{ marginBottom: 24 }}>
           <Users size={40} style={{ color: "#ffd77b", marginBottom: 12 }} />
           {mode === "host" ? (
@@ -3816,7 +3858,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
               ) : (
                 <>
                   <p style={{ color: "#ccc", marginBottom: 16 }}>Compartí este código con tu party:</p>
-                  <div style={{ fontSize: 48, fontWeight: 900, letterSpacing: "0.15em", color: "#ffd77b", background: "rgba(255,215,123,0.08)", borderRadius: 12, padding: "16px 24px", marginBottom: 20 }}>
+                  <div className="mpRoomCode" style={{ fontSize: 48, fontWeight: 900, letterSpacing: "0.15em", color: "#ffd77b", background: "rgba(255,215,123,0.08)", borderRadius: 12, padding: "16px 24px", marginBottom: 20 }}>
                     {roomCode}
                   </div>
                   {playerList}
@@ -3878,26 +3920,73 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
 function PartyChat({ mpState, embedded = false }: { mpState: MultiplayerState; embedded?: boolean }) {
   const [text, setText] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [minimized, setMinimized] = useState(() => !embedded && typeof window !== "undefined" && window.matchMedia("(max-width: 680px)").matches);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const chatRef = useRef<HTMLElement | null>(null);
   const me = mpState.players.find((player) => player.id === mpState.playerId);
   const color = me?.chatColor || "#f5d77b";
+  const [colorDraft, setColorDraft] = useState(color);
+  const usedColors = mpState.players.filter((player) => player.id !== mpState.playerId).map((player) => player.chatColor);
+  const colorError = validateChatColor(colorDraft, usedColors);
+  const sizeKey = embedded ? "tiny-quest:party-chat-size:embedded" : "tiny-quest:party-chat-size:floating";
+  const [savedSize] = useState<{ width?: number; height?: number }>(() => {
+    try { return JSON.parse(localStorage.getItem(sizeKey) ?? "{}"); } catch { return {}; }
+  });
+  useEffect(() => { setColorDraft(color); }, [color]);
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [mpState.chatMessages.length]);
+  useEffect(() => {
+    const node = chatRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    let timer: number | undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      if (minimized) return;
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        const width = Math.round(entry.contentRect.width);
+        const height = Math.round(entry.contentRect.height);
+        try { localStorage.setItem(sizeKey, JSON.stringify(embedded ? { height } : { width, height })); } catch { /* sin storage */ }
+      }, 120);
+    });
+    observer.observe(node);
+    return () => { window.clearTimeout(timer); observer.disconnect(); };
+  }, [embedded, minimized, sizeKey]);
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!text.trim()) return;
     multiplayerClient.sendChat(text);
     setText("");
   }
+  function applyColor() {
+    if (colorError || colorDraft === color) return;
+    multiplayerClient.setChatColor(colorDraft);
+  }
+  const sizeStyle = minimized ? undefined : embedded
+    ? { height: savedSize.height ? `${savedSize.height}px` : undefined }
+    : { width: savedSize.width ? `${savedSize.width}px` : undefined, height: savedSize.height ? `${savedSize.height}px` : undefined };
   return (
-    <aside className={`partyChat ${embedded ? "partyChatEmbedded" : "partyChatFloating"}`} aria-label="Chat de la party">
-      <header><strong>Chat de la party</strong><button type="button" onClick={() => setSettingsOpen((open) => !open)} title="Ajustes del chat">⚙</button></header>
-      {settingsOpen && <div className="partyChatSettings"><label>Color de tu letra <input type="color" value={color} onChange={(event) => multiplayerClient.setChatColor(event.target.value)} /></label></div>}
-      <div className="partyChatMessages" ref={listRef}>
+    <aside ref={chatRef} style={sizeStyle} className={`partyChat ${embedded ? "partyChatEmbedded" : "partyChatFloating"} ${minimized ? "partyChatMinimized" : ""}`} aria-label="Chat de la party">
+      <header>
+        <strong>Chat de la party</strong>
+        <div className="partyChatHeaderActions">
+          {!minimized && <button type="button" onClick={() => setSettingsOpen((open) => !open)} title="Color de la letra" aria-label="Personalizar color de la letra">⚙</button>}
+          <button type="button" onClick={() => setMinimized((value) => !value)} title={minimized ? "Abrir chat" : "Minimizar chat"} aria-label={minimized ? "Abrir chat" : "Minimizar chat"}>{minimized ? "▢" : "—"}</button>
+        </div>
+      </header>
+      {!minimized && settingsOpen && <div className="partyChatSettings">
+        <label>Color de tu letra <input type="color" value={colorDraft} onChange={(event) => setColorDraft(event.target.value)} /></label>
+        <button type="button" onClick={applyColor} disabled={Boolean(colorError) || colorDraft === color}>Aplicar</button>
+        {colorError && <small role="alert">{colorError}</small>}
+        {!colorError && <small>Solo cambia el texto. Los colores usados por tus compañeros están reservados.</small>}
+      </div>}
+      {!minimized && <div className="partyChatMessages" ref={listRef}>
         {mpState.chatMessages.length === 0 && <p>La conversación todavía está vacía.</p>}
-        {mpState.chatMessages.map((message) => <div key={message.id} className="partyChatMessage"><strong style={{ color: message.color }}>{message.playerName}</strong><span style={{ color: message.color }}>{message.text}</span></div>)}
-      </div>
-      <form onSubmit={submit}><input value={text} maxLength={280} onChange={(event) => setText(event.target.value)} placeholder="Escribí a la party…" /><button type="submit" disabled={!text.trim()}>Enviar</button></form>
-      {!embedded && mpState.isHost && <details className="partyPlayers"><summary>Participantes ({mpState.players.length})</summary>{mpState.players.filter((player) => !player.isHost).map((player) => <div key={player.id}><span>{player.name}</span><button type="button" onClick={() => multiplayerClient.kickPlayer(player.id)}><X size={11} /> Echar</button></div>)}</details>}
+        {mpState.chatMessages.map((message) => {
+          const messageColor = mpState.players.find((player) => player.id === message.playerId)?.chatColor ?? message.color;
+          return <div key={message.id} className="partyChatMessage"><strong style={{ color: messageColor }}>{message.playerName}</strong><span style={{ color: messageColor }}>{message.text}</span></div>;
+        })}
+      </div>}
+      {!minimized && <form onSubmit={submit}><input value={text} maxLength={280} onChange={(event) => setText(event.target.value)} placeholder="Escribe a la party…" /><button type="submit" disabled={!text.trim()}>Enviar</button></form>}
+      {!minimized && !embedded && mpState.isHost && <details className="partyPlayers"><summary>Participantes ({mpState.players.length})</summary>{mpState.players.filter((player) => !player.isHost).map((player) => <div key={player.id}><span>{player.name}</span><button type="button" onClick={() => multiplayerClient.kickPlayer(player.id)}><X size={11} /> Echar</button></div>)}</details>}
     </aside>
   );
 }
@@ -3912,7 +4001,7 @@ function MultiplayerStatusBar({ mpState, onLeave, onToggleDoor }: { mpState: Mul
   };
   const connectedCount = mpState.players.filter((p) => p.connected).length;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 16px", background: "rgba(255,215,123,0.08)", borderBottom: "1px solid rgba(255,215,123,0.2)", fontSize: 13 }}>
+    <div className="multiplayerStatusBar" style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 16px", background: "rgba(255,215,123,0.08)", borderBottom: "1px solid rgba(255,215,123,0.2)", fontSize: 13 }}>
       <Users size={14} style={{ color: "#ffd77b", flexShrink: 0 }} />
       <span style={{ color: "#ffd77b", fontWeight: 700 }}>Party</span>
       {mpState.roomCode && <span style={{ color: "#aaa" }}>Sala: <strong style={{ color: "#fff" }}>{mpState.roomCode}</strong> · {connectedCount} en línea</span>}

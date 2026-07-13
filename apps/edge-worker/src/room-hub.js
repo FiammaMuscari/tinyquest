@@ -5,6 +5,9 @@ const MAX_MESSAGE_SIZE = 1 << 20;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
 const RECONNECT_GRACE_MS = 5 * 60 * 1000;
 const VALID_STATS = new Set(["body", "mind", "charm", "creativity", "courage", "focus", "luck"]);
+const CHAT_BACKGROUND = "#05090f";
+const MIN_CHAT_CONTRAST = 4.5;
+const CHAT_COLORS = ["#f5d77b", "#8ff2e2", "#ff8fb1", "#a9e66f", "#c6a5ff"];
 
 function randomToken(alphabet, length) {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
@@ -27,6 +30,33 @@ function publicPlayers(room) {
 
 function trimmed(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function relativeLuminance(color) {
+  const channels = color.slice(1).match(/../g).map((pair) => {
+    const value = Number.parseInt(pair, 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+export function chatContrast(color, background = CHAT_BACKGROUND) {
+  if (!/^#[0-9a-f]{6}$/i.test(color) || !/^#[0-9a-f]{6}$/i.test(background)) return 0;
+  const first = relativeLuminance(color);
+  const second = relativeLuminance(background);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+function nextChatColor(room) {
+  const used = new Set(room.players.map((player) => player.chatColor?.toLowerCase()).filter(Boolean));
+  return CHAT_COLORS.find((color) => !used.has(color.toLowerCase())) || CHAT_COLORS[room.players.length % CHAT_COLORS.length];
+}
+
+function validCharacter(character) {
+  if (!character || typeof character !== "object" || Array.isArray(character)) return false;
+  const avatarUrl = trimmed(character.avatarUrl);
+  if (!avatarUrl || avatarUrl.length > 12000 || /[\u0000-\u001f\u007f]/.test(avatarUrl)) return false;
+  try { return JSON.stringify(character).length <= 64 * 1024; } catch { return false; }
 }
 
 // Cloudflare Durable Object que reemplaza al relay Go en producción. El juego
@@ -178,7 +208,7 @@ export class RoomHub {
     if (room.players.length >= MAX_PLAYERS) return this.error(ws, "room_full", "La sala está llena (anfitrión + 4 amigos como máximo).");
     const guest = {
       id: playerId(), name, isHost: false, connected: true,
-      character: msg.character, chatColor: "#8ff2e2", joinedAt: Date.now()
+      character: msg.character, chatColor: nextChatColor(room), joinedAt: Date.now()
     };
     room.players.push(guest);
     room.lastActivity = Date.now();
@@ -294,7 +324,30 @@ export class RoomHub {
     if (!room) return this.error(ws, "room_not_found", "La sala ya no existe.");
     const player = this.seatOf(ws, room);
     if (!player) return this.error(ws, "room_not_found", "No estás en la sala.");
+    if (chatContrast(color) < MIN_CHAT_CONTRAST) {
+      return this.error(ws, "invalid_action", "Ese color no tiene contraste suficiente para leerse en el chat.");
+    }
+    if (room.players.some((candidate) => candidate.id !== player.id && candidate.chatColor?.toLowerCase() === color.toLowerCase())) {
+      return this.error(ws, "invalid_action", "Ese color ya pertenece a otro jugador.");
+    }
     player.chatColor = color;
+    room.lastActivity = Date.now();
+    this.saveRoom(room);
+    this.broadcast(room, { type: "player_updated", players: publicPlayers(room) });
+  }
+
+  setPlayerAvatar(ws, msg) {
+    const room = this.rooms.get(trimmed(msg.roomCode).toUpperCase());
+    if (!room) return this.error(ws, "room_not_found", "La sala ya no existe.");
+    const player = this.seatOf(ws, room);
+    if (!player) return this.error(ws, "room_not_found", "No estás en la sala.");
+    if (!validCharacter(msg.character)) {
+      return this.error(ws, "invalid_action", "El avatar guardado no es válido.");
+    }
+    // La selección guardada por el dueño es la única fuente de verdad. El relay
+    // nunca elige automáticamente entre la imagen de frente y la de cuerpo.
+    player.character = msg.character;
+    room.lastActivity = Date.now();
     this.saveRoom(room);
     this.broadcast(room, { type: "player_updated", players: publicPlayers(room) });
   }
@@ -331,6 +384,7 @@ export class RoomHub {
         case "submit_action": this.submitAction(ws, msg); break;
         case "send_chat": this.sendChat(ws, msg); break;
         case "set_chat_color": this.setChatColor(ws, msg); break;
+        case "set_player_avatar": this.setPlayerAvatar(ws, msg); break;
         case "kick_player": this.kickPlayer(ws, msg); break;
         default: this.error(ws, "invalid_action", `Tipo de mensaje desconocido: ${msg.type || ""}`);
       }

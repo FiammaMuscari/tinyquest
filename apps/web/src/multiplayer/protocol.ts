@@ -96,6 +96,7 @@ export type C2SMessage =
   | SubmitActionMsg
   | { type: "send_chat"; roomCode: string; text: string }
   | { type: "set_chat_color"; roomCode: string; color: string }
+  | { type: "set_player_avatar"; roomCode: string; character: Character }
   | { type: "kick_player"; roomCode: string; playerId: string }
   | { type: "ping" };
 

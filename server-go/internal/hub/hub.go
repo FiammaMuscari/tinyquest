@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"log"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -106,6 +108,8 @@ func (h *Hub) handleMessage(c *Client, data []byte) {
 		h.sendChat(c, data)
 	case CSetChatColor:
 		h.setChatColor(c, data)
+	case CSetPlayerAvatar:
+		h.setPlayerAvatar(c, data)
 	case CKickPlayer:
 		h.kickPlayer(c, data)
 	default:
@@ -164,7 +168,7 @@ func (h *Hub) joinRoom(c *Client, data []byte) {
 	guest := &player{
 		id: genPlayerID(), name: msg.PlayerName,
 		character: msg.Character, client: c, connected: true, joinedAt: time.Now(),
-		chatColor: "#8ff2e2",
+		chatColor: nextChatColor(room),
 	}
 	room.players = append(room.players, guest)
 	room.touch()
@@ -381,6 +385,38 @@ func validChatColor(value string) bool {
 	return true
 }
 
+var chatColorPalette = []string{"#f5d77b", "#8ff2e2", "#ff8fb1", "#a9e66f", "#c6a5ff"}
+
+func nextChatColor(room *Room) string {
+	used := make(map[string]bool, len(room.players))
+	for _, p := range room.players {
+		used[strings.ToLower(p.chatColor)] = true
+	}
+	for _, color := range chatColorPalette {
+		if !used[strings.ToLower(color)] {
+			return color
+		}
+	}
+	return "#ffffff"
+}
+
+func chatColorReadable(value string) bool {
+	if !validChatColor(value) {
+		return false
+	}
+	parse := func(part string) float64 {
+		v, _ := strconv.ParseUint(part, 16, 8)
+		s := float64(v) / 255
+		if s <= 0.04045 {
+			return s / 12.92
+		}
+		return math.Pow((s+0.055)/1.055, 2.4)
+	}
+	lum := 0.2126*parse(value[1:3]) + 0.7152*parse(value[3:5]) + 0.0722*parse(value[5:7])
+	bg := 0.2126*parse("05") + 0.7152*parse("09") + 0.0722*parse("0f")
+	return (math.Max(lum, bg)+0.05)/(math.Min(lum, bg)+0.05) >= 4.5
+}
+
 func (h *Hub) sendChat(c *Client, data []byte) {
 	var msg SendChatMsg
 	if json.Unmarshal(data, &msg) != nil {
@@ -416,7 +452,7 @@ func (h *Hub) sendChat(c *Client, data []byte) {
 
 func (h *Hub) setChatColor(c *Client, data []byte) {
 	var msg SetChatColorMsg
-	if json.Unmarshal(data, &msg) != nil || !validChatColor(msg.Color) {
+	if json.Unmarshal(data, &msg) != nil || !chatColorReadable(msg.Color) {
 		c.sendError(ErrInvalidAction, "Color de chat inválido.")
 		return
 	}
@@ -430,7 +466,45 @@ func (h *Hub) setChatColor(c *Client, data []byte) {
 		c.sendError(ErrRoomNotFound, "No estás en la sala.")
 		return
 	}
+	for _, other := range room.players {
+		if other.id != p.id && strings.EqualFold(other.chatColor, msg.Color) {
+			c.sendError(ErrInvalidAction, "Ese color ya pertenece a otro integrante de la party.")
+			return
+		}
+	}
 	p.chatColor = msg.Color
+	room.touch()
+	payload := mustJSON(PlayerUpdatedMsg{Type: SPlayerUpdated, Players: room.snapshot()})
+	for _, other := range room.connectedClients() {
+		other.enqueue(payload)
+	}
+}
+
+func (h *Hub) setPlayerAvatar(c *Client, data []byte) {
+	var msg SetPlayerAvatarMsg
+	if json.Unmarshal(data, &msg) != nil || len(msg.Character) == 0 || len(msg.Character) > 64*1024 {
+		c.sendError(ErrInvalidAction, "Avatar de jugador inválido.")
+		return
+	}
+	var visual struct {
+		AvatarURL string `json:"avatarUrl"`
+	}
+	if json.Unmarshal(msg.Character, &visual) != nil || strings.TrimSpace(visual.AvatarURL) == "" || len(visual.AvatarURL) > 12000 || strings.ContainsAny(visual.AvatarURL, "\r\n\x00") {
+		c.sendError(ErrInvalidAction, "El avatar debe tener una imagen guardada válida.")
+		return
+	}
+	room := h.rooms[strings.ToUpper(strings.TrimSpace(msg.RoomCode))]
+	if room == nil {
+		c.sendError(ErrRoomNotFound, "La sala ya no existe.")
+		return
+	}
+	p := room.findByClient(c)
+	if p == nil {
+		c.sendError(ErrRoomNotFound, "No estás en la sala.")
+		return
+	}
+	p.character = append(json.RawMessage(nil), msg.Character...)
+	room.touch()
 	payload := mustJSON(PlayerUpdatedMsg{Type: SPlayerUpdated, Players: room.snapshot()})
 	for _, other := range room.connectedClients() {
 		other.enqueue(payload)

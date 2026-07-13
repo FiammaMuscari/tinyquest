@@ -275,6 +275,29 @@ func TestSharedChatColorAndHostKick(t *testing.T) {
 	send(t, guest, map[string]any{"type": CSetChatColor, "roomCode": code, "color": "#ff66aa"})
 	waitFor(t, guest, SPlayerUpdated)
 	waitFor(t, host, SPlayerUpdated)
+	send(t, host, map[string]any{"type": CSetChatColor, "roomCode": code, "color": "#ff66aa"})
+	if waitFor(t, host, SError)["code"] != ErrInvalidAction {
+		t.Fatal("dos integrantes no deben compartir color")
+	}
+	send(t, guest, map[string]any{"type": CSetChatColor, "roomCode": code, "color": "#111111"})
+	if waitFor(t, guest, SError)["code"] != ErrInvalidAction {
+		t.Fatal("un color sin contraste debe rechazarse")
+	}
+	send(t, guest, map[string]any{"type": CSetPlayerAvatar, "roomCode": code, "character": map[string]any{"name": "Luna", "avatarUrl": "/luna-cuerpo.jpg", "look": map[string]any{"avatarShot": "fullbody"}}})
+	for _, client := range []*websocket.Conn{host, guest} {
+		updated := waitFor(t, client, SPlayerUpdated)
+		players := updated["players"].([]any)
+		found := false
+		for _, raw := range players {
+			entry := raw.(map[string]any)
+			if entry["id"] == guestID && entry["character"].(map[string]any)["avatarUrl"] == "/luna-cuerpo.jpg" {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("el avatar canónico no se sincronizó")
+		}
+	}
 	send(t, guest, map[string]any{"type": CSendChat, "roomCode": code, "text": "Hola party"})
 	chatHost := waitFor(t, host, SChatMessage)
 	chatGuest := waitFor(t, guest, SChatMessage)

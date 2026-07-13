@@ -22,18 +22,19 @@ type Envelope struct {
 // ─── Cliente → Servidor ──────────────────────────────────────────────────────
 
 const (
-	CCreateRoom     = "create_room"      // el host abre una sala y trae su héroe
-	CJoinRoom       = "join_room"        // un invitado entra con código + su héroe
-	CRejoinRoom     = "rejoin_room"      // un jugador vuelve a su asiento tras caerse
-	CSetRoomOptions = "set_room_options" // (host) abre/cierra la puerta a mitad de partida
-	CStartStory     = "start_story"      // (host) la historia main está forjada; a jugar
-	CBroadcastGame  = "broadcast_game"   // (host) difunde el estado autoritativo del juego
-	CSubmitAction   = "submit_action"    // (invitado) manda su acción de turno al host
-	CSendChat       = "send_chat"
-	CSetChatColor   = "set_chat_color"
-	CKickPlayer     = "kick_player"
-	CTurnResult     = "turn_result" // (host) resultado del turno + de quién es el próximo
-	CPing           = "ping"
+	CCreateRoom      = "create_room"      // el host abre una sala y trae su héroe
+	CJoinRoom        = "join_room"        // un invitado entra con código + su héroe
+	CRejoinRoom      = "rejoin_room"      // un jugador vuelve a su asiento tras caerse
+	CSetRoomOptions  = "set_room_options" // (host) abre/cierra la puerta a mitad de partida
+	CStartStory      = "start_story"      // (host) la historia main está forjada; a jugar
+	CBroadcastGame   = "broadcast_game"   // (host) difunde el estado autoritativo del juego
+	CSubmitAction    = "submit_action"    // (invitado) manda su acción de turno al host
+	CSendChat        = "send_chat"
+	CSetChatColor    = "set_chat_color"
+	CSetPlayerAvatar = "set_player_avatar"
+	CKickPlayer      = "kick_player"
+	CTurnResult      = "turn_result" // (host) resultado del turno + de quién es el próximo
+	CPing            = "ping"
 )
 
 // CreateRoomMsg — el host abre la sala trayendo su Character (JSON opaco: lo define
@@ -98,6 +99,10 @@ type SendChatMsg struct {
 type SetChatColorMsg struct {
 	RoomCode string `json:"roomCode"`
 	Color    string `json:"color"`
+}
+type SetPlayerAvatarMsg struct {
+	RoomCode  string          `json:"roomCode"`
+	Character json.RawMessage `json:"character"`
 }
 type KickPlayerMsg struct {
 	RoomCode string `json:"roomCode"`

@@ -1,5 +1,6 @@
 import type { Character, GameRoom, StatKey } from "@tiny-quest/game-engine";
 import type { C2SMessage, ChatMessage, GuestActionMsg, MultiplayerPhase, PlayerInfo, S2CMessage } from "./protocol";
+import { canonicalMultiplayerCharacter } from "./session-style";
 
 // Cliente de salas de Tiny Quest. Es transporte + estado; NO corre el juego.
 // El HOST usa startStory/broadcastState/signalNarrating tras resolver contra el
@@ -164,7 +165,7 @@ export class MultiplayerClient {
   createRoom(playerName: string, character: Character, opts: { worldId?: string; perspective?: string } = {}): void {
     this.connect();
     this.setState({ phase: "lobby_host", isHost: true });
-    this.send({ type: "create_room", playerName, character, worldId: opts.worldId, perspective: opts.perspective });
+    this.send({ type: "create_room", playerName, character: canonicalMultiplayerCharacter(character), worldId: opts.worldId, perspective: opts.perspective });
   }
 
   joinRoom(roomCode: string, playerName: string, character: Character): void {
@@ -179,7 +180,7 @@ export class MultiplayerClient {
       this.send({ type: "rejoin_room", roomCode: code, playerId: seat.playerId });
       return;
     }
-    this.send({ type: "join_room", roomCode: code, playerName, character });
+    this.send({ type: "join_room", roomCode: code, playerName, character: canonicalMultiplayerCharacter(character) });
   }
 
   // ─── Acciones (host) ────────────────────────────────────────────────────────
@@ -213,6 +214,7 @@ export class MultiplayerClient {
   kickPlayer(playerId: string): void { if (this._state.roomCode) this.send({ type: "kick_player", roomCode: this._state.roomCode, playerId }); }
   sendChat(text: string): void { if (this._state.roomCode && text.trim()) this.send({ type: "send_chat", roomCode: this._state.roomCode, text: text.trim().slice(0, 280) }); }
   setChatColor(color: string): void { if (this._state.roomCode) this.send({ type: "set_chat_color", roomCode: this._state.roomCode, color }); }
+  setPlayerAvatar(character: Character): void { if (this._state.roomCode) this.send({ type: "set_player_avatar", roomCode: this._state.roomCode, character: canonicalMultiplayerCharacter(character) }); }
 
   /** El host avisa a los invitados que está narrando (spinner). */
   signalNarrating(): void {
@@ -255,7 +257,7 @@ export class MultiplayerClient {
         break;
 
       case "player_updated":
-        this.setState({ players: msg.players });
+        this.setState({ players: msg.players, errorMessage: null });
         break;
 
       case "chat_message":

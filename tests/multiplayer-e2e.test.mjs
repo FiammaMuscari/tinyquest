@@ -54,10 +54,13 @@ before(async () => {
   // Transpilar el cliente TS real a mjs (los `import type` se borran; no arrastra el motor).
   const dir = join(tmpdir(), `tq-mp-${process.pid}`);
   await mkdir(dir, { recursive: true });
+  const styleSrc = await readFile(new URL("../apps/web/src/multiplayer/session-style.ts", import.meta.url), "utf8");
+  const styleOut = ts.transpileModule(styleSrc, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+  await writeFile(join(dir, "session-style.mjs"), styleOut);
   const src = await readFile(new URL("../apps/web/src/multiplayer/ws-client.ts", import.meta.url), "utf8");
   const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } });
   const out = join(dir, "ws-client.mjs");
-  await writeFile(out, outputText);
+  await writeFile(out, outputText.replace('from "./session-style"', 'from "./session-style.mjs"'));
   ({ MultiplayerClient } = await import(`file://${out}`));
 });
 
@@ -69,19 +72,25 @@ test("party completa: crear → unirse → arrancar → turnos → relay", async
   const guest = new MultiplayerClient(url);
 
   // 1) Host crea la sala.
-  host.createRoom("Fiamy", { name: "Fiamy" }, { worldId: "veldaran" });
+  host.createRoom("Fiamy", { name: "Fiamy", avatarUrl: "/host-cuerpo.jpg" }, { worldId: "veldaran" });
   await waitState(host, (s) => s.roomCode && s.isHost && s.playerId);
   const code = host.state.roomCode;
   const hostId = host.state.playerId;
   assert.equal(code.length, 6);
 
   // 2) Invitado se une.
-  guest.joinRoom(code, "Beto", { name: "Beto" });
+  guest.joinRoom(code, "Beto", { name: "Beto", avatarUrl: "/beto-frente.jpg", look: { avatarShot: "face", faceUrl: "/beto-frente.jpg", fullBodyUrl: "/beto-cuerpo.jpg" } });
   await waitState(guest, (s) => s.roomCode === code && s.playerId);
   const guestId = guest.state.playerId;
   assert.notEqual(guestId, hostId);
   // El host ve la lista actualizada (2 jugadores).
   await waitState(host, (s) => s.players.length === 2);
+  assert.equal(host.state.players.find((p) => p.id === guestId).character.avatarUrl, "/beto-frente.jpg");
+
+  // La toma guardada del compañero se actualiza como fuente única para ambos.
+  guest.setPlayerAvatar({ name: "Beto", avatarUrl: "/beto-cuerpo-nuevo.jpg", look: { avatarShot: "fullbody", faceUrl: "/beto-frente-nuevo.jpg", fullBodyUrl: "/beto-cuerpo-nuevo.jpg" } });
+  await waitState(host, (s) => s.players.find((p) => p.id === guestId)?.character.avatarUrl === "/beto-cuerpo-nuevo.jpg");
+  await waitState(guest, (s) => s.players.find((p) => p.id === guestId)?.character.avatarUrl === "/beto-cuerpo-nuevo.jpg");
 
   // 3) Host arranca la historia; primero juega él.
   const fakeRoom = { turn: 0, sessionComplete: false, players: [{ id: hostId }, { id: guestId }], activePlayerIndex: 0, sessionLog: [], currentSceneIndex: 0 };
@@ -110,6 +119,8 @@ test("party completa: crear → unirse → arrancar → turnos → relay", async
   // 6) Chat compartido, color personal y expulsión del host.
   guest.setChatColor("#ff66aa");
   await waitState(guest, (s) => s.players.find((p) => p.id === guestId)?.chatColor === "#ff66aa");
+  host.setChatColor("#ff66aa");
+  await waitState(host, (s) => s.errorMessage?.includes("ya pertenece"));
   const hostChat = waitEvent(host, "chat_message");
   guest.sendChat("Hola desde el grupo");
   const chat = await hostChat;
