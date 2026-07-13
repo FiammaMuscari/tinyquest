@@ -38,10 +38,10 @@ test("Frente prioriza cámara e identidad antes del estilo", () => {
 test("Cuerpo muestra cabeza a rodillas y excluye pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 760), /KNEE-UP.*head through BOTH KNEES.*DO NOT show lower legs, ankles, boots, feet or floor/is);
-  assert.ok(prompt.indexOf("KNEE-UP") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
+  assert.match(prompt.slice(0, 900), /KNEE-UP V17.*through BOTH FULLY VISIBLE KNEECAPS.*crop line is immediately BELOW both knees.*NEVER crop at waist or mid-thigh/is);
+  assert.ok(prompt.indexOf("KNEE-UP V17") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
   assert.doesNotMatch(prompt, /head-to-feet|BOTH FEET FULLY VISIBLE/i);
-  assert.equal(new URL(url).searchParams.get("width"), "512");
+  assert.equal(new URL(url).searchParams.get("width"), "448");
   assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
@@ -49,8 +49,9 @@ test("Cuerpo muestra cabeza a rodillas y excluye pies", () => {
 test("Worker deriva Cuerpo desde el master sin rediseñar persona o ropa", () => {
   assert.match(workerSource, /IMMUTABLE canonical character and wardrobe master/);
   assert.match(workerSource, /Copy the EXACT same garments: colors, materials, collar, sleeves, seams, armor pieces, jewelry, weapons/);
-  assert.match(workerSource, /KNEE-UP standing shot from head through both knees/);
-  assert.match(workerSource, /Do not show lower legs, ankles, boots, feet or floor/);
+  assert.match(workerSource, /Do not add any garment, armor, weapon or accessory absent from image 0/);
+  assert.match(workerSource, /American shot, camera 4 meters away, from head through BOTH FULLY VISIBLE KNEECAPS/);
+  assert.match(workerSource, /Do not show shins, ankles, boots, feet or floor/);
 });
 
 test("medallones NPC usan perfil rápido de seis pasos", () => {

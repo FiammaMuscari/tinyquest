@@ -69,9 +69,9 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // Plano americano estricto: revela ropa/armas sin malgastar resolución en pies
   // ni alejar tanto el rostro. El Worker usa Frente como input_image_0 y cambia
   // SOLO el encuadre; no vuelve a inventar persona ni vestuario.
-  const prompt = `TINYQUEST HERO KNEE-UP V16. CAMERA MANDATORY: medium-long three-quarter-length standing shot from the top of the head through BOTH KNEES. Knees touch the lower frame edge. Show torso, waist, hips and upper legs. DO NOT show lower legs, ankles, boots, feet or floor. Face remains turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND PIXEL-FAITHFUL OUTFIT AS MASTER REFERENCE.`;
+  const prompt = `TINYQUEST HERO KNEE-UP V17. CAMERA MANDATORY: medium-long American shot, camera 4 meters away, from the top of the head through BOTH FULLY VISIBLE KNEECAPS. The crop line is immediately BELOW both knees; both complete knees must appear at the lower frame edge. Show torso, waist, hips, thighs and knees. Character occupies 92 percent of canvas height. NEVER crop at waist or mid-thigh. DO NOT show shins, ankles, boots, feet or floor. Face remains turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND PIXEL-FAITHFUL OUTFIT AS MASTER REFERENCE.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Arquetipos de linaje/oficio PRE-GENERADOS y guardados como assets fijos

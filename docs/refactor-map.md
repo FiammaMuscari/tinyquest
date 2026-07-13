@@ -79,18 +79,16 @@ section** — an outdated map costs more than no map.
   firma no coincide, porque eso representa una edición pendiente, no una URL
   legacy rota.
 - `forgeHeroPortraitPair` genera Frente como identidad canónica con Schnell y
-  deriva Cuerpo mediante `linkPortraitReference` + Flux.2 Klein 4B. V16 usa un
-  master Frente 3/4 y una variante estricta de cabeza a rodillas; el Worker copia
+  deriva Cuerpo mediante `linkPortraitReference` + Flux.2 Klein 4B. Frente V16 es
+  el master 3/4 y Cuerpo V17 una variante estricta de cabeza a rodillas; el Worker copia
   literalmente persona, ropa, armas, colores y cicatrices y cambia SOLO cámara.
-  Ambas tomas son 512² (un tile en vez de 512×768) y no aparecen pies. Si Klein
+  Frente es 512² y Cuerpo 448×512 (ambos un tile, antes 512×768); no aparecen pies. Si Klein
   agota cuota, el Worker cae a Schnell con el mismo prompt; nunca cachea una
   imagen inferior. Mientras termina Cuerpo, `HeroAvatarImg.fallbackUrl` muestra
   el master Frente ya listo en vez de mantener el spinner.
-- Cuerpo suma dos referencias estéticas JPEG comprimidas mediante
-  `linkPortraitStyleReferences`: son STYLE ONLY (pincel, silueta elegante y ropa
-  medieval), mientras Frente/colores/especie/cicatriz/armas mandan como identidad.
-  No conectar estas referencias al Frente ni a NPCs: gastaría cuota y copiaría
-  anatomía femenina/elfa donde no corresponde.
+- Cuerpo usa únicamente el master Frente como referencia: no se agregan láminas
+  de estilo que puedan contaminar ropa/anatomía. El estilo aprobado ya vive en el
+  master; una sola referencia reduce latencia, payload y riesgo de rediseño.
 - NPC `portraitUrl` se estampa en `forgeStory` desde `appearance + description`.
   Son medallones 448×448 y Schnell usa 6 pasos (héroe/escenas conservan 8): menos
   píxeles y ~25% menos pasos sin perder detalle al tamaño máximo del lightbox.
