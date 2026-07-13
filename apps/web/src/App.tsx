@@ -599,7 +599,10 @@ function readStoredStat() {
 }
 
 export function App() {
-  const masterProvider = useMemo(() => createDungeonMasterProvider(import.meta.env.VITE_MASTER_PROVIDER ?? "groq", import.meta.env), []);
+  // Gemini escribe forja/apertura/recap; el propio provider manda los turnos
+  // baratos a Groq y hace failover cruzado. Era el diseño documentado, pero el
+  // default accidental en "groq" estaba degradando justo la prosa de campaña.
+  const masterProvider = useMemo(() => createDungeonMasterProvider(import.meta.env.VITE_MASTER_PROVIDER ?? "gemini", import.meta.env), []);
   const atmosphereEnv = useMemo(() => readAtmosphereEnv(import.meta.env), []);
   const imageProvider = useMemo(() => createImageProvider(import.meta.env.VITE_IMAGE_PROVIDER ?? "mock"), []);
   const soundProvider = useMemo(() => createSoundProvider(import.meta.env.VITE_SOUND_PROVIDER ?? "mock"), []);

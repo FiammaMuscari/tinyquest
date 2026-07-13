@@ -500,7 +500,16 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     let story = first;
     if (!first || firstIssues.length > 0) {
       if (first) logDmEvent("story-forge", { ok: false, coherence: firstIssues });
-      const second = await attempt(firstIssues);
+      // Una revisión inmediata puede chocar con el TPM gratuito aun cuando la
+      // primera historia era JSON válido. En ese caso conservamos la primera en
+      // vez de convertir una mejora editorial opcional en un error total.
+      let second: ImprovisedStoryContent | null = null;
+      try {
+        second = await attempt(firstIssues);
+      } catch (error) {
+        logDmEvent("story-forge", { ok: false, editorialRetry: error instanceof Error ? error.message.slice(0, 160) : "retry failed" });
+        if (!first) throw error;
+      }
       if (second) {
         const secondIssues = storyCoherenceIssues(second, input);
         story = !first || secondIssues.length < firstIssues.length ? second : first;

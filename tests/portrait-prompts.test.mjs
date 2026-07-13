@@ -76,6 +76,10 @@ test("editar rasgos no queda bloqueado por la generación y guardar confirma cam
   assert.match(appSource, /disabled=\{disabled \|\| portraitBusy \|\| !heroLookDone\}/);
 });
 
+test("la forja literaria usa Gemini por defecto y reserva Groq para los turnos", () => {
+  assert.match(appSource, /VITE_MASTER_PROVIDER \?\? "gemini"/);
+});
+
 test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
   assert.match(appSource, /linkPortraitStyleReferences\(urls\.face, \["\/assets\/style\/face-style-oil\.jpg"\]\)/);
