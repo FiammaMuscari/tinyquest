@@ -66,12 +66,12 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
 // "close portrait" → "knee-up standing". No tocar el estilo acá — si
 // diverge del prompt de characterPortraitUrl, flux pinta OTRO personaje.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Plano americano estricto: revela ropa/armas sin malgastar resolución en pies
-  // ni alejar tanto el rostro. El Worker usa Frente como input_image_0 y cambia
-  // SOLO el encuadre; no vuelve a inventar persona ni vestuario.
-  const prompt = `TINYQUEST HERO KNEE-UP V17. CAMERA MANDATORY: medium-long American shot, camera 4 meters away, from the top of the head through BOTH FULLY VISIBLE KNEECAPS. The crop line is immediately BELOW both knees; both complete knees must appear at the lower frame edge. Show torso, waist, hips, thighs and knees. Character occupies 92 percent of canvas height. NEVER crop at waist or mid-thigh. DO NOT show shins, ankles, boots, feet or floor. Face remains turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND PIXEL-FAITHFUL OUTFIT AS MASTER REFERENCE.`;
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V18 fuerza
+  // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
+  // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
+  const prompt = `TINYQUEST HERO KNEE-UP SOURCE V18. RAW SOURCE FOR DETERMINISTIC KNEE CROP. CAMERA MANDATORY: full standing figure from entire head through both feet, camera 7 meters away, centered neutral pose, character occupies 78 percent of canvas height. BOTH KNEECAPS must be completely visible around 72 percent of canvas height. The disposable lower band below the knees exists only so the client can remove it. Face remains turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND PIXEL-FAITHFUL OUTFIT AS MASTER REFERENCE.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=448&height=512&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Arquetipos de linaje/oficio PRE-GENERADOS y guardados como assets fijos
@@ -457,6 +457,60 @@ async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> 
 const readyObjectUrls = new Map<string, string>();
 const inFlight = new Map<string, Promise<string>>();
 
+export function kneeUpCropGeometry(width: number, height: number): { sx: number; sy: number; sw: number; sh: number; width: number; height: number } {
+  const sh = Math.max(1, Math.round(height * 0.82));
+  const targetWidth = 448;
+  const targetHeight = 512;
+  const sw = Math.min(width, Math.round(sh * (targetWidth / targetHeight)));
+  return { sx: Math.max(0, Math.round((width - sw) / 2)), sy: 0, sw, sh, width: targetWidth, height: targetHeight };
+}
+
+function needsKneeUpCrop(url: string): boolean {
+  try {
+    return decodeURIComponent(new URL(url).pathname).includes("TINYQUEST HERO KNEE-UP SOURCE V18");
+  } catch {
+    return false;
+  }
+}
+
+async function cropKneeUpPortrait(blob: Blob): Promise<Blob> {
+  if (typeof document === "undefined") return blob;
+  let source: CanvasImageSource;
+  let sourceWidth: number;
+  let sourceHeight: number;
+  let release: () => void = () => {};
+  if (typeof createImageBitmap !== "undefined") {
+    const bitmap = await createImageBitmap(blob);
+    source = bitmap;
+    sourceWidth = bitmap.width;
+    sourceHeight = bitmap.height;
+    release = () => bitmap.close();
+  } else {
+    const objectUrl = URL.createObjectURL(blob);
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+    source = image;
+    sourceWidth = image.naturalWidth;
+    sourceHeight = image.naturalHeight;
+    release = () => URL.revokeObjectURL(objectUrl);
+  }
+  try {
+    const crop = kneeUpCropGeometry(sourceWidth, sourceHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = crop.width;
+    canvas.height = crop.height;
+    const context = canvas.getContext("2d");
+    if (!context) return blob;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, crop.width, crop.height);
+    return await new Promise<Blob>((resolve) => canvas.toBlob((output) => resolve(output ?? blob), "image/jpeg", 0.94));
+  } finally {
+    release();
+  }
+}
+
 export function loadPortrait(url: string, options: { priority?: boolean } = {}): Promise<string> {
   const ready = readyObjectUrls.get(url);
   if (ready) return Promise.resolve(ready);
@@ -466,6 +520,7 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
     let blob = await idbGet(url).catch(() => undefined);
     if (!blob) {
       blob = await fetchPortraitBlob(url, options.priority ?? false);
+      if (needsKneeUpCrop(url)) blob = await cropKneeUpPortrait(blob);
       await idbPut(url, blob).catch(() => undefined); // sin persistencia sigue funcionando en memoria
     }
     const objectUrl = URL.createObjectURL(blob);

@@ -80,9 +80,11 @@ section** — an outdated map costs more than no map.
   legacy rota.
 - `forgeHeroPortraitPair` genera Frente como identidad canónica con Schnell y
   deriva Cuerpo mediante `linkPortraitReference` + Flux.2 Klein 4B. Frente V16 es
-  el master 3/4 y Cuerpo V17 una variante estricta de cabeza a rodillas; el Worker copia
+  el master 3/4 y Cuerpo V18 una variante estricta de cabeza a rodillas; el Worker copia
   literalmente persona, ropa, armas, colores y cicatrices y cambia SOLO cámara.
-  Frente es 512² y Cuerpo 448×512 (ambos un tile, antes 512×768); no aparecen pies. Si Klein
+  Frente es 512². Cuerpo genera una fuente 384×512 (un tile) con rodillas seguras;
+  `cropKneeUpPortrait` elimina el 18% inferior y cachea una salida 448×512, por lo
+  que ni UI, lightbox ni descarga ven pies. Si Klein
   agota cuota, el Worker cae a Schnell con el mismo prompt; nunca cachea una
   imagen inferior. Mientras termina Cuerpo, `HeroAvatarImg.fallbackUrl` muestra
   el master Frente ya listo en vez de mantener el spinner.

@@ -35,14 +35,15 @@ test("Frente prioriza cámara e identidad antes del estilo", () => {
   assert.ok(prompt.length <= 1960, `prompt de frente truncable: ${prompt.length}`);
 });
 
-test("Cuerpo muestra cabeza a rodillas y excluye pies", () => {
+test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 900), /KNEE-UP V17.*through BOTH FULLY VISIBLE KNEECAPS.*crop line is immediately BELOW both knees.*NEVER crop at waist or mid-thigh/is);
-  assert.ok(prompt.indexOf("KNEE-UP V17") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
-  assert.doesNotMatch(prompt, /head-to-feet|BOTH FEET FULLY VISIBLE/i);
-  assert.equal(new URL(url).searchParams.get("width"), "448");
+  assert.match(prompt.slice(0, 900), /KNEE-UP SOURCE V18.*full standing figure.*BOTH KNEECAPS.*72 percent.*disposable lower band/is);
+  assert.ok(prompt.indexOf("KNEE-UP SOURCE V18") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
+  assert.equal(new URL(url).searchParams.get("width"), "384");
   assert.equal(new URL(url).searchParams.get("height"), "512");
+  assert.deepEqual(portraits.kneeUpCropGeometry(384, 512), { sx: 8, sy: 0, sw: 368, sh: 420, width: 448, height: 512 });
+  assert.match(portraitSource, /if \(needsKneeUpCrop\(url\)\) blob = await cropKneeUpPortrait\(blob\)/);
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
 
@@ -50,8 +51,9 @@ test("Worker deriva Cuerpo desde el master sin rediseñar persona o ropa", () =>
   assert.match(workerSource, /IMMUTABLE canonical character and wardrobe master/);
   assert.match(workerSource, /Copy the EXACT same garments: colors, materials, collar, sleeves, seams, armor pieces, jewelry, weapons/);
   assert.match(workerSource, /Do not add any garment, armor, weapon or accessory absent from image 0/);
-  assert.match(workerSource, /American shot, camera 4 meters away, from head through BOTH FULLY VISIBLE KNEECAPS/);
-  assert.match(workerSource, /Do not show shins, ankles, boots, feet or floor/);
+  assert.match(workerSource, /full standing source sheet, camera 7 meters away/);
+  assert.match(workerSource, /Both complete kneecaps must sit near 72 percent/);
+  assert.match(workerSource, /raw lower band is disposable and will be removed by a deterministic client crop/);
 });
 
 test("medallones NPC usan perfil rápido de seis pasos", () => {
