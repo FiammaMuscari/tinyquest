@@ -1295,7 +1295,9 @@ export function App() {
           entryLine: perspectiveEntryLine(world, chosenPerspective)
         }
       });
-      const built = buildImprovisedCampaign(content);
+      // El segundo argumento es la ÚNICA fuente de la lista visible de ideas:
+      // vacío = no mostrar nada; con texto = repetir solo palabras del jugador.
+      const built = buildImprovisedCampaign(content, extraWish.trim());
       // El LLM imaginó el aspecto de cada personaje: acá nace su retrato generado.
       const campaign: Campaign = {
         ...built,
@@ -1715,6 +1717,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
+  const [confirmPortraitUpdate, setConfirmPortraitUpdate] = useState(false);
   // Ficha rápida de un personaje forjado (click en un chip del teaser).
   const [castPeek, setCastPeek] = useState<CastPeek | null>(null);
   // Estado del retrato del héroe: avisa que la personalización tarda (con prioridad en la cola).
@@ -1735,6 +1738,18 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   // El anfitrión trae su héroe a la sala; solo pedimos que esté listo. La historia
   // (autoral o forjada) se resuelve al arrancar la party, no al crear la sala.
   const mpBlocked = !heroLookDone || editingHero || heroPairBusy;
+  function saveHeroAndClose() {
+    onSaveHero(draft);
+    setConfirmPortraitUpdate(false);
+    setEditingHero(false);
+  }
+  function requestHeroSave() {
+    if (heroImageHasPendingChanges) {
+      setConfirmPortraitUpdate(true);
+      return;
+    }
+    saveHeroAndClose();
+  }
   return (
     <main className="appShell lobbyShell">
       <HelpButton open={showHelp} setOpen={setShowHelp} />
@@ -1752,10 +1767,11 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
       <section className="lobbyLayout">
         {editingHero ? (
           <section className="heroEditWrap lobbyHeroGrid soloHero heroSpecial">
-            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={heroPairBusy} onReimagine={onReimagineHero} onRestorePrevious={onRestoreHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
-            <button className={`ghostButton heroDone ${heroLookDone && heroImageHasPendingChanges ? "forgeAttention" : ""}`} type="button" disabled={!heroLookDone || heroPairBusy} onClick={() => { onSaveHero(draft); setEditingHero(false); }} title={!heroLookDone ? "Elegí género, piel, ojos, color y largo del pelo" : heroImageHasPendingChanges ? "Guardar y aplicar las nuevas opciones a Frente y Cuerpo" : "Guardar sin regenerar: la imagen ya está al día"}>
-              ✔ {heroImageHasPendingChanges ? "Guardar y actualizar imagen" : "Guardar héroe y continuar"}
+            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} portraitBusy={heroPairBusy} onReimagine={onReimagineHero} onRestorePrevious={onRestoreHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
+            <button className={`ghostButton heroDone ${heroLookDone && heroImageHasPendingChanges ? "forgeAttention" : ""}`} type="button" disabled={!heroLookDone || heroPairBusy} onClick={requestHeroSave} title={!heroLookDone ? "Elegí género, piel, ojos, color y largo del pelo" : heroImageHasPendingChanges ? "Hay cambios físicos pendientes; vas a poder confirmarlos antes de actualizar la imagen" : "Guardar sin regenerar: la imagen ya está al día"}>
+              ✔ Guardar héroe y continuar
             </button>
+            {heroPairBusy && <p className="heroEditBusyNote">Podés seguir cambiando rasgos mientras termina la imagen actual. Esos cambios no se aplican hasta que reimagines o confirmes Guardar.</p>}
           </section>
         ) : (
           <section className="panel heroSummary heroSpecial">
@@ -1832,14 +1848,14 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
                   info innecesaria; el riesgo/evidencia se descubre jugando. */}
               {/* heroBond: se sigue generando y validando (ata la historia al héroe),
                   pero NO se muestra — en el teaser era texto redundante/ruidoso. */}
-              {/* Solo si el jugador dio ideas (input no vacío): cada cambio en su
-                  propia línea, explicación corta, sin flecha de acordeón ni símbolos. */}
+              {/* Solo aparece si el jugador escribió ideas. La lista conserva sus
+                  palabras y no adelanta personajes, pistas, giros ni consecuencias. */}
               {improvisedCampaign.forgeNotes?.keywordsUsed && improvisedCampaign.forgeNotes.keywordsUsed.length > 0 && (
                 <details className="keywordsUsed">
-                  <summary><Lightbulb size={14} className="tIcon" /> Cómo se usaron tus ideas</summary>
+                  <summary><Lightbulb size={14} className="tIcon" /> Tus ideas incluidas</summary>
                   <div>
                     {improvisedCampaign.forgeNotes.keywordsUsed.map((keyword) => (
-                      <article key={keyword.idea}><strong>{normalizeUiText(keyword.idea)}</strong><p>{normalizeUiText(keyword.how)}</p></article>
+                      <article key={keyword.idea}><strong>{normalizeUiText(keyword.idea)}</strong></article>
                     ))}
                   </div>
                 </details>
@@ -1900,6 +1916,19 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
         </section>
       </section>
+      {confirmPortraitUpdate && (
+        <div className="heroSaveConfirmBackdrop" role="presentation" onClick={() => setConfirmPortraitUpdate(false)}>
+          <section className="heroSaveConfirm" role="dialog" aria-modal="true" aria-labelledby="hero-save-confirm-title" onClick={(event) => event.stopPropagation()}>
+            <strong id="hero-save-confirm-title">Actualizar la imagen del héroe</strong>
+            <p>Cambiaste rasgos físicos que todavía no aparecen en Frente y Cuerpo. Al continuar, ambas imágenes se volverán a crear con esos cambios.</p>
+            <span>¿Querés guardar y actualizar el retrato ahora?</span>
+            <div>
+              <button type="button" className="ghostButton" onClick={() => setConfirmPortraitUpdate(false)}>Seguir editando</button>
+              <button type="button" className="soloButton" onClick={saveHeroAndClose}>Sí, guardar y actualizar</button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
@@ -3341,7 +3370,7 @@ const builderTabList = [
 ] as const;
 type BuilderTab = typeof builderTabList[number]["id"];
 
-function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onRestorePrevious, onUnlockAutoPortrait }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; onReimagine?: (seedNonce: number) => void; onRestorePrevious?: () => void; onUnlockAutoPortrait?: () => void }) {
+function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, onReimagine, onRestorePrevious, onUnlockAutoPortrait }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; portraitBusy?: boolean; onReimagine?: (seedNonce: number) => void; onRestorePrevious?: () => void; onUnlockAutoPortrait?: () => void }) {
   const spentPoints = totalExtraPoints(draft.stats);
   const remainingPoints = 8 - spentPoints;
   const selectedSpecies = species.find((item) => item.name === draft.species) ?? species[0];
@@ -3427,7 +3456,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onRestorePr
                 <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={currentShot === "face" ? draft.look?.fullBodyUrl : undefined} name={draft.name} className="heroPortrait" priority />
               </button>
               {heroLookDone && (
-                <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled} title={currentShot === "face" ? "Descargar la imagen de frente 3/4" : "Descargar la imagen de cuerpo hasta las rodillas"} aria-label="Descargar esta toma">
+                <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled || portraitBusy} title={currentShot === "face" ? "Descargar la imagen de frente 3/4" : "Descargar la imagen de cuerpo hasta las rodillas"} aria-label="Descargar esta toma">
                   <Download size={14} />
                 </button>
               )}
@@ -3440,12 +3469,12 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onRestorePr
             )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
-              <button type="button" className={`reimagineButton ${heroLookDone && portraitNeedsRefresh ? "forgeAttention" : ""}`} onClick={() => onReimagine(hasForgedPortrait ? 1 + Math.floor(Math.random() * 9000) : 0)} disabled={disabled || !heroLookDone} title={heroLookDone ? (hasForgedPortrait ? "La IA imagina otra cara respetando tu identidad" : "Crear retrato con los rasgos elegidos") : "Elegí género, piel, ojos, color y largo del pelo primero"}>
+              <button type="button" className={`reimagineButton ${heroLookDone && portraitNeedsRefresh ? "forgeAttention" : ""}`} onClick={() => onReimagine(hasForgedPortrait ? 1 + Math.floor(Math.random() * 9000) : 0)} disabled={disabled || portraitBusy || !heroLookDone} title={portraitBusy ? "La imagen actual todavía se está terminando" : heroLookDone ? (hasForgedPortrait ? "Crear un nuevo avatar con los rasgos que ves en el editor" : "Crear retrato con los rasgos elegidos") : "Elegí género, piel, ojos, color y largo del pelo primero"}>
                 <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> {hasForgedPortrait ? "Reimaginar héroe" : "Imaginar héroe"}
               </button>
             )}
             {onRestorePrevious && draft.look?.previousFaceUrl && draft.look?.previousFullBodyUrl && (
-              <button type="button" className="ghostButton previousPortraitButton" onClick={onRestorePrevious} disabled={disabled}>↶ Recuperar versión anterior</button>
+              <button type="button" className="ghostButton previousPortraitButton" onClick={onRestorePrevious} disabled={disabled || portraitBusy}>↶ Recuperar versión anterior</button>
             )}
             {heroLookDone && <small className="portraitContractHint">Cuerpo = master canónico · Frente = variante 3/4 del mismo personaje</small>}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}

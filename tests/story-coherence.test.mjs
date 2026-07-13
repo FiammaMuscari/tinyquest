@@ -148,3 +148,41 @@ test("el nombre del jugador con guion NO se penaliza", () => {
   const issues = storyCoherenceIssues(story, { userPrompt: "un perro llamado Firulais", hero });
   assert.ok(!issues.some((i) => i.startsWith("apellido")));
 });
+
+const mareaContext = {
+  worldName: "La Marea de Ceniza",
+  era: "Ciencia ficción árida",
+  ambience: "Un planeta sin agua superficial.",
+  rules: [],
+  seasoning: "supervivencia política",
+  perspective: "exterior",
+  entryLine: "Un viento rojo te escupió por un portal a tres días de la aldea más cercana, sin agua y con un mapa de napas que no es de este mundo."
+};
+
+test("la revisión editorial rechaza título genérico y premise que repite la entrada", () => {
+  const story = baseStory({
+    title: "El Eco del Festín",
+    premise: "Una ráfaga de viento rojo te arroja junto a un portal, sin agua y con un mapa de napas que no pertenece a este mundo. En la aldea más cercana, una bomba oxidada es la única esperanza y todos esperan que la arregles antes de que sea demasiado tarde.",
+    scenes: [{ title: "La Verdad Torcida", objective: "Reparar la bomba" }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "", worldContext: mareaContext });
+  assert.ok(issues.some((issue) => issue.startsWith("titulo-generico")));
+  assert.ok(issues.includes("premisa-repite-la-entrada"));
+  assert.ok(issues.includes("premisa-cliche"));
+  assert.ok(issues.some((issue) => issue.startsWith("escena-titulo-generico")));
+});
+
+test("una presentación concreta, sensorial y dramática supera la revisión editorial", () => {
+  const story = baseStory({
+    title: "Tres Dientes en la Bomba",
+    premise: "La capataz Shadri sella la bomba comunal con tres dientes humanos dentro del engranaje y acusa a tu casa de haber envenenado la napa. El metal caliente huele a sal quemada mientras un niño llena el último odre limpio bajo la mirada de dos castas armadas. Para abrir la máquina tendrás que entregar el mapa que podría salvarte o demostrar, antes del próximo reparto, quién puso los dientes allí.",
+    scenes: [
+      { title: "El Odre del Niño", objective: "Examinar el agua" },
+      { title: "Los Dientes del Engranaje", objective: "Abrir la bomba" },
+      { title: "La Casa de Sal", objective: "Seguir al culpable" },
+      { title: "El Último Reparto", objective: "Elegir el costo" }
+    ]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "", worldContext: mareaContext });
+  assert.deepEqual(issues.filter((issue) => /^(?:titulo|premisa|escena-)/.test(issue)), []);
+});

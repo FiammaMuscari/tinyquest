@@ -499,19 +499,20 @@ type NarrativeSeed = {
   title: string;
   genre: string;
   description: string;
+  storyHook: string;
   themeSkill: string;
   scenes: string[];
 };
 
 const narrativeSeeds: NarrativeSeed[] = [
-  { id: "luna-roja", title: "El Asesino de la Luna Roja", genre: "intriga urbana licántropa", description: "En Veldaran, la ciudad de los sellos, el Inspector Bran va a ejecutar a un licántropo inocente para enterrar su propio crimen. El grupo tiene horas para encontrar al testigo clandestino, robar el archivo y llegar al Tribunal antes del amanecer.", themeSkill: "investigación", scenes: ["El Cuartel del Umbral", "Los Muros Bajos", "El Archivo de Veldaran", "El Tribunal del Gran Sello"] },
-  { id: "conde-vampiro", title: "La Cena del Conde Vacio", genre: "mansion gotica y sangre familiar", description: "Una mansion abandonada vuelve a encender sus luces; quiza no desperto el conde, sino una mentira sostenida con su sangre.", themeSkill: "negociacion peligrosa", scenes: ["El Porton de la Mansion", "El Salon de los Retratos", "La Cripta de Sangre", "La Cena del Conde Vacio"] },
-  { id: "bosque-embrujado", title: "El Bosque que Recuerda tu Nombre", genre: "bosque embrujado y pacto roto", description: "Los senderos cambian y repiten voces de personas perdidas; los arboles quieren que alguien recuerde un pacto roto.", themeSkill: "supervivencia", scenes: ["El Sendero que Cambia", "El Claro de los Nombres", "La Casa Bajo las Raices", "El Corazon del Bosque"] },
-  { id: "reliquias-alba-negra", title: "Las Siete Reliquias del Alba Negra", genre: "reliquias sagradas y orden rota", description: "El grupo debe recuperar objetos sagrados antes de que una orden quebrada los consagre al reves.", themeSkill: "ritual", scenes: ["El Santuario Saqueado", "El Mercado de Reliquias Falsas", "La Cripta del Primer Portador", "El Altar del Alba Negra"] },
-  { id: "escuela-no-amanece", title: "La Escuela que No Amanece", genre: "academia encantada y noche repetida", description: "Una academia queda atrapada en una noche repetida; alumnos desaparecidos siguen asistiendo sin que nadie recuerde sus nombres.", themeSkill: "memoria", scenes: ["El Aula de las Velas", "El Pasillo que Repite", "La Biblioteca Cerrada", "El Examen de Medianoche"] },
-  { id: "isla-devora-mapas", title: "La Isla que Devora Mapas", genre: "piratas y geografia imposible", description: "Una tripulacion llega a una isla que borra mapas y cambia la costa; el tesoro no esta enterrado, espera dueno.", themeSkill: "cartografia", scenes: ["La Costa sin Norte", "El Barco Encallado", "La Cueva de las Mareas", "El Tesoro que Respira"] },
-  { id: "castillo-culpa", title: "El Castillo que Heredo la Culpa", genre: "castillo maldito y linaje culpable", description: "Un castillo encierra a descendientes de una familia que juro proteger el valle y termino sacrificandolo.", themeSkill: "linajes", scenes: ["El Puente de los Juramentos", "El Salon de los Escudos Negros", "La Habitacion sin Heredero", "La Torre que No Perdona"] },
-  { id: "cripta-rey", title: "La Cripta del Rey sin Ultima Palabra", genre: "cripta real y orden falsificada", description: "Un rey muerto se niega a descansar porque su ultima orden fue cambiada por alguien vivo.", themeSkill: "juramentos", scenes: ["La Puerta de las Monedas Frias", "El Corredor de los Nombres Borrados", "La Camara del Juramento", "El Trono Bajo Tierra"] }
+  { id: "luna-roja", title: "El Asesino de la Luna Roja", genre: "intriga urbana licántropa", description: "En Veldaran, la ciudad de los sellos, el Inspector Bran va a ejecutar a un licántropo inocente para enterrar su propio crimen. El grupo tiene horas para encontrar al testigo clandestino, robar el archivo y llegar al Tribunal antes del amanecer.", storyHook: "El sello de la sentencia todavía está húmedo cuando una huella imposible aparece junto al cadáver.", themeSkill: "investigación", scenes: ["El Cuartel del Umbral", "Los Muros Bajos", "El Archivo de Veldaran", "El Tribunal del Gran Sello"] },
+  { id: "conde-vampiro", title: "La Cena del Conde Vacío", genre: "mansión gótica y sangre familiar", description: "Después de treinta inviernos a oscuras, la mansión del conde enciende una vela en cada ventana y sirve seis platos calientes en un comedor cubierto de polvo. El sexto lleva el nombre de alguien que todavía no ha llegado.", storyHook: "Entrar antes de que el último invitado ocupe la silla reservada y la casa cierre sus puertas.", themeSkill: "negociación peligrosa", scenes: ["El Portón de la Mansión", "El Salón de los Retratos", "La Cripta de Sangre", "La Cena del Conde Vacío"] },
+  { id: "bosque-embrujado", title: "El Bosque que Recuerda tu Nombre", genre: "bosque embrujado y pacto roto", description: "Cada sendero devuelve a los viajeros al mismo fresno, donde sus nombres aparecen recién tallados en la corteza. Entre las raíces, una voz perdida ofrece la salida a cambio de que alguien recuerde el juramento que el valle decidió olvidar.", storyHook: "Encontrar el nombre que falta en el fresno antes de entregar un recuerdo propio al bosque.", themeSkill: "supervivencia", scenes: ["El Sendero que Cambia", "El Claro de los Nombres", "La Casa Bajo las Raíces", "El Corazón del Bosque"] },
+  { id: "reliquias-alba-negra", title: "Las Siete Reliquias del Alba Negra", genre: "reliquias sagradas y orden rota", description: "Siete relicarios robados repican desde lugares distintos a la misma hora, y cada campanada apaga una lámpara del santuario. La orden encargada de recuperarlos es también la única que conoce el rito capaz de consagrarlos al revés.", storyHook: "Seguir el sonido de los relicarios y decidir cuál de sus guardianes todavía merece confianza.", themeSkill: "ritual", scenes: ["El Santuario Saqueado", "El Mercado de Reliquias Falsas", "La Cripta del Primer Portador", "El Altar del Alba Negra"] },
+  { id: "escuela-no-amanece", title: "La Escuela que No Amanece", genre: "academia encantada y noche repetida", description: "La campana de medianoche suena por séptima vez y los pupitres de los alumnos desaparecidos vuelven a aparecer tibios, con tinta fresca en los cuadernos. Solo una maestra nota que cada repetición deja un nombre menos en el registro.", storyHook: "Romper la noche antes de que el registro borre al último alumno capaz de recordar la mañana.", themeSkill: "memoria", scenes: ["El Aula de las Velas", "El Pasillo que Repite", "La Biblioteca Cerrada", "El Examen de Medianoche"] },
+  { id: "isla-devora-mapas", title: "La Isla que Devora Mapas", genre: "piratas y geografía imposible", description: "La tinta se desprende de las cartas náuticas apenas la isla toca el horizonte, y la costa cambia de forma con cada ola. En la bodega, un cofre sin cerradura respira al ritmo del capitán y espera que alguien trace una ruta usando algo más valioso que tinta.", storyHook: "Cartografiar una salida antes de que la isla borre también los recuerdos del camino de regreso.", themeSkill: "cartografía", scenes: ["La Costa sin Norte", "El Barco Encallado", "La Cueva de las Mareas", "El Tesoro que Respira"] },
+  { id: "castillo-culpa", title: "El Castillo que Heredó la Culpa", genre: "castillo maldito y linaje culpable", description: "Cuando el último heredero cruza el puente, los escudos del gran salón giran para mirar el suelo y las puertas se sellan con barro del valle. Una campana bajo la torre exige que la familia nombre a quién sacrificó para conservar sus muros.", storyHook: "Abrir la torre y decidir si una confesión puede pagar una deuda heredada por inocentes.", themeSkill: "linajes", scenes: ["El Puente de los Juramentos", "El Salón de los Escudos Negros", "La Habitación sin Heredero", "La Torre que No Perdona"] },
+  { id: "cripta-rey", title: "La Cripta del Rey sin Última Palabra", genre: "cripta real y orden falsificada", description: "Bajo el sudario del rey muerto aparece una orden cosida con hilo negro, distinta de la que leyó la corte durante el funeral. Cada vez que alguien pronuncia una de las dos versiones, las monedas sobre sus ojos cambian de rostro.", storyHook: "Demostrar cuál fue la última voluntad antes de que los vivos coronen una mentira irreversible.", themeSkill: "juramentos", scenes: ["La Puerta de las Monedas Frías", "El Corredor de los Nombres Borrados", "La Cámara del Juramento", "El Trono Bajo Tierra"] }
 ];
 
 function narrativeCampaign(seed: NarrativeSeed): Campaign {
@@ -521,7 +522,7 @@ function narrativeCampaign(seed: NarrativeSeed): Campaign {
     title: seed.title,
     genre: seed.genre,
     description: seed.description,
-    storyHook: "Jugar una campana de cuatro escenas como mini-libro interactivo, con RAG narrativo, memoria viva, objetos persistentes, facciones y finales multiples.",
+    storyHook: seed.storyHook,
     difficulty: "normal",
     recommendedStats: ["mind", "courage", "focus", "charm"],
     recommendedSkills: [seed.themeSkill, "investigacion", "objetos", "dialogo"],
@@ -650,7 +651,20 @@ function asFragment(text: string): string {
   return text.replace(/^(Un|Una|Unos|Unas|El|La|Los|Las)\s/, (article) => article.toLowerCase());
 }
 
-export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campaign {
+/** Devuelve únicamente fragmentos escritos por el jugador. Nunca usa las
+ * paráfrasis del LLM porque podían inventar detalles y adelantar la trama en el
+ * lobby. `undefined` conserva compatibilidad con contenido viejo; string vacío
+ * significa explícitamente "no hubo ideas opcionales". */
+export function requestedStoryIdeas(userPrompt: string): string[] {
+  return userPrompt
+    .replace(/\r/g, "\n")
+    .split(/\n+|\s*[;,]\s*|(?<=[.!?])\s+/u)
+    .map((idea) => idea.replace(/^[-*•\d.)\s]+/u, "").replace(/\s+/g, " ").trim())
+    .filter((idea) => idea.length >= 2)
+    .slice(0, 8);
+}
+
+export function buildImprovisedCampaign(content: ImprovisedStoryContent, userPrompt?: string): Campaign {
   const slug = IMPROVISED_CAMPAIGN_ID;
   const sceneContent = Array.from({ length: 4 }, (_, index) => ({
     title: clampText(content.scenes?.[index]?.title, `Escena ${index + 1}`, 80),
@@ -762,9 +776,11 @@ export function buildImprovisedCampaign(content: ImprovisedStoryContent): Campai
         firstMystery: content.summary.firstMystery ? clampText(content.summary.firstMystery, "", 160) : undefined,
         timeLimit: content.summary.timeLimit ? clampText(content.summary.timeLimit, "", 110) : undefined
       } : undefined,
-      keywordsUsed: Array.isArray(content.keywordsUsed)
-        ? content.keywordsUsed.slice(0, 8).map((item) => ({ idea: clampText(item?.idea, "", 180), how: clampText(item?.how, "", 260) })).filter((item) => item.idea && item.how)
-        : undefined,
+      keywordsUsed: userPrompt !== undefined
+        ? requestedStoryIdeas(userPrompt).map((idea) => ({ idea: clampText(idea, "", 180), how: "Incluida sin adelantar su desarrollo." }))
+        : Array.isArray(content.keywordsUsed)
+          ? content.keywordsUsed.slice(0, 8).map((item) => ({ idea: clampText(item?.idea, "", 180), how: clampText(item?.how, "", 260) })).filter((item) => item.idea && item.how)
+          : undefined,
       heroBond: content.heroBond ? clampText(content.heroBond, "", 220) : undefined,
       evidence: Array.isArray(content.evidence) ? content.evidence.slice(0, 3).map((item) => clampText(item, "", 140)).filter(Boolean) : undefined
     },

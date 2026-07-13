@@ -16,7 +16,7 @@ const dir = join(tmpdir(), `tinyquest-improvised-${process.pid}`);
 await mkdir(dir, { recursive: true });
 await transpile("../packages/game-engine/src/campaigns.ts", join(dir, "campaigns.mjs"));
 
-const { buildImprovisedCampaign, canonicalVisualAppearance, IMPROVISED_CAMPAIGN_ID } = await import(`file://${join(dir, "campaigns.mjs")}`);
+const { buildImprovisedCampaign, canonicalVisualAppearance, requestedStoryIdeas, IMPROVISED_CAMPAIGN_ID } = await import(`file://${join(dir, "campaigns.mjs")}`);
 
 const fullContent = {
   title: "El Faro que Come Nombres",
@@ -100,6 +100,25 @@ test("keywordsUsed conserva hasta ocho ideas completas para explicarlas en el lo
   assert.equal(campaign.forgeNotes?.keywordsUsed?.length, 8);
   assert.ok(campaign.forgeNotes.keywordsUsed[0].idea.length > 40);
   assert.ok(campaign.forgeNotes.keywordsUsed[0].how.length > 90);
+});
+
+test("sin ideas opcionales no se expone ninguna explicación inventada por el LLM", () => {
+  const campaign = buildImprovisedCampaign({
+    ...fullContent,
+    keywordsUsed: [{ idea: "Una traición inventada", how: "El testigo será el culpable." }]
+  }, "");
+  assert.deepEqual(campaign.forgeNotes?.keywordsUsed, []);
+});
+
+test("el lobby conserva solo fragmentos literales escritos por el jugador", () => {
+  const prompt = "elfos del desierto, una deuda de agua; mi hermana desaparecida";
+  assert.deepEqual(requestedStoryIdeas(prompt), ["elfos del desierto", "una deuda de agua", "mi hermana desaparecida"]);
+  const campaign = buildImprovisedCampaign({
+    ...fullContent,
+    keywordsUsed: [{ idea: "El asesino es la hermana", how: "Giro final secreto." }]
+  }, prompt);
+  assert.deepEqual(campaign.forgeNotes?.keywordsUsed?.map((item) => item.idea), ["elfos del desierto", "una deuda de agua", "mi hermana desaparecida"]);
+  assert.ok(campaign.forgeNotes?.keywordsUsed?.every((item) => !/asesino|giro|secreto/i.test(`${item.idea} ${item.how}`)));
 });
 
 test("buildImprovisedCampaign resiste contenido incompleto del LLM", () => {

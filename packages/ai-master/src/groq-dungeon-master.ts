@@ -420,13 +420,13 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     const world = input.worldContext;
     const wish = input.userPrompt?.trim() ?? "";
     const system = [
-      "Sos el arquitecto de historias de Tiny Quest, un juego de misterio narrativo en español.",
+      "Sos el arquitecto de historias y editor literario de Tiny Quest, un juego de misterio narrativo en español. Escribís con precisión de novelista: imágenes concretas, tensión humana y ninguna frase de tráiler genérico.",
       "Diseñá una historia jugable de 4 escenas con un culpable oculto.",
       ...(world ? [
         `La historia ocurre en ${world.worldName} (${world.era}). Ambiente sellado: ${world.ambience}`,
         `REGLAS INMUTABLES del mundo — respetalas en premisa, pistas y giro, pero NO las enuncies de golpe: el grupo las descubre jugando: ${world.rules.join(" · ")}`,
         `Tono y elementos de este mundo: ${world.seasoning}`,
-        `Punto de entrada de los héroes (perspectiva ${world.perspective}): ${world.entryLine} La escena 1 arranca exactamente ahí.`
+        `Punto de entrada de los héroes (perspectiva ${world.perspective}): ${world.entryLine} La escena 1 arranca exactamente ahí, pero premise NO repite ni parafrasea esta llegada: avanza un hecho dramático después.`
       ] : []),
       // El pedido del equipo manda: el mundo es el escenario, no una excusa para ignorarlo.
       ...(wish ? [
@@ -457,8 +457,11 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       "APARIENCIA CANÓNICA PARA IMÁGENES: appearance no es prosa decorativa sino una ficha visual literal y NO puede contradecir description. TODA appearance empieza por un TIPO explícito, elegí uno: 'mujer', 'hombre', 'hombre afeminado', 'andrógino/intersexual', 'mascota/criatura', 'híbrido' o 'fenómeno incorpóreo'. Luego indicá especie, edad aparente, anatomía exacta, cara o cabeza, cuerpo/silueta, ropa si existe y marca distintiva. Conservá cualquier anatomía solicitada SIN normalizarla: cantidad exacta de ojos, brazos, alas o cuernos; cicatrices, discapacidad, prótesis, escamas, mezcla de especies y asimetrías. Si dice tres ojos, escribí 'exactamente tres ojos visibles' y dónde están. Una criatura mítica, fusionada, alienígena, dracónica o animal sigue siendo NO HUMANA y conserva su silueta real; centauros/minotauros conservan ambas mitades; solo escribí humanoide/antropomorfa si el pedido lo exige. Una amenaza que ES viento, portal, niebla, llama o anomalía usa tipo 'fenómeno incorpóreo' y NO recibe rostro humano.",
       "Si el pedido incluye una identidad para el héroe ('elfo oscuro', 'vampiro'), aplicásela AL HÉROE: su linaje, su condición social o el prejuicio del mundo contra él forman parte del conflicto — no la conviertas en un NPC suelto.",
       "AUTO-REVISIÓN: la salida es INVÁLIDA si ignora o renombra una entidad pedida, adelanta una criatura futura, cambia la escala temporal, inventa una mascota no pedida o no ata al héroe al conflicto.",
-      "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal, MÁXIMO 20 palabras, frase COMPLETA), risk (qué PERDÉS si fallás — cosas con nombre: tu linaje, tu perro, un juramento; máximo 20 palabras), firstMystery (la primera pregunta que pica), timeLimit (el reloj coherente con la escala que pidió el jugador: corto si es urgente, largo si pidió una búsqueda de semanas/meses). keywordsUsed = por CADA idea del pedido, cómo se usó y con qué función.",
-      "PROHIBIDO el tono de sinopsis genérica: nada de 'la única forma de limpiar tu nombre', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo'. Escribí como novelista: premise de MÁXIMO 3 frases con al menos UN detalle sensorial concreto (un olor, un objeto en una mano, un gesto) y UNA imagen memorable. Todo texto visible debe poder leerse en voz alta sin vergüenza.",
+      "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal, MÁXIMO 20 palabras, frase COMPLETA), risk (qué PERDÉS si fallás — cosas con nombre: tu linaje, tu perro, un juramento; máximo 20 palabras), firstMystery (la primera pregunta que pica), timeLimit (el reloj coherente con la escala que pidió el jugador: corto si es urgente, largo si pidió una búsqueda de semanas/meses). Si NO hubo pedido especial, keywordsUsed DEBE ser []. Si lo hubo, cada idea es una CITA breve y literal del pedido; how explica su función sin revelar culpables, pistas, apariciones futuras ni giros.",
+      "TÍTULO LITERARIO (CRÍTICO): 3-8 palabras, singular y recordable. Debe nacer de una contradicción, objeto, deuda, lugar o decisión CONCRETA de esta historia; no resumas el mundo ni recicles el nombre de su fiesta. Prohibidos títulos intercambiables que empiecen 'El Eco de', 'La Sombra de', 'El Susurro de', 'El Secreto de', 'El Misterio de', 'El Destino de', 'La Maldición de' o 'El Despertar de'. Tampoco uses subtítulos ni dos puntos.",
+      "PREMISE LITERARIA (CRÍTICO): 2-3 oraciones completas y 55-105 palabras. Empieza un latido DESPUÉS del punto de entrada ya dado. Presenta (1) una persona o fuerza que hace algo irreversible, (2) un detalle sensorial y un objeto físico memorable, y (3) una pérdida o elección que obligue al héroe a actuar. No enumeres lore, no expliques las reglas del mundo y no reveles la verdad oculta.",
+      "ESCENAS CON AUTORÍA: cada título señala un lugar, objeto o acontecimiento irrepetible de ESA escena. Prohibidos 'La Verdad Torcida', 'La Decisión Final', 'El Enfrentamiento Final', 'La Revelación' y equivalentes vacíos.",
+      "PROHIBIDO el tono de sinopsis genérica: nada de 'la única esperanza', 'la única forma', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo', 'un oscuro secreto' o 'una antigua amenaza'. La imagen poética nunca sustituye el conflicto jugable. Todo texto visible debe poder leerse en voz alta sin vergüenza.",
       'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove","appearance"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[3-5 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4,"isFalse":bool}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"],"npcRelations":[2-3 x {"from","to","nature"}]}. appearance = ficha visual literal y dibujable de 1 frase que SIEMPRE empieza con el TIPO permitido y coincide con description. threat.appearance es obligatoria y sigue la misma regla, incluso si es un fenómeno sin cuerpo. Variá MUCHO los cuerpos. bond = relación dramática con el héroe en 3-8 palabras. whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
     ].join(" ");
     const messages: GroqMessage[] = [
@@ -468,9 +471,16 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     // El LLM a veces devuelve JSON malformado o truncado por límite de tokens:
     // se intenta crudo → reparado, y si nada sirve se pide la historia de nuevo una vez.
     // (la revisión de coherencia corre después de cada intento; ver storyCoherenceIssues)
-    const attempt = async (): Promise<ImprovisedStoryContent | null> => {
+    const attempt = async (revisionIssues: string[] = []): Promise<ImprovisedStoryContent | null> => {
       // Los bloques nuevos (summary/keywords/evidence/bonds) piden más espacio de salida.
-      const json = await this.callGroqWithFailover(messages, { forceJson: true, maxTokens: 4400 }, "story-forge");
+      const attemptMessages = revisionIssues.length === 0 ? messages : [
+        ...messages,
+        {
+          role: "user" as const,
+          content: `REVISIÓN EDITORIAL OBLIGATORIA. La versión anterior falló por: ${revisionIssues.slice(0, 10).join("; ")}. Reescribí el JSON completo desde cero. Conservá nombres y requisitos del pedido, pero corregí específicamente título, premise, títulos de escenas y cualquier incoherencia marcada. No expliques la revisión.`
+        }
+      ];
+      const json = await this.callGroqWithFailover(attemptMessages, { forceJson: true, maxTokens: 4400 }, revisionIssues.length ? "story-forge-editorial-retry" : "story-forge");
       for (const candidate of [json, repairLooseJson(json)]) {
         try {
           const parsed = improvisedStorySchema.safeParse(parseGroqJson(candidate));
@@ -490,7 +500,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     let story = first;
     if (!first || firstIssues.length > 0) {
       if (first) logDmEvent("story-forge", { ok: false, coherence: firstIssues });
-      const second = await attempt();
+      const second = await attempt(firstIssues);
       if (second) {
         const secondIssues = storyCoherenceIssues(second, input);
         story = !first || secondIssues.length < firstIssues.length ? second : first;

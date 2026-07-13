@@ -68,6 +68,14 @@ test("Frente y Cuerpo comparten seed temporal y una pestaña nueva no revive cac
   assert.match(appSource, /Recuperar versión anterior/);
 });
 
+test("editar rasgos no queda bloqueado por la generación y guardar confirma cambios pendientes", () => {
+  assert.match(appSource, /CharacterDesigner draft=\{draft\} setDraft=\{setDraft\} disabled=\{false\} portraitBusy=\{heroPairBusy\}/);
+  assert.match(appSource, /if \(heroImageHasPendingChanges\) \{\s*setConfirmPortraitUpdate\(true\)/s);
+  assert.match(appSource, /Cambiaste rasgos físicos que todavía no aparecen en Frente y Cuerpo/);
+  assert.match(appSource, /Sí, guardar y actualizar/);
+  assert.match(appSource, /disabled=\{disabled \|\| portraitBusy \|\| !heroLookDone\}/);
+});
+
 test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
   assert.match(appSource, /linkPortraitStyleReferences\(urls\.face, \["\/assets\/style\/face-style-oil\.jpg"\]\)/);

@@ -4064,6 +4064,47 @@ img.npcPortrait[src^="/assets/companions/"] {
 }
 @keyframes forgeButtonPulse { 50% { transform: translateY(-1px) scale(1.025); box-shadow: 0 0 0 5px rgba(255, 203, 69, .2), 0 0 28px rgba(255, 190, 43, .55); } }
 
+.heroEditBusyNote {
+  margin: 0;
+  color: #d8cda9;
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-align: center;
+}
+.heroSaveConfirmBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 3, 7, .82);
+  backdrop-filter: blur(5px);
+}
+.heroSaveConfirm {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 13px;
+  padding: clamp(20px, 4vw, 30px);
+  border: 1px solid rgba(255, 207, 99, .62);
+  border-radius: 15px;
+  background: radial-gradient(circle at 50% 0, rgba(88, 58, 18, .28), transparent 52%), #100c0d;
+  box-shadow: 0 24px 80px rgba(0,0,0,.7), inset 0 1px rgba(255,240,190,.08);
+}
+.heroSaveConfirm > strong {
+  color: #ffe39a;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: clamp(18px, 4vw, 23px);
+}
+.heroSaveConfirm > p { margin: 0; color: #eee3c9; line-height: 1.6; }
+.heroSaveConfirm > span { color: #cbbd9c; font-size: 13px; }
+.heroSaveConfirm > div { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.heroSaveConfirm .soloButton { min-height: 42px; }
+@media (max-width: 520px) {
+  .heroSaveConfirm > div { display: grid; }
+  .heroSaveConfirm > div button { width: 100%; }
+}
+
 .heroPortraitZoomButton {
   display: block;
   width: 100%;
