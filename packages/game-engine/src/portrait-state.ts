@@ -1,7 +1,7 @@
 import type { Character, StatKey } from "./types";
 
 const portraitStatOrder: StatKey[] = ["body", "mind", "charm", "creativity", "courage", "focus", "luck"];
-export const HERO_PORTRAIT_IDENTITY_VERSION = "hero-v21";
+export const HERO_PORTRAIT_IDENTITY_VERSION = "hero-v22";
 
 function dominantStat(character: Character): StatKey {
   return portraitStatOrder.reduce((best, stat) => character.stats[stat] > character.stats[best] ? stat : best, portraitStatOrder[0]);

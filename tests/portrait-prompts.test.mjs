@@ -29,7 +29,7 @@ const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\
 test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", () => {
   const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt, /HERO FACE VARIANT V21/);
+  assert.match(prompt, /HERO FACE VARIANT V22/);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("CANONICAL SPEC:") < prompt.indexOf("CAMERA:"));
   assert.match(prompt.slice(0, 700), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
@@ -43,7 +43,7 @@ test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", ()
 test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V21.*CAMERA FIRST.*whole head through feet.*margins.*BOTH KNEES.*crops below knees/is);
+  assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V22.*CAMERA FIRST.*whole head through feet.*margins.*BOTH KNEES.*crops below knees/is);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.match(prompt, /FULLY CLOTHED opaque medieval layers/i);
   assert.match(prompt, /NO blur, deformity, extra digits\/limbs.*nudity\/bare chest.*mixed gender anatomy/is);
@@ -71,11 +71,13 @@ test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
   assert.match(appSource, /linkPortraitStyleReferences\(urls\.face, \["\/assets\/style\/face-style-oil\.jpg"\]\)/);
   assert.doesNotMatch(appSource, /linkPortraitReference\(urls\.fullbody, urls\.face\)/);
-  assert.match(workerSource, /HERO FACE VARIANT V21/);
+  assert.match(workerSource, /HERO FACE VARIANT V22/);
+  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v22"/);
   assert.match(workerSource, /IMMUTABLE canonical full character and wardrobe master/);
   assert.match(workerSource, /Copy the EXACT same person, facial geometry, adult sex\/gender presentation, species, anatomy, skin, iris and hair colors\/LENGTH/);
   assert.match(workerSource, /face and torso MUST express the same coherent gender/);
   assert.match(workerSource, /Keep chest and torso fully clothed/);
+  assert.match(workerSource, /Reject anime, doll-face, beauty-render and glossy digital smoothness/);
   assert.match(workerSource, /Change ONLY camera to close head-and-shoulders/);
   assert.match(workerSource, /Expression only moves brows, eyelids and mouth; never geometry/);
   assert.match(portraitSource, /if \(referenceUrl\) throw new ReferenceVariantError\(\)/);

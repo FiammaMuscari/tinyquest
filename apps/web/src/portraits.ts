@@ -76,17 +76,17 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V21. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; not frontal/full-body. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and upper clothes; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V22. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; not frontal/full-body. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and upper clothes; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V21 fuerza
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V22 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V21. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA FIRST: distant single standing figure, whole head through feet visible with margins, BOTH KNEES mandatory; client crops below knees. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Face at 30 degrees, both eyes visible. ${heroPromptTail(name, styleHint)} MASTER PERSON/WARDROBE. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V22. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA FIRST: distant single standing figure, whole head through feet visible with margins, BOTH KNEES mandatory; client crops below knees. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Face at 30 degrees, both eyes visible. ${heroPromptTail(name, styleHint)} MASTER PERSON/WARDROBE. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -499,7 +499,7 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
 
 function needsKneeUpCrop(url: string): boolean {
   try {
-    return /TINYQUEST HERO BODY MASTER V(?:19|20|21)/.test(decodeURIComponent(new URL(url).pathname));
+    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22)/.test(decodeURIComponent(new URL(url).pathname));
   } catch {
     return false;
   }

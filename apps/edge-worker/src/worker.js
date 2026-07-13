@@ -1,5 +1,7 @@
 export { RoomHub } from "./room-hub.js";
 
+const IMAGE_PIPELINE_VERSION = "image-v22";
+
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status,
   headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }
@@ -37,9 +39,9 @@ async function cfImage(request, env, ctx) {
   // Caché global por payload: IndexedDB evita repetir dentro de un navegador;
   // esto evita volver a gastar IA en otro dispositivo o después de limpiar datos.
   // Incluye seed y referencias base64, por lo que dos identidades nunca colisionan.
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${IMAGE_PIPELINE_VERSION}\n${payload}`));
   const cacheId = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  const cacheKey = new Request(`https://tinyquest.internal/image/${cacheId}`);
+  const cacheKey = new Request(`https://tinyquest.internal/image/${IMAGE_PIPELINE_VERSION}/${cacheId}`);
   const cached = await caches.default.match(cacheKey);
   if (cached) return new Response(cached.body, cached);
   const cacheGenerated = (response) => {
@@ -79,12 +81,12 @@ async function cfImage(request, env, ctx) {
     const form = new FormData();
     const styleStart = referenceImage ? 1 : 0;
     const styleInstruction = styleImages.length
-      ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful knee-up silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.`
+      ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their mature medieval oil technique: dry matte pigment, visible canvas tooth, rough broken brush strokes, believable asymmetry, normal-sized eyes, natural proportions, hand-painted costume and restrained tonal background. Reject anime, doll-face, beauty-render and glossy digital smoothness. NEVER copy their person, elf anatomy, gender, face, skin, eye/hair colors, clothes, weapons or pose; canonical identity overrides every reference.`
       : "";
-    const faceVariant = /^TINYQUEST HERO FACE VARIANT V21\b/.test(input.prompt);
+    const faceVariant = /^TINYQUEST HERO FACE VARIANT V22\b/.test(input.prompt);
     form.append("prompt", referenceImage
       ? faceVariant
-        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, facial geometry, adult sex/gender presentation, species, anatomy, skin, iris and hair colors/LENGTH, scar, collar, upper garments, armor, jewelry and weapon details. The face and torso MUST express the same coherent gender; never attach a masculine torso to a woman or a feminine torso to a man. Keep chest and torso fully clothed in the exact opaque medieval layers from Image 0. Change ONLY camera to close head-and-shoulders at exactly 30 degrees, both eyes and entire head visible. Expression only moves brows, eyelids and mouth; never geometry. Never redesign person, body or outfit. ${styleInstruction} Matte medieval oil; simple dark gradient; one character. ${input.prompt.slice(0, 1050)}`
+        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, facial geometry, adult sex/gender presentation, species, anatomy, skin, iris and hair colors/LENGTH, collar, upper garments, armor, jewelry and weapon details. Preserve facial marks only when the canonical spec explicitly requires one; otherwise keep the same clear unmarked face from Image 0. The face and torso MUST express the same coherent gender; never attach a masculine torso to a woman or a feminine torso to a man. Keep chest and torso fully clothed in the exact opaque medieval layers from Image 0. Change ONLY camera to close head-and-shoulders at exactly 30 degrees, both eyes and entire head visible. Expression only moves brows, eyelids and mouth; never geometry. Never redesign person, body or outfit. ${styleInstruction} Matte medieval oil; simple dark gradient; one character. ${input.prompt.slice(0, 1050)}`
         : `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the exact person and outfit. ${styleInstruction} ${input.prompt.slice(0, 1400)}`
       : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));

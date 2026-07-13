@@ -55,8 +55,8 @@ test("raza y rasgos visuales dejan la imagen pendiente", () => {
 
 test("la firma versionada migra caché y contiene el largo de pelo", () => {
   const key = heroPortraitIdentityKey(hero());
-  assert.equal(HERO_PORTRAIT_IDENTITY_VERSION, "hero-v21");
-  assert.match(key, /^hero-v21\|/);
+  assert.equal(HERO_PORTRAIT_IDENTITY_VERSION, "hero-v22");
+  assert.match(key, /^hero-v22\|/);
   assert.match(key, /\|largo\|/);
 });
 

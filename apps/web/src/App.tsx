@@ -2398,7 +2398,7 @@ function heroPortraitSpec(draft: Character): { name: string; appearance: string;
   const exactHair = look.hairColor ? `exact hair ${lookHairPrompt[look.hairColor] ?? look.hairColor}` : "hair not selected";
   const exactScar = look.scar && look.scar !== "sin cicatrices"
     ? `EXACT PERMANENT SCAR: ${lookScarPrompt[look.scar] ?? look.scar}; keep identical in both shots`
-    : "NO SCARS anywhere on face or body";
+    : "clear unmarked face and body";
   const exactHairLength = look.hairLength ? lookHairLengthPrompt[look.hairLength] ?? look.hairLength : "hair length not selected";
   const identity = selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : draft.species;
   // El spec composable ordena género → colores/largo → ropa → anatomía para que
