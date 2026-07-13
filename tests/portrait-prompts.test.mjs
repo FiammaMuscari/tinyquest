@@ -29,15 +29,14 @@ const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\
 test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", () => {
   const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt, /HERO FACE VARIANT V24/);
+  assert.match(prompt, /HERO FACE VARIANT V25/);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("CANONICAL SPEC:") < prompt.indexOf("CAMERA:"));
-  assert.match(prompt.slice(0, 700), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
-  assert.match(prompt, /TEXT COLOR LOCK: written skin, iris and hair colors override references/i);
-  assert.match(prompt, /EXPRESSION LOCK: calm alert self-possession/i);
+  assert.match(prompt.slice(0, 900), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
+  assert.match(prompt, /COLOR LOCK: written skin, iris and hair colors are literal and immutable/i);
   assert.match(prompt, /FACE QUALITY: crisp believable proportions/i);
   assert.match(prompt, /FACIAL LANDMARK LOCK:.*anatomical side.*never mirror\/move\/omit/is);
-  assert.match(prompt, /pixel-identical neckline, collar, garments, armor, jewelry and colors/i);
+  assert.match(prompt, /SAME BODY MASTER: exact person, adult age, anatomy, hair, face, neckline, garments, armor, jewelry and colors/i);
   assert.equal(new URL(url).searchParams.get("width"), "512");
   assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.ok(prompt.length <= 1960, `prompt de frente truncable: ${prompt.length}`);
@@ -46,7 +45,7 @@ test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", ()
 test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 1300), /HERO BODY MASTER V24.*CHARACTER-SHEET CAMERA.*90% of frame height.*whole head through feet.*BOTH KNEES.*crops below knees/is);
+  assert.match(prompt.slice(0, 1300), /HERO BODY MASTER V25.*CHARACTER-SHEET CAMERA.*90% of frame height.*whole head through feet.*BOTH KNEES.*crops below knees/is);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.match(prompt, /FULLY CLOTHED opaque medieval layers/i);
   assert.match(prompt, /DETAIL PARITY:.*close-portrait quality/i);
@@ -56,7 +55,7 @@ test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies",
   assert.equal(new URL(url).searchParams.get("width"), "576");
   assert.equal(new URL(url).searchParams.get("height"), "768");
   assert.deepEqual(portraits.kneeUpCropGeometry(576, 768), { sx: 13, sy: 0, sw: 551, sh: 630, width: 448, height: 512 });
-  assert.match(portraitSource, /if \(needsKneeUpCrop\(url\)\) blob = await cropKneeUpPortrait\(blob\)/);
+  assert.match(portraitSource, /if \(needsKneeUpCrop\(url\)\) \{[\s\S]*blob = await cropKneeUpPortrait\(blob\)/);
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
 
@@ -76,6 +75,9 @@ test("Frente muestra un crop local del master mientras llega la variante final",
   assert.deepEqual(portraits.facePreviewCropGeometry(448, 512), { sx: 96, sy: 8, side: 256, width: 512, height: 512 });
   assert.match(portraitSource, /loadLinkedReferencePreview\(url\)/);
   assert.match(portraitSource, /prev\.status === "ready" \? prev : \{ src: previewSrc, status: "loading" \}/);
+  assert.match(portraitSource, /referenceUrl && isCanonicalFaceCrop\(url\)/);
+  assert.match(portraitSource, /rawMasterKey\(referenceUrl\)/);
+  assert.match(portraitSource, /blob = await cropFacePreview\(source\)/);
 });
 
 test("editar rasgos no queda bloqueado por la generación y guardar confirma cambios pendientes", () => {
@@ -94,8 +96,8 @@ test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
   assert.doesNotMatch(appSource, /linkPortraitStyleReferences\(urls\.face/);
   assert.doesNotMatch(appSource, /linkPortraitReference\(urls\.fullbody, urls\.face\)/);
-  assert.match(workerSource, /HERO FACE VARIANT V24/);
-  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v24"/);
+  assert.match(workerSource, /HERO FACE VARIANT V25/);
+  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v25"/);
   assert.match(workerSource, /IMMUTABLE canonical full character and wardrobe master/);
   assert.match(workerSource, /Copy the EXACT same person, facial geometry, adult sex\/gender presentation, species, anatomy, skin, iris and hair colors\/LENGTH/);
   assert.match(workerSource, /face and torso MUST express the same coherent gender/);

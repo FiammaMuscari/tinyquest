@@ -62,31 +62,29 @@ export function portraitSessionSeedOffset(): number {
 // permite "reimaginar": nueva cara para la misma identidad.
 // MISMO TRAZO en las dos tomas: la raíz del prompt es idéntica palabra por palabra
 // y solo cambia el ENCUADRE — frente = primer plano 3/4; cuerpo = de cabeza a
-// rodillas. Frente se deriva desde Cuerpo por img2img: alejar una imagen cercana
-// inventaba piernas y hasta recortaba la cabeza; acercar un master es estable.
+// rodillas. Frente se recorta del master crudo: no existe una segunda IA capaz
+// de cambiar edad, rostro, ropa o colores entre ambas tomas.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
-const heroPromptTail = (name: string, styleHint: string) =>
-  ` Character: ${name}. ${styleHint}. ${facialExpressionPrompt("neutral-alert")}`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
-  // mayor consistencia de personaje posible sin img2img (kontext es de pago).
+  // mayor consistencia de personaje posible antes del recorte local.
   // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
   // Mantener EXACTO el prompt aprobado del avatar: recupera las imágenes previas
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V24. ${TINY_QUEST_PAINT_MEDIUM}. FACIAL LANDMARK LOCK: the exact SCAR field is mandatory; place it on the stated anatomical side, visibly and only there, never mirror/move/omit it. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. TEXT COLOR LOCK: written skin, iris and hair colors override references; never default irises to brown. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; requested scar side nearest camera. DETAIL PARITY: premium focal detail in eyes, lashes, skin texture, individual hair locks, scar edges, collar seams, jewelry and material grain; clean deliberate brushwork, never a rough draft. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and pixel-identical neckline, collar, garments, armor, jewelry and colors; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V25. ${TINY_QUEST_PAINT_MEDIUM}. AGE LOCK: unmistakably adult, never child, teenager, baby-faced or chibi. FACIAL LANDMARK LOCK: the exact SCAR field is mandatory; place it on the stated anatomical side, visibly and only there, never mirror/move/omit it. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. COLOR LOCK: written skin, iris and hair colors are literal and immutable; hair keeps the named base pigment roots-to-tips, never another color. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; requested scar side nearest camera. DETAIL PARITY: crisp eyes, skin, hair locks, scar, collar, jewelry and material grain; finished deliberate brushwork. Character: ${name}. ${styleHint}. SAME BODY MASTER: exact person, adult age, anatomy, hair, face, neckline, garments, armor, jewelry and colors; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V24 fuerza
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V25 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V24. ${TINY_QUEST_PAINT_MEDIUM}. CHARACTER-SHEET CAMERA, NOT AN ESTABLISHING SHOT: one standing figure occupies 90% of frame height and 72% of frame width; hair near top edge, boots near bottom edge, whole head through feet visible, BOTH KNEES mandatory; client crops below knees. No large empty space. CAMERA: eye-level 85mm portrait lens, subtle 30-degree turn, both eyes readable, no perspective distortion. DETAIL PARITY: face, irises, hair locks, scar, hands, garment seams, embroidery, buckles, jewelry, weapon and material grain are crisp at close-portrait quality, never simplified. BACKGROUND LOCK: plain dark neutral gradient only; no sky, clouds, horizon, landscape, architecture or scenery. FACIAL LANDMARK LOCK: exact SCAR field is mandatory and stays on the stated anatomical side; requested scar side faces camera. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Character: ${name}. ${styleHint}. Calm alert natural expression. MASTER PERSON/WARDROBE: establish one precise immutable outfit. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V25. ${TINY_QUEST_PAINT_MEDIUM}. AGE LOCK: unmistakably adult anatomy and face, never child, teenager, baby-faced or chibi. CHARACTER-SHEET CAMERA, NOT AN ESTABLISHING SHOT: one standing figure occupies 90% of frame height; whole head through feet visible, BOTH KNEES mandatory; client crops below knees. No large empty space. CAMERA: eye-level 85mm portrait lens, subtle 30-degree turn, both eyes readable, no perspective distortion. COLOR LOCK: written skin, iris and hair colors are literal and immutable; hair keeps the named base pigment uniformly roots-to-tips. DETAIL PARITY: face, irises, hair locks, scar, hands, garment seams, embroidery, buckles, jewelry, weapon and material grain are crisp at close-portrait quality, never simplified. BACKGROUND LOCK: plain dark neutral gradient only; no sky, clouds, horizon, landscape, architecture or scenery. FACIAL LANDMARK LOCK: exact SCAR field is mandatory and stays on the stated anatomical side; requested scar side faces camera. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Character: ${name}. ${styleHint}. Calm alert natural expression. MASTER PERSON/WARDROBE: establish one precise immutable outfit. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=576&height=768&nologo=true&model=flux&seed=${seed}`;
 }
@@ -499,11 +497,21 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
 
 function needsKneeUpCrop(url: string): boolean {
   try {
-    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22|23|24)/.test(decodeURIComponent(new URL(url).pathname));
+    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22|23|24|25)/.test(decodeURIComponent(new URL(url).pathname));
   } catch {
     return false;
   }
 }
+
+function isCanonicalFaceCrop(url: string): boolean {
+  try {
+    return /TINYQUEST HERO FACE VARIANT V25/.test(decodeURIComponent(new URL(url).pathname));
+  } catch {
+    return false;
+  }
+}
+
+const rawMasterKey = (url: string) => `${url}#tinyquest-raw-master-v1`;
 
 async function cropKneeUpPortrait(blob: Blob): Promise<Blob> {
   if (typeof document === "undefined") return blob;
@@ -551,8 +559,27 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
   const promise = (async () => {
     let blob = await idbGet(url).catch(() => undefined);
     if (!blob) {
-      blob = await fetchPortraitBlob(url, options.priority ?? false);
-      if (needsKneeUpCrop(url)) blob = await cropKneeUpPortrait(blob);
+      const referenceUrl = portraitReferences.get(url);
+      if (referenceUrl && isCanonicalFaceCrop(url)) {
+        // Frente ya no es una segunda reinterpretación de IA: es un recorte del
+        // master crudo. Así edad, rostro, pelo, piel, ropa y cicatriz son los
+        // mismos píxeles y resulta imposible convertir al adulto en niña o
+        // cambiarle el pigmento del cabello entre tomas.
+        await loadPortrait(referenceUrl, { priority: true });
+        const rawMaster = await idbGet(rawMasterKey(referenceUrl)).catch(() => undefined);
+        const displayedMaster = readyObjectUrls.get(referenceUrl);
+        const source = rawMaster ?? (displayedMaster ? await fetch(displayedMaster).then((response) => response.blob()) : undefined);
+        if (!source) throw new ReferenceVariantError();
+        blob = await cropFacePreview(source);
+      } else {
+        blob = await fetchPortraitBlob(url, options.priority ?? false);
+        if (needsKneeUpCrop(url)) {
+          // Guardar además el master sin recortar: Frente necesita sus píxeles
+          // originales de 576×768, no un upscale del cuerpo mostrado.
+          await idbPut(rawMasterKey(url), blob).catch(() => undefined);
+          blob = await cropKneeUpPortrait(blob);
+        }
+      }
       await idbPut(url, blob).catch(() => undefined); // sin persistencia sigue funcionando en memoria
     }
     const objectUrl = URL.createObjectURL(blob);
@@ -565,9 +592,9 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
   return promise;
 }
 
-// Vista previa instantánea de Frente: apenas termina el Cuerpo master, recortamos
-// localmente cabeza/hombros y la mostramos mientras Klein pinta el 3/4 definitivo.
-// No hace otra llamada de IA, no ocupa la cola y ya comparte ropa/persona al 100%.
+// Frente instantáneo: apenas termina el Cuerpo master, recortamos localmente
+// cabeza/hombros. Es también el resultado final: no hace otra llamada de IA y
+// comparte edad, rostro, ropa y colores al 100%.
 const referencePreviewObjectUrls = new Map<string, string>();
 const referencePreviewInFlight = new Map<string, Promise<string>>();
 

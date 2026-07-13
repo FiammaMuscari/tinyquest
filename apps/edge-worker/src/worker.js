@@ -1,6 +1,6 @@
 export { RoomHub } from "./room-hub.js";
 
-const IMAGE_PIPELINE_VERSION = "image-v24";
+const IMAGE_PIPELINE_VERSION = "image-v25";
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status,
@@ -83,7 +83,7 @@ async function cfImage(request, env, ctx) {
     const styleInstruction = styleImages.length
       ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their mature medieval oil technique: dry matte pigment, visible canvas tooth, rough broken brush strokes, believable asymmetry, normal-sized eyes, natural proportions, hand-painted costume and restrained tonal background. Reject anime, doll-face, beauty-render and glossy digital smoothness. NEVER copy their person, elf anatomy, gender, face, skin, eye/hair colors, clothes, weapons or pose; canonical identity overrides every reference.`
       : "";
-    const faceVariant = /^TINYQUEST HERO FACE VARIANT V24\b/.test(input.prompt);
+    const faceVariant = /^TINYQUEST HERO FACE VARIANT V25\b/.test(input.prompt);
     const scarMatch = input.prompt.match(/EXACT PERMANENT SCAR:\s*([^;.\n]+)/i);
     const scarSide = scarMatch?.[1] ?? "";
     const scarCamera = /anatomical LEFT/i.test(scarSide)

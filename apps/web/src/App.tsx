@@ -672,9 +672,9 @@ export function App() {
   }
   function forgeHeroPortraitPair(seedNonce: number, source = draftRef.current) {
     const urls = heroImageUrls(source, seedNonce);
-    // Cuerpo es el master inmutable y Frente es su VARIANTE img2img 3/4.
-    // Acercar conserva identidad; expandir un rostro inventaba cuerpo y podía
-    // cortar la cabeza (bug comprobado en producción). Esta única fuente de
+    // Cuerpo es el master inmutable y Frente es su recorte local 3/4.
+    // Recortar conserva los mismos píxeles; expandir o reinterpretar un rostro
+    // inventaba edad, colores y cuerpo. Esta única fuente de
     // verdad garantiza misma persona, ropa, armas, colores y cicatrices.
     prepareHeroPortraitPair(urls);
     const shot = source.look?.avatarShot ?? "fullbody";
@@ -2391,7 +2391,7 @@ function lookComplete(draft: Character): boolean {
 }
 
 // Las dos imágenes del héroe con la MISMA identidad: Cuerpo es el master canónico
-// y Frente su acercamiento img2img 3/4. No son dos text-to-image sueltos.
+// y Frente su recorte local 3/4. No son dos generaciones independientes.
 function heroImageUrls(draft: Character, nonce = 0): { face: string; fullbody: string } {
   const spec = heroPortraitSpec(draft);
   return {

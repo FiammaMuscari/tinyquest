@@ -48,7 +48,7 @@ test("NPC 448² usa seis pasos mientras el héroe conserva ocho", async () => {
   assert.equal(npc.calls[0].input.height, 448);
 
   const hero = harness();
-  await generate("TINYQUEST HERO BODY MASTER V24. full standing figure", 384, 512, hero);
+  await generate("TINYQUEST HERO BODY MASTER V25. full standing figure", 384, 512, hero);
   assert.equal(hero.calls[0].input.steps, 8);
 });
 
