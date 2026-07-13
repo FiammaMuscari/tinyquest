@@ -34,6 +34,10 @@ test("cada mundo sellado está completo: reglas, tagline, entradas y sazón de f
       assert.notEqual(world.tagline, rule, `${world.id}: el tagline repite una regla`);
     }
   }
+
+  const visibleWorldCopy = worldEras.flatMap((world) => [world.tagline, world.entry.exterior, world.entry.interior]).join(" ");
+  assert.doesNotMatch(visibleWorldCopy, /\b(?:sos|tenés|podés|querés|cruzás|recordás|bombeás|caminás)\b/i);
+  assert.doesNotMatch(visibleWorldCopy, /borrarte con un pensamiento/i);
 });
 
 test("la historia madre de cada mundo autorado existe en el registro de campañas", () => {

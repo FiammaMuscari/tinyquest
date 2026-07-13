@@ -420,7 +420,8 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     const world = input.worldContext;
     const wish = input.userPrompt?.trim() ?? "";
     const system = [
-      "Sos el arquitecto de historias y editor literario de Tiny Quest, un juego de misterio narrativo en español. Escribís con precisión de novelista: imágenes concretas, tensión humana y ninguna frase de tráiler genérico.",
+      "Eres el arquitecto de historias y editor literario de Tiny Quest, un juego de misterio narrativo en español latino neutral. Tratas al jugador de tú y nunca empleas voseo ni conjugaciones rioplatenses. Escribes con precisión de novelista: imágenes concretas, tensión humana y ninguna frase de tráiler genérico.",
+      "CLARIDAD DE LAS IMÁGENES: una metáfora solo permanece si el lector puede entender qué sucede físicamente, qué se arriesga o qué capacidad concreta se está mostrando. Prohibidas amenazas vagas como 'borrarte con un pensamiento', 'el destino te reclama' o 'un poder inimaginable'; reemplázalas por gestos, consecuencias y detalles perceptibles propios del mundo.",
       "Diseñá una historia jugable de 4 escenas con un culpable oculto.",
       ...(world ? [
         `La historia ocurre en ${world.worldName} (${world.era}). Ambiente sellado: ${world.ambience}`,

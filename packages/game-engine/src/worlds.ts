@@ -20,7 +20,7 @@ export const worldEras: WorldEra[] = [
     ],
     forgeSeasoning: "Intriga política estilo Juego de Tronos en una metrópoli mágica medieval-oriental multirraza: academias de magia, gremios de Hunters, castas de sellos, armas malditas, telepatía entre razas y consejos de Predators sobre el destino de la humanidad. La violencia abierta está prohibida, así que los conflictos se libran en favores, duelos rituales, secretos y ascensos. Puede haber sangre al estilo Game of Thrones, nunca gore extremo. REGISTRO DE NOMBRES: apellidos con guiño inglés, de una sola palabra (Ashcombe, Morvane, Dunwyn, Blackwood, Ashford, Vayne).",
     entry: {
-      exterior: "Cruzás uno de los doce portales lunares con el sello de otro mundo cosido al brazo: en Veldaran sos apenas un junior sin nombre entre magos que podrían borrarte con un pensamiento.",
+      exterior: "Cruzas uno de los doce portales lunares con el sello de otro mundo cosido al brazo. En Veldaran eres apenas un junior sin nombre; a tu alrededor, los maestros pueden inmovilizarte, arrancarte el sello o detenerte el corazón con un solo gesto.",
       interior: "Creciste en las academias de Veldaran esperando tu primer sello; esta noche alguien de rango Hunter pronuncia tu nombre en un consejo al que jamás te invitaron."
     }
   },
@@ -40,7 +40,7 @@ export const worldEras: WorldEra[] = [
     forgeSeasoning: "Supervivencia y ciencia estilo Dune: escasez de agua, castas de mutantes y alienígenas, trajes selladores, peregrinaje de la luna roja y portales de viento a mundos donde siempre falta un recurso. El motor de la trama es científico-político: nivelar las castas y arreglar el sistema hidráulico. Trueques crueles, tecnología oxidada semiviva y un secreto sobre cómo se secó el mundo. REGISTRO DE NOMBRES: raíces árabe-fremen y casas nobles estilo Dune, de una sola palabra sin guion (Harkonnen, Fenring, Corrino, Bashar, Naib, Sayyadina, Farok, Shaddam).",
     entry: {
       exterior: "Un viento rojo te escupió por un portal a tres días de la aldea más cercana, sin agua y con un mapa de napas que no es de este mundo.",
-      interior: "Naciste en esta aldea de recolectores y bombeás agua desde que caminás; esta luna roja, el Festín de Akmoltemph'e amaneció con tu nombre en una deuda que no contrajiste."
+      interior: "Naciste en esta aldea de recolectores y bombeas agua desde que aprendiste a caminar; esta luna roja, el Festín de Akmoltemph'e amaneció con tu nombre en una deuda que no contrajiste."
     }
   },
   {
@@ -59,7 +59,7 @@ export const worldEras: WorldEra[] = [
     ],
     forgeSeasoning: "Mitología griega estilo World History Encyclopedia: Olimpo, dioses, semidioses y héroes con nombres de la época, oráculos, juramentos que pesan y política entre deidades. Tono más family-friendly que cruento —sangre al estilo Game of Thrones, jamás gore extremo tipo Berserk— salvo que la mesa pida más. Cruces opcionales con el panteón egipcio y la Roma legionaria como embajadas o rivales. REGISTRO DE NOMBRES: griegos clásicos o de terminación helena/hebrea, de una sola palabra sin guion (Theron, Kallias, Nikanor, Adrestos, Melanthios, Adiel, Netaniah).",
     entry: {
-      exterior: "Tu barco encalló donde el oráculo dijo que encallaría: te esperaban hace tres días y ya te cobraron la estadía en un juramento que no recordás haber hecho.",
+      exterior: "Tu barco encalló donde el oráculo dijo que encallaría: te esperaban desde hace tres días y ya cobraron tu estadía con un juramento que no recuerdas haber hecho.",
       interior: "Serviste toda tu vida en el templo chico de tu isla, hasta que hoy tu dios te habló por primera vez para convocarte al Olimpo… y pedirte algo que ningún mortal debería oír."
     }
   }
