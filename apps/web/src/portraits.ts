@@ -42,7 +42,8 @@ export function nameHash(name: string): number {
 // permite "reimaginar": nueva cara para la misma identidad.
 // MISMO TRAZO en las dos tomas: la raíz del prompt es idéntica palabra por palabra
 // y solo cambia el ENCUADRE — frente = primer plano 3/4; cuerpo = de cabeza a
-// rodillas. Cuerpo se deriva además desde Frente por img2img en el Worker.
+// rodillas. Frente se deriva desde Cuerpo por img2img: alejar una imagen cercana
+// inventaba piernas y hasta recortaba la cabeza; acercar un master es estable.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, styleHint: string) =>
   ` Character: ${name}. ${styleHint}. COLOR LOCK: exact selected skin, iris and hair colors, unaffected by species or lighting. Same canonical clothing, weapons, jewelry and scars in both shots. Simple dark tonal gradient only.`;
@@ -55,21 +56,17 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO MASTER V16. CAMERA MANDATORY: close three-quarter profile portrait, head and torso, face turned exactly 30 degrees from camera, both eyes visible, entire head and shoulders visible. This 30-degree three-quarter face angle is mandatory, never straight-on. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)}`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V19. CAMERA MANDATORY: close three-quarter profile portrait, head and torso, face turned exactly 30 degrees from camera, both eyes visible, entire head and shoulders visible. This 30-degree three-quarter face angle is mandatory, never straight-on. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND SAME UPPER OUTFIT AS BODY MASTER.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
-// Imagen de cuerpo hasta las rodillas: MISMO personaje que el retrato de frente.
-// La receta de consistencia es seed idéntica + prompt idéntico palabra por palabra
-// (mismo estilo, misma descripción, mismo fondo) cambiando SOLO el encuadre:
-// "close portrait" → "knee-up standing". No tocar el estilo acá — si
-// diverge del prompt de characterPortraitUrl, flux pinta OTRO personaje.
+// Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V18 fuerza
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V19 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO KNEE-UP SOURCE V18. RAW SOURCE FOR DETERMINISTIC KNEE CROP. CAMERA MANDATORY: full standing figure from entire head through both feet, camera 7 meters away, centered neutral pose, character occupies 78 percent of canvas height. BOTH KNEECAPS must be completely visible around 72 percent of canvas height. The disposable lower band below the knees exists only so the client can remove it. Face remains turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND PIXEL-FAITHFUL OUTFIT AS MASTER REFERENCE.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V19. RAW SOURCE FOR DETERMINISTIC KNEE CROP. CAMERA MANDATORY: full standing figure from entire head through both feet, camera 7 meters away, centered neutral pose, generous empty margin above the head and below the feet, character occupies 72 percent of canvas height. Entire head, hair, both shoulders, torso, hips, BOTH KNEECAPS and both feet must all be inside the frame. The disposable lower band below the knees exists only so the client can remove it. Face turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} THIS IS THE CANONICAL PERSON AND WARDROBE MASTER.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -296,6 +293,12 @@ class QualityImageQuotaError extends Error {
   }
 }
 
+class ReferenceVariantError extends Error {
+  constructor() {
+    super("TINYQUEST_REFERENCE_VARIANT_FAILED");
+  }
+}
+
 function nextUtcMidnight(): number {
   const now = new Date();
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
@@ -335,7 +338,11 @@ function styleReferencePayload(styleUrl: string): Promise<{ data: string; type: 
 }
 
 async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls: string[] = []): Promise<Blob | null> {
-  if (!cfImageAvailable || !url.startsWith("https://image.pollinations.ai/")) return null;
+  if (!url.startsWith("https://image.pollinations.ai/")) return null;
+  if (!cfImageAvailable) {
+    if (referenceUrl) throw new ReferenceVariantError();
+    return null;
+  }
   // No caer a Sana mientras la cuota de calidad está agotada. Al llegar el
   // reset diario UTC se rehabilita solo, sin recargar ni degradar el retrato.
   if (Date.now() < cfImageQuotaBlockedUntil) throw new QualityImageQuotaError(cfImageQuotaBlockedUntil);
@@ -374,13 +381,17 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
       });
       if (response.status === 501 || response.status === 404 || response.status === 405) {
         cfImageAvailable = false;
+        if (referenceUrl) throw new ReferenceVariantError();
         return null;
       }
       if (response.status === 429) {
         cfImageQuotaBlockedUntil = nextUtcMidnight();
         throw new QualityImageQuotaError(cfImageQuotaBlockedUntil);
       }
-      if (!response.ok) return null;
+      if (!response.ok) {
+        if (referenceUrl) throw new ReferenceVariantError();
+        return null;
+      }
       const blob = await response.blob();
       if (!blob.type.startsWith("image/")) return null;
       return blob;
@@ -390,7 +401,7 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
   } catch (error) {
     // No cachear una imagen inferior cuando se agota la cuota del proveedor de
     // calidad. El hook conserva la imagen anterior y reintenta más tarde.
-    if (error instanceof QualityImageQuotaError) throw error;
+    if (error instanceof QualityImageQuotaError || error instanceof ReferenceVariantError) throw error;
     return null;
   }
 }
@@ -467,7 +478,7 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
 
 function needsKneeUpCrop(url: string): boolean {
   try {
-    return decodeURIComponent(new URL(url).pathname).includes("TINYQUEST HERO KNEE-UP SOURCE V18");
+    return decodeURIComponent(new URL(url).pathname).includes("TINYQUEST HERO BODY MASTER V19");
   } catch {
     return false;
   }

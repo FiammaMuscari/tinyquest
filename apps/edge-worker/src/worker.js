@@ -81,8 +81,11 @@ async function cfImage(request, env, ctx) {
     const styleInstruction = styleImages.length
       ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful knee-up silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.`
       : "";
+    const faceVariant = /^TINYQUEST HERO FACE VARIANT V19\b/.test(input.prompt);
     form.append("prompt", referenceImage
-      ? `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the EXACT same person, face, canonical species and non-human anatomy, skin color, iris color, hair color and scar. Copy the EXACT same garments: colors, materials, collar, sleeves, seams, armor pieces, jewelry, weapons and every visible accessory; never redesign or substitute clothing. Do not add any garment, armor, weapon or accessory absent from image 0; extend hidden areas using the same fabric and construction instead of inventing details. ${styleInstruction} Change ONLY camera/framing to a full standing source sheet, camera 7 meters away, entire head-to-feet figure centered at 78 percent of canvas height. Both complete kneecaps must sit near 72 percent of canvas height. This raw lower band is disposable and will be removed by a deterministic client crop. Keep the same 30-degree three-quarter face angle with both eyes visible. Simple dark tonal gradient; one character only. ${input.prompt.slice(0, 1120)}`
+      ? faceVariant
+        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, face, species, anatomy, skin, iris and hair colors, scar, collar, upper garments, armor, jewelry and visible weapon details. Change ONLY camera to a close head-and-torso portrait with the face turned exactly 30 degrees, both eyes visible, entire head and shoulders inside frame. Never redesign the person or outfit. ${styleInstruction} Simple dark tonal gradient; one character only. ${input.prompt.slice(0, 1250)}`
+        : `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the exact person and outfit. ${styleInstruction} ${input.prompt.slice(0, 1400)}`
       : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));
     form.append("height", String(Math.min(1920, Math.max(256, Number(input.height) || 768))));
@@ -104,7 +107,7 @@ async function cfImage(request, env, ctx) {
     } catch (error) {
       // La edición de referencia es cara en neuronas. Si se agotó, Schnell
       // conserva el prompt/seed y evita caer al generador de baja calidad.
-      if (quotaError(error)) return runSchnell();
+      if (quotaError(error)) return json({ error: { message: "quality reference quota exhausted", stage: "flux-2-klein" } }, 429);
       return json({ error: { message: error instanceof Error ? error.message : String(error), stage: "flux-2-klein" } }, 502);
     }
     const encoded = edited?.image;

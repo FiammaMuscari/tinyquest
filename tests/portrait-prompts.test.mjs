@@ -9,6 +9,7 @@ const dir = await mkdtemp(join(tmpdir(), "tinyquest-portrait-prompts-"));
 const transpile = (source) => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
 const visualSource = await readFile(new URL("../apps/web/src/visual-identity.ts", import.meta.url), "utf8");
 const workerSource = await readFile(new URL("../apps/edge-worker/src/worker.js", import.meta.url), "utf8");
+const appSource = await readFile(new URL("../apps/web/src/App.tsx", import.meta.url), "utf8");
 let portraitSource = await readFile(new URL("../apps/web/src/portraits.ts", import.meta.url), "utf8");
 portraitSource = portraitSource
   .replace(/^import \{ useCallback[^\n]+\n/, "")
@@ -25,9 +26,10 @@ test("expone referencias de estilo separadas de la identidad", () => {
 const appearance = "EXACT SKIN COLOR: light warm beige skin. EXACT IRIS COLOR: strongly saturated VIOLET PURPLE irises, NOT blue. EXACT HAIR COLOR: metallic golden hair. female veil elf, black and gold medieval gown, scar on left eyebrow";
 const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""));
 
-test("Frente prioriza cámara e identidad antes del estilo", () => {
+test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", () => {
   const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
+  assert.match(prompt, /HERO FACE VARIANT V19/);
   assert.ok(prompt.indexOf("CAMERA MANDATORY") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
   assert.match(prompt.slice(0, 600), /three-quarter profile.*30 degrees.*VIOLET PURPLE/is);
   assert.equal(new URL(url).searchParams.get("width"), "512");
@@ -38,8 +40,8 @@ test("Frente prioriza cámara e identidad antes del estilo", () => {
 test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 900), /KNEE-UP SOURCE V18.*full standing figure.*BOTH KNEECAPS.*72 percent.*disposable lower band/is);
-  assert.ok(prompt.indexOf("KNEE-UP SOURCE V18") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
+  assert.match(prompt.slice(0, 1100), /HERO BODY MASTER V19.*full standing figure.*generous empty margin above the head and below the feet.*BOTH KNEECAPS.*disposable lower band/is);
+  assert.ok(prompt.indexOf("HERO BODY MASTER V19") < prompt.indexOf("IDENTITY AND WARDROBE LOCK"));
   assert.equal(new URL(url).searchParams.get("width"), "384");
   assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.deepEqual(portraits.kneeUpCropGeometry(384, 512), { sx: 8, sy: 0, sw: 368, sh: 420, width: 448, height: 512 });
@@ -47,13 +49,14 @@ test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies",
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
 
-test("Worker deriva Cuerpo desde el master sin rediseñar persona o ropa", () => {
-  assert.match(workerSource, /IMMUTABLE canonical character and wardrobe master/);
-  assert.match(workerSource, /Copy the EXACT same garments: colors, materials, collar, sleeves, seams, armor pieces, jewelry, weapons/);
-  assert.match(workerSource, /Do not add any garment, armor, weapon or accessory absent from image 0/);
-  assert.match(workerSource, /full standing source sheet, camera 7 meters away/);
-  assert.match(workerSource, /Both complete kneecaps must sit near 72 percent/);
-  assert.match(workerSource, /raw lower band is disposable and will be removed by a deterministic client crop/);
+test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
+  assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
+  assert.doesNotMatch(appSource, /linkPortraitReference\(urls\.fullbody, urls\.face\)/);
+  assert.match(workerSource, /HERO FACE VARIANT V19/);
+  assert.match(workerSource, /IMMUTABLE canonical full character and wardrobe master/);
+  assert.match(workerSource, /Copy the EXACT same person, face, species, anatomy, skin, iris and hair colors/);
+  assert.match(workerSource, /Change ONLY camera to a close head-and-torso portrait/);
+  assert.match(portraitSource, /if \(referenceUrl\) throw new ReferenceVariantError\(\)/);
 });
 
 test("medallones NPC usan perfil rápido de seis pasos", () => {
