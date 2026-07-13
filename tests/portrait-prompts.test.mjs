@@ -29,7 +29,7 @@ const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\
 test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", () => {
   const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt, /HERO FACE VARIANT V23/);
+  assert.match(prompt, /HERO FACE VARIANT V24/);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("CANONICAL SPEC:") < prompt.indexOf("CAMERA:"));
   assert.match(prompt.slice(0, 700), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
@@ -46,14 +46,16 @@ test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", ()
 test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 1300), /HERO BODY MASTER V23.*CAMERA FIRST.*whole head through feet.*margins.*BOTH KNEES.*crops below knees/is);
+  assert.match(prompt.slice(0, 1300), /HERO BODY MASTER V24.*CHARACTER-SHEET CAMERA.*90% of frame height.*whole head through feet.*BOTH KNEES.*crops below knees/is);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.match(prompt, /FULLY CLOTHED opaque medieval layers/i);
+  assert.match(prompt, /DETAIL PARITY:.*close-portrait quality/i);
+  assert.match(prompt, /BACKGROUND LOCK: plain dark neutral gradient only/i);
   assert.match(prompt, /NO blur, deformity, extra digits\/limbs.*nudity\/bare chest.*mixed gender anatomy/is);
-  assert.ok(prompt.indexOf("CAMERA FIRST:") < prompt.indexOf("CANONICAL SPEC:"));
-  assert.equal(new URL(url).searchParams.get("width"), "384");
-  assert.equal(new URL(url).searchParams.get("height"), "512");
-  assert.deepEqual(portraits.kneeUpCropGeometry(384, 512), { sx: 8, sy: 0, sw: 368, sh: 420, width: 448, height: 512 });
+  assert.ok(prompt.indexOf("CHARACTER-SHEET CAMERA") < prompt.indexOf("CANONICAL SPEC:"));
+  assert.equal(new URL(url).searchParams.get("width"), "576");
+  assert.equal(new URL(url).searchParams.get("height"), "768");
+  assert.deepEqual(portraits.kneeUpCropGeometry(576, 768), { sx: 13, sy: 0, sw: 551, sh: 630, width: 448, height: 512 });
   assert.match(portraitSource, /if \(needsKneeUpCrop\(url\)\) blob = await cropKneeUpPortrait\(blob\)/);
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
@@ -92,8 +94,8 @@ test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
   assert.doesNotMatch(appSource, /linkPortraitStyleReferences\(urls\.face/);
   assert.doesNotMatch(appSource, /linkPortraitReference\(urls\.fullbody, urls\.face\)/);
-  assert.match(workerSource, /HERO FACE VARIANT V23/);
-  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v23"/);
+  assert.match(workerSource, /HERO FACE VARIANT V24/);
+  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v24"/);
   assert.match(workerSource, /IMMUTABLE canonical full character and wardrobe master/);
   assert.match(workerSource, /Copy the EXACT same person, facial geometry, adult sex\/gender presentation, species, anatomy, skin, iris and hair colors\/LENGTH/);
   assert.match(workerSource, /face and torso MUST express the same coherent gender/);

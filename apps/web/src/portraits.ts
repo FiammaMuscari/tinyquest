@@ -76,19 +76,19 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V23. ${TINY_QUEST_PAINT_MEDIUM}. FACIAL LANDMARK LOCK: the exact SCAR field is mandatory; place it on the stated anatomical side, visibly and only there, never mirror/move/omit it. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. TEXT COLOR LOCK: written skin, iris and hair colors override references; never default irises to brown. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; requested scar side nearest camera. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and pixel-identical neckline, collar, garments, armor, jewelry and colors; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V24. ${TINY_QUEST_PAINT_MEDIUM}. FACIAL LANDMARK LOCK: the exact SCAR field is mandatory; place it on the stated anatomical side, visibly and only there, never mirror/move/omit it. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. TEXT COLOR LOCK: written skin, iris and hair colors override references; never default irises to brown. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; requested scar side nearest camera. DETAIL PARITY: premium focal detail in eyes, lashes, skin texture, individual hair locks, scar edges, collar seams, jewelry and material grain; clean deliberate brushwork, never a rough draft. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and pixel-identical neckline, collar, garments, armor, jewelry and colors; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V23 fuerza
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V24 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V23. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA FIRST: distant single standing figure, whole head through feet visible with margins, BOTH KNEES mandatory; client crops below knees. FACIAL LANDMARK LOCK: exact SCAR field is mandatory and stays on the stated anatomical side; requested scar side faces camera. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Face at 30 degrees, both eyes visible. ${heroPromptTail(name, styleHint)} MASTER PERSON/WARDROBE: establish one precise immutable outfit. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V24. ${TINY_QUEST_PAINT_MEDIUM}. CHARACTER-SHEET CAMERA, NOT AN ESTABLISHING SHOT: one standing figure occupies 90% of frame height and 72% of frame width; hair near top edge, boots near bottom edge, whole head through feet visible, BOTH KNEES mandatory; client crops below knees. No large empty space. CAMERA: eye-level 85mm portrait lens, subtle 30-degree turn, both eyes readable, no perspective distortion. DETAIL PARITY: face, irises, hair locks, scar, hands, garment seams, embroidery, buckles, jewelry, weapon and material grain are crisp at close-portrait quality, never simplified. BACKGROUND LOCK: plain dark neutral gradient only; no sky, clouds, horizon, landscape, architecture or scenery. FACIAL LANDMARK LOCK: exact SCAR field is mandatory and stays on the stated anatomical side; requested scar side faces camera. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Character: ${name}. ${styleHint}. Calm alert natural expression. MASTER PERSON/WARDROBE: establish one precise immutable outfit. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=576&height=768&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Arquetipos de linaje/oficio PRE-GENERADOS y guardados como assets fijos
@@ -499,7 +499,7 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
 
 function needsKneeUpCrop(url: string): boolean {
   try {
-    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22|23)/.test(decodeURIComponent(new URL(url).pathname));
+    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22|23|24)/.test(decodeURIComponent(new URL(url).pathname));
   } catch {
     return false;
   }
