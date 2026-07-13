@@ -76,7 +76,7 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V22. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; not frontal/full-body. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and upper clothes; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V22. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. TEXT COLOR LOCK: written skin, iris and hair colors override references; never default irises to brown. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; not frontal/full-body. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and upper clothes; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }

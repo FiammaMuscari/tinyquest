@@ -33,6 +33,7 @@ test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", ()
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("CANONICAL SPEC:") < prompt.indexOf("CAMERA:"));
   assert.match(prompt.slice(0, 700), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
+  assert.match(prompt, /TEXT COLOR LOCK: written skin, iris and hair colors override references/i);
   assert.match(prompt, /EXPRESSION LOCK: calm alert self-possession/i);
   assert.match(prompt, /FACE QUALITY: crisp believable proportions/i);
   assert.equal(new URL(url).searchParams.get("width"), "512");
@@ -77,6 +78,7 @@ test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(workerSource, /Copy the EXACT same person, facial geometry, adult sex\/gender presentation, species, anatomy, skin, iris and hair colors\/LENGTH/);
   assert.match(workerSource, /face and torso MUST express the same coherent gender/);
   assert.match(workerSource, /Keep chest and torso fully clothed/);
+  assert.match(workerSource, /explicit text CANONICAL SPEC is mandatory and overrides references/);
   assert.match(workerSource, /Reject anime, doll-face, beauty-render and glossy digital smoothness/);
   assert.match(workerSource, /Change ONLY camera to close head-and-shoulders/);
   assert.match(workerSource, /Expression only moves brows, eyelids and mouth; never geometry/);
