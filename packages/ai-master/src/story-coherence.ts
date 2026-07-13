@@ -1,8 +1,8 @@
 import type { ImprovisedStoryContent, ImprovisedStoryRequest } from "@tiny-quest/game-engine";
 
-const genericTitlePattern = /^(?:el|la|los|las)\s+(?:eco|sombra|susurro|secreto|misterio|destino|amenaza|maldici[oó]n|despertar|profec[ií]a)\s+(?:de|del|en)\b/i;
-const genericVisibleProsePattern = /\b(?:nada es lo que parece|antes de que sea demasiado tarde|una carrera contra el tiempo|la [uú]nica esperanza|la [uú]nica forma|deber[aá] descubrir|se ver[aá] obligado|un oscuro secreto|una antigua amenaza)\b/i;
-const genericSceneTitlePattern = /^(?:la verdad(?: torcida| oculta)?|la decisi[oó]n final|el enfrentamiento final|el cl[ií]max|la revelaci[oó]n|el desenlace)$/i;
+const genericTitlePattern = /^(?:el|la|los|las)\s+(?:eco|sombra|susurro|secreto|misterio|destino|amenaza|maldici[oó]n|despertar|profec[ií]a|llamado|legado|precio)\s+(?:de|del|en)\b/i;
+const genericVisibleProsePattern = /\b(?:nada es lo que parece|antes de que sea demasiado tarde|una carrera contra el tiempo|la [uú]nica esperanza|la [uú]nica forma|deber[aá] descubrir|se ver[aá] obligado|un oscuro secreto|una antigua amenaza|un poder inimaginable|una oscuridad sin nombre|borrar(?:te|lo|la) con un pensamiento|el destino (?:te )?(?:llama|reclama|aguarda)|todo cambiar[aá] para siempre|algo antiguo (?:despierta|se agita)|m[aá]s de lo que parece|contra toda esperanza)\b/i;
+const genericSceneTitlePattern = /^(?:la verdad(?: torcida| oculta)?|la decisi[oó]n final|el enfrentamiento final|el cl[ií]max|la revelaci[oó]n|el desenlace|el precio a pagar|sin vuelta atr[aá]s)$/i;
 const sensoryLanguagePattern = /\b(?:huele|olor|perfume|hedor|sabor|amargo|salado|cruje|chirria|rechina|susurra|zumba|silba|vibra|tiembla|chisporrotea|[aá]spero|viscoso|fr[ií]o|calor|humo|polvo|ceniza|sangre|metal|barro|sal|cera|aceite)\b/i;
 
 function words(text: string): string[] {
@@ -47,6 +47,21 @@ export function storyCoherenceIssues(content: ImprovisedStoryContent, input: Imp
     else if (!playable.includes(name)) issues.push(`nombre-sin-rol-jugable:${name}`);
   }
   const petName = input.hero?.petName?.toLowerCase();
+
+  // Una edición del héroe no autoriza al modelo a tirar la campaña anterior.
+  // Esta auditoría fuerza una segunda pasada si cambió el reparto, el misterio o
+  // la arquitectura de escenas; bonds públicos y heroBond sí pueden adaptarse.
+  if (input.revision) {
+    const previous = input.revision.preserveStory;
+    const names = (items: Array<{ name: string }> | undefined) => (items ?? []).map((item) => item.name.trim().toLocaleLowerCase("es")).sort();
+    const titles = (items: Array<{ title: string }> | undefined) => (items ?? []).map((item) => item.title.trim().toLocaleLowerCase("es"));
+    if (content.title.trim().toLocaleLowerCase("es") !== previous.title.trim().toLocaleLowerCase("es")) issues.push("revision-cambio-titulo");
+    if (content.hiddenTruth.trim() !== previous.hiddenTruth.trim()) issues.push("revision-cambio-culpable-o-verdad");
+    if (content.threat.name.trim().toLocaleLowerCase("es") !== previous.threat.name.trim().toLocaleLowerCase("es")) issues.push("revision-cambio-amenaza");
+    if (JSON.stringify(names(content.npcs)) !== JSON.stringify(names(previous.npcs))) issues.push("revision-cambio-reparto");
+    if (JSON.stringify(titles(content.scenes)) !== JSON.stringify(titles(previous.scenes))) issues.push("revision-cambio-escenas");
+    if (JSON.stringify(titles(content.clues)) !== JSON.stringify(titles(previous.clues))) issues.push("revision-cambio-pistas");
+  }
   if (petName) {
     const escaped = petName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const fusion = new RegExp(`(?:perro|gato|lobo|caballo|mascota)[^.!?"]{0,26}${escaped}`, "i");

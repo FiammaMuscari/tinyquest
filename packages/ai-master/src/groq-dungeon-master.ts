@@ -149,7 +149,7 @@ function compactGroqMessages(messages: GroqMessage[], emergency = false): GroqMe
   return [
     {
       role: "system",
-      content: "Sos el narrador de Tiny Quest. Respondé SOLO JSON válido con DungeonNarrationOutput. Obedecé resolutionPlan por encima de todo: no cambies tirada, resultado, pistas, NPCs, objetos, mustHappen ni mustNotHappen. Narrá breve y oscuro usando solo el payload."
+      content: "Eres el narrador de Tiny Quest. Responde SOLO JSON válido con DungeonNarrationOutput. Obedece resolutionPlan por encima de todo: no cambies tirada, resultado, pistas, NPCs, objetos, mustHappen ni mustNotHappen. Narra con precisión usando solo el payload."
     },
     {
       role: "user",
@@ -174,6 +174,8 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   private fallbackUses = 0;
   private readonly responseCache = new Map<string, NarrationResponse>();
   private readonly pendingNarrationRequests = new Map<string, Promise<NarrationResponse>>();
+  private readonly storyCache = new Map<string, ImprovisedStoryContent>();
+  private readonly pendingStoryRequests = new Map<string, Promise<ImprovisedStoryContent>>();
 
   constructor(env: GroqEnv = {}) {
     // Gemini is selected explicitly (provider=gemini) or implicitly when a Gemini key is present.
@@ -383,15 +385,16 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
 
   async generateOpeningScene(input: OpeningSceneRequest): Promise<OpeningSceneResponse> {
     const system = [
-      "Sos el narrador de Tiny Quest, una aventura de misterio en español rioplatense neutro.",
+      "Eres el narrador de Tiny Quest, una aventura de misterio en español latino neutral, siempre con tuteo y sin voseo.",
       input.narratorVoice ? `Voz del narrador: ${JSON.stringify(input.narratorVoice)}.` : "",
-      "Escribí la ESCENA DE APERTURA de la historia como el primer capítulo de una novela: tiempo presente, sensorial, concreta, con los héroes ya dentro de la escena.",
+      "Escribe la ESCENA DE APERTURA como el primer capítulo de una novela contemporánea: tiempo presente, sensorial, concreta, con los héroes ya actuando.",
+      "Evita frases de tráiler, solemnidad abstracta y metáforas sin consecuencia visible. Cada párrafo debe mover un personaje, revelar una fricción o alterar un objeto concreto.",
       "Prohibido el meta-lenguaje: nada de 'campaña', 'jugador', 'opciones', 'misión', 'objetivo', 'dados'.",
-      "Usá SOLO los NPC listados (no inventes nombres) y solo su información pública.",
-      "Si un NPC es un ANIMAL (gato, perro, cuervo…), NO habla con palabras: describí su comportamiento (maúlla, señala, tira de la manga). El diálogo debe ser de un NPC que hable.",
+      "Usa SOLO los NPC listados (no inventes nombres) y solo su información pública.",
+      "Si un NPC es un ANIMAL (gato, perro, cuervo…), NO habla con palabras: describe su comportamiento (maúlla, señala, tira de la manga). El diálogo debe ser de un NPC que hable.",
       "FRASES COMPLETAS SIEMPRE: la narración jamás termina cortada ni con puntos suspensivos.",
-      "Cerrá con la tensión apuntando a la primera decisión, sin enumerar acciones posibles.",
-      'Respondé SOLO JSON válido: {"narration":"2 párrafos, 90-160 palabras","dialogue":"una línea dicha por un NPC listado QUE PUEDA HABLAR, formato Nombre: \\"...\\""}'
+      "Cierra con una consecuencia inmediata que exige la primera decisión, sin enumerar acciones posibles.",
+      'Responde SOLO JSON válido: {"narration":"2 párrafos, 90-160 palabras","dialogue":"una línea dicha por un NPC listado QUE PUEDA HABLAR, formato Nombre: \\"...\\""}'
     ].filter(Boolean).join(" ");
     const payload = {
       historia: input.campaignTitle,
@@ -417,57 +420,92 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   }
 
   async generateImprovisedStory(input: ImprovisedStoryRequest): Promise<ImprovisedStoryContent> {
+    const storyCacheKey = JSON.stringify(input);
+    const cachedStory = this.storyCache.get(storyCacheKey);
+    if (cachedStory) return cachedStory;
+    const pendingStory = this.pendingStoryRequests.get(storyCacheKey);
+    if (pendingStory) return pendingStory;
+    const request = this.generateImprovisedStoryUncached(input);
+    this.pendingStoryRequests.set(storyCacheKey, request);
+    try {
+      const story = await request;
+      this.storyCache.set(storyCacheKey, story);
+      if (this.storyCache.size > 12) {
+        const oldest = this.storyCache.keys().next().value;
+        if (oldest) this.storyCache.delete(oldest);
+      }
+      return story;
+    } finally {
+      this.pendingStoryRequests.delete(storyCacheKey);
+    }
+  }
+
+  private async generateImprovisedStoryUncached(input: ImprovisedStoryRequest): Promise<ImprovisedStoryContent> {
     const world = input.worldContext;
     const wish = input.userPrompt?.trim() ?? "";
+    const revision = input.revision;
     const system = [
       "Eres el arquitecto de historias y editor literario de Tiny Quest, un juego de misterio narrativo en español latino neutral. Tratas al jugador de tú y nunca empleas voseo ni conjugaciones rioplatenses. Escribes con precisión de novelista: imágenes concretas, tensión humana y ninguna frase de tráiler genérico.",
       "CLARIDAD DE LAS IMÁGENES: una metáfora solo permanece si el lector puede entender qué sucede físicamente, qué se arriesga o qué capacidad concreta se está mostrando. Prohibidas amenazas vagas como 'borrarte con un pensamiento', 'el destino te reclama' o 'un poder inimaginable'; reemplázalas por gestos, consecuencias y detalles perceptibles propios del mundo.",
-      "Diseñá una historia jugable de 4 escenas con un culpable oculto.",
+      revision
+        ? "REVISION INCREMENTAL: no diseñes otra campaña. Reescribe el JSON completo conservando título, conflicto, culpable, amenaza, pistas, objetos, lugares, orden de escenas y todos los NPC con sus nombres, secretos y apariencia. Adapta solamente heroBond, trato de género, capacidades de especie/oficio y bonds públicos que ya no encajen con el héroe nuevo. Las relaciones secretas ENTRE NPC permanecen, salvo una concordancia gramatical indispensable. No reinicies la trama ni agregues reparto."
+        : "Diseña una historia jugable de 4 escenas con un culpable oculto.",
+      !revision && input.variationNonce ? `VARIACIÓN ${input.variationNonce}: crea una combinación nueva de conflicto, culpable, objetos y relaciones; no repitas la historia anterior aunque el pedido sea idéntico.` : "",
       ...(world ? [
         `La historia ocurre en ${world.worldName} (${world.era}). Ambiente sellado: ${world.ambience}`,
-        `REGLAS INMUTABLES del mundo — respetalas en premisa, pistas y giro, pero NO las enuncies de golpe: el grupo las descubre jugando: ${world.rules.join(" · ")}`,
+        `REGLAS INMUTABLES del mundo — respétalas en premisa, pistas y giro, pero NO las enuncies de golpe: el grupo las descubre jugando: ${world.rules.join(" · ")}`,
         `Tono y elementos de este mundo: ${world.seasoning}`,
         `Punto de entrada de los héroes (perspectiva ${world.perspective}): ${world.entryLine} La escena 1 arranca exactamente ahí, pero premise NO repite ni parafrasea esta llegada: avanza un hecho dramático después.`
       ] : []),
       // El pedido del equipo manda: el mundo es el escenario, no una excusa para ignorarlo.
       ...(wish ? [
         `PEDIDO ESPECIAL DEL EQUIPO — OBLIGATORIO, tiene prioridad sobre el tono por defecto del mundo: "${wish}".`,
-        "Integrá CADA elemento del pedido de forma central y visible (criaturas, tono, cantidad de NPCs, traiciones, lo que pidan): tienen que notarse en la premisa, los NPCs y las escenas, no de decorado.",
-        "Si un elemento del pedido tensa el ambiente, adaptalo al mundo sin descartarlo (ej: una estirpe o facción propia de este mundo que encarne lo pedido). Las reglas inmutables son el único límite."
-      ] : ["No hay pedido especial: diseñá la historia central del mundo y sorprendé al equipo."]),
+        "Integra CADA elemento del pedido de forma central y visible (criaturas, tono, cantidad de NPCs, traiciones, lo que pidan): tienen que notarse en la premisa, los NPCs y las escenas, no de decorado.",
+        "Si un elemento del pedido tensa el ambiente, adáptalo al mundo sin descartarlo (ej: una estirpe o facción propia de este mundo que encarne lo pedido). Las reglas inmutables son el único límite."
+      ] : ["No hay pedido especial: diseña la historia central del mundo y sorprendé al equipo."]),
       "Reglas de diseño: la premisa plantea un CONFLICTO JUGABLE nacido del input del jugador (puede ser una injusticia, una desaparición, una deuda, una cacería, un pacto roto, un viaje peligroso — lo que pidan sus ideas), con algo en juego si el grupo no actúa;",
       "hiddenTruth contradice la explicación visible; cada pista acerca al culpable sin nombrarlo directo;",
       "los NPC tienen secreto propio (uno protege al culpable o ES parte del engaño); la escena 4 es el clímax donde se decide el final.",
       "keyObject y escapeRoute de cada escena son cosas FÍSICAS y concretas de ese lugar (van en botones de acción, cortos).",
       "Tono: fantasía oscura apta para todo público.",
       "NOMBRES de PERSONAS = nombre de pila + APELLIDO PROPIO inventado que suene al REGISTRO CULTURAL de ESTE mundo. NUNCA mezcles registros. El apellido es una palabra eufónica sin guion, no una descripción ni el nombre del mundo. Los nombres escritos por el jugador quedan intactos y sin apellido agregado.",
-      "PROHIBIDO que un NPC use el nombre o apellido del héroe, SALVO que bond lo explique explícitamente ('tu hermano menor', 'prima de tu madre'). El conflicto DEBE atarse a la identidad del héroe (heroe del payload: linaje, oficio, compañero, concepto) — escribí heroBond: 1 frase que explique por qué ESTE héroe no puede irse (su juramento, su oficio, su compañero o su sello lo atan). Sus strengths deben poder brillar en al menos una escena y su weakness complicarlo en otra: diseñá objetivos y rutas que las toquen.",
+      "PROHIBIDO que un NPC use el nombre o apellido del héroe, SALVO que bond lo explique explícitamente ('tu hermano menor', 'prima de tu madre'). El conflicto DEBE atarse a la identidad del héroe (heroe del payload: linaje, oficio, compañero, concepto) — escribe heroBond: 1 frase que explique por qué ESTE héroe no puede irse (su juramento, su oficio, su compañero o su sello lo atan). Sus strengths deben poder brillar en al menos una escena y su weakness complicarlo en otra: diseña objetivos y rutas que las toquen.",
       "El conflicto necesita EVIDENCIA inicial concreta (evidence: 2-3 pruebas físicas, pueden ser falsas o plantadas: 'el mapa apareció doblado en tu capa', 'las huellas se cortan en el río'). Sin evidencia el conflicto se siente arbitrario; con evidencia se siente misterio investigable.",
       "CADA idea del pedido debe convertirse en una FUNCIÓN JUGABLE —nunca decoración—. Una mascota solo existe si el jugador la eligió o la pidió expresamente; si la pide, puede aparecer al inicio o más adelante según sus palabras y debe tener una función propia.",
       "hiddenTwists = 3 giros SECRETOS que REINTERPRETAN la evidencia inicial sin contradecirla (la prueba plantada tiene segunda lectura, el testigo vio otra cosa, el objeto robado eligió aparecer). Son capa de motor: JAMÁS los insinúes en premise, summary ni descripciones visibles.",
       "npcRelations = 2-3 relaciones SECRETAS entre NPCs (entre ellos, NUNCA con el héroe) que reinterpretan sus bonds públicos: una deuda, un amor viejo, un chantaje, una lealtad cruzada ('Marga encubre a Bren desde el incendio'). from/to = nombres EXACTOS de tus npcs. También son capa de motor: jamás visibles al crear.",
       "PISTAS FALSAS: EXACTAMENTE UNA de las 3 clues lleva isFalse:true — es una pista PLANTADA (por la amenaza o por un NPC que miente) que apunta en la dirección equivocada. Debe ser tan creíble como las verdaderas pero contener UN detalle verificable que no cierra (una hora imposible, una mano equivocada, un olor que no corresponde) para poder desmentirla jugando. Las otras dos son verdaderas. Capa de motor: jamás se marca cuál es.",
-      "ESCALA TEMPORAL = la que ESCRIBIÓ el jugador. Si pide 'búsqueda de 3 meses', 'un año', 'un viaje largo': la historia es una BÚSQUEDA/RASTREO/INVESTIGACIÓN PROLONGADA, NO todo en una noche. Las 4 escenas son saltos temporales con marca en el título ('Semana 2 — el rastro', 'Mes 2 — la frontera'), y summary.timeLimit refleja ESA escala ('antes de que la luna nueva cierre el paso', 'quedan seis semanas'). PROHIBIDO forzar 'antes del anochecer' si el jugador pidió una escala larga. Si NO mencionó tiempo, elegí un reloj que le quede bien al conflicto, no siempre corto.",
-      "REGLA ANTIFÓRMULA (CRÍTICA): NO conviertas toda historia en el mismo molde. Está PROHIBIDO usar por defecto: acusación de un consejo/concilio, robo de reliquia, exilio, una marca mágica que aparece en el brazo, misión de 'limpiar tu nombre', una amenaza abstracta llamada 'El Ojo de…' / 'El X de [nombre del mundo]', y 'antes del próximo anochecer'. Usá cualquiera de esos recursos SOLO si el input real del jugador lo pide. El conflicto se CONSTRUYE desde sus elecciones (mundo, entrada, recorrido, linaje/oficio, personas, mascotas, enemigos y tono que escribió), no desde una plantilla.",
+      "ESCALA TEMPORAL = la que ESCRIBIÓ el jugador. Si pide 'búsqueda de 3 meses', 'un año', 'un viaje largo': la historia es una BÚSQUEDA/RASTREO/INVESTIGACIÓN PROLONGADA, NO todo en una noche. Las 4 escenas son saltos temporales con marca en el título ('Semana 2 — el rastro', 'Mes 2 — la frontera'), y summary.timeLimit refleja ESA escala ('antes de que la luna nueva cierre el paso', 'quedan seis semanas'). PROHIBIDO forzar 'antes del anochecer' si el jugador pidió una escala larga. Si NO mencionó tiempo, elige un reloj que le quede bien al conflicto, no siempre corto.",
+      "REGLA ANTIFÓRMULA (CRÍTICA): NO conviertas toda historia en el mismo molde. Está PROHIBIDO usar por defecto: acusación de un consejo/concilio, robo de reliquia, exilio, una marca mágica que aparece en el brazo, misión de 'limpiar tu nombre', una amenaza abstracta llamada 'El Ojo de…' / 'El X de [nombre del mundo]', y 'antes del próximo anochecer'. Usa cualquiera de esos recursos SOLO si el input real del jugador lo pide. El conflicto se CONSTRUYE desde sus elecciones (mundo, entrada, recorrido, linaje/oficio, personas, mascotas, enemigos y tono que escribió), no desde una plantilla.",
       "NOMBRES DEL JUGADOR = intocables. Toda persona, mascota o enemigo nombrado conserva su nombre EXACTO. PROHIBIDO renombrarlos o agregarles epítetos. No inventes una mascota cuando el pedido y hero.petName no traen ninguna.",
-      "PERSONAS mencionadas ('mi mejor amiga', 'mi hermano'): creá un ALIADO importante con esa relación exacta y una función jugable concreta (te abre una puerta, guarda un secreto, te cubre en una escena) — nunca una figura genérica de fondo.",
+      "PERSONAS mencionadas ('mi mejor amiga', 'mi hermano'): crea un ALIADO importante con esa relación exacta y una función jugable concreta (te abre una puerta, guarda un secreto, te cubre en una escena) — nunca una figura genérica de fondo.",
       "ENEMIGO FUTURO: si el jugador dice que un enemigo aparece 'más adelante' (ej: 'después agregamos un hombre lobo enemigo'), NO lo pongas como amenaza inicial ni jefe de escena 1, PERO SÍ tiene que APARECER en la historia — como NPC sembrado (presagio, rastro, aullido lejano, rumor, marcas de garras, un testigo aterrado que lo vio). NUNCA lo omitas: el jugador lo pidió. Debe quedar claro que su papel crece más adelante.",
       "CANTIDAD DE NPCs = la que pida el input, HASTA 5. Cada persona, mascota y enemigo nombrado es SU PROPIO NPC, más los que el conflicto necesite. Una o dos mascotas pueden aparecer a mitad de historia si el pedido lo sugiere; no tienen que existir desde el inicio.",
       "ADAPTÁ según la entrada y el recorrido. 'En solitario' no implica mascota: puede empezar completamente solo. 'Con compañeros' significa aliados humanos o criaturas solo si fueron elegidos o pedidos.",
       "MASCOTAS OPCIONALES: hero.petName ausente significa que el héroe NO comienza con mascota. No inventes una por costumbre. Si el pedido introduce una criatura más adelante, sembrala y hacela aparecer recién en una escena posterior. Si hero.petName existe, esa compañera ya pertenece al héroe y no debe fusionarse con otra criatura pedida.",
-      "APARIENCIA CANÓNICA PARA IMÁGENES: appearance no es prosa decorativa sino una ficha visual literal y NO puede contradecir description. TODA appearance empieza por un TIPO explícito, elegí uno: 'mujer', 'hombre', 'hombre afeminado', 'andrógino/intersexual', 'mascota/criatura', 'híbrido' o 'fenómeno incorpóreo'. Luego indicá especie, edad aparente, anatomía exacta, cara o cabeza, cuerpo/silueta, ropa si existe y marca distintiva. Conservá cualquier anatomía solicitada SIN normalizarla: cantidad exacta de ojos, brazos, alas o cuernos; cicatrices, discapacidad, prótesis, escamas, mezcla de especies y asimetrías. Si dice tres ojos, escribí 'exactamente tres ojos visibles' y dónde están. Una criatura mítica, fusionada, alienígena, dracónica o animal sigue siendo NO HUMANA y conserva su silueta real; centauros/minotauros conservan ambas mitades; solo escribí humanoide/antropomorfa si el pedido lo exige. Una amenaza que ES viento, portal, niebla, llama o anomalía usa tipo 'fenómeno incorpóreo' y NO recibe rostro humano.",
-      "Si el pedido incluye una identidad para el héroe ('elfo oscuro', 'vampiro'), aplicásela AL HÉROE: su linaje, su condición social o el prejuicio del mundo contra él forman parte del conflicto — no la conviertas en un NPC suelto.",
+      "APARIENCIA CANÓNICA PARA IMÁGENES: appearance no es prosa decorativa sino una ficha visual literal y NO puede contradecir description. TODA appearance empieza por un TIPO explícito, elige uno: 'mujer', 'hombre', 'hombre afeminado', 'andrógino/intersexual', 'mascota/criatura', 'híbrido' o 'fenómeno incorpóreo'. Luego indicá especie, edad aparente, anatomía exacta, cara o cabeza, cuerpo/silueta, ropa si existe y marca distintiva. Conserva cualquier anatomía solicitada SIN normalizarla: cantidad exacta de ojos, brazos, alas o cuernos; cicatrices, discapacidad, prótesis, escamas, mezcla de especies y asimetrías. Si dice tres ojos, escribe 'exactamente tres ojos visibles' y dónde están. Una criatura mítica, fusionada, alienígena, dracónica o animal sigue siendo NO HUMANA y conserva su silueta real; centauros/minotauros conservan ambas mitades; solo escribe humanoide/antropomorfa si el pedido lo exige. Una amenaza que ES viento, portal, niebla, llama o anomalía usa tipo 'fenómeno incorpóreo' y NO recibe rostro humano.",
+      "Si el pedido incluye una identidad para el héroe ('elfo oscuro', 'vampiro'), aplícasela AL HÉROE: su linaje, su condición social o el prejuicio del mundo contra él forman parte del conflicto — no la conviertas en un NPC suelto.",
       "AUTO-REVISIÓN: la salida es INVÁLIDA si ignora o renombra una entidad pedida, adelanta una criatura futura, cambia la escala temporal, inventa una mascota no pedida o no ata al héroe al conflicto.",
-      "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal, MÁXIMO 20 palabras, frase COMPLETA), risk (qué PERDÉS si fallás — cosas con nombre: tu linaje, tu perro, un juramento; máximo 20 palabras), firstMystery (la primera pregunta que pica), timeLimit (el reloj coherente con la escala que pidió el jugador: corto si es urgente, largo si pidió una búsqueda de semanas/meses). Si NO hubo pedido especial, keywordsUsed DEBE ser []. Si lo hubo, cada idea es una CITA breve y literal del pedido; how explica su función sin revelar culpables, pistas, apariciones futuras ni giros.",
+      "summary = card jugable en segunda persona: objective (TU misión, imperativa y personal, MÁXIMO 20 palabras, frase COMPLETA), risk (qué PIERDES si fallás — cosas con nombre: tu linaje, tu perro, un juramento; máximo 20 palabras), firstMystery (la primera pregunta que pica), timeLimit (el reloj coherente con la escala que pidió el jugador: corto si es urgente, largo si pidió una búsqueda de semanas/meses). Si NO hubo pedido especial, keywordsUsed DEBE ser []. Si lo hubo, cada idea es una CITA breve y literal del pedido; how explica su función sin revelar culpables, pistas, apariciones futuras ni giros.",
       "TÍTULO LITERARIO (CRÍTICO): 3-8 palabras, singular y recordable. Debe nacer de una contradicción, objeto, deuda, lugar o decisión CONCRETA de esta historia; no resumas el mundo ni recicles el nombre de su fiesta. Prohibidos títulos intercambiables que empiecen 'El Eco de', 'La Sombra de', 'El Susurro de', 'El Secreto de', 'El Misterio de', 'El Destino de', 'La Maldición de' o 'El Despertar de'. Tampoco uses subtítulos ni dos puntos.",
       "PREMISE LITERARIA (CRÍTICO): 2-3 oraciones completas y 55-105 palabras. Empieza un latido DESPUÉS del punto de entrada ya dado. Presenta (1) una persona o fuerza que hace algo irreversible, (2) un detalle sensorial y un objeto físico memorable, y (3) una pérdida o elección que obligue al héroe a actuar. No enumeres lore, no expliques las reglas del mundo y no reveles la verdad oculta.",
       "ESCENAS CON AUTORÍA: cada título señala un lugar, objeto o acontecimiento irrepetible de ESA escena. Prohibidos 'La Verdad Torcida', 'La Decisión Final', 'El Enfrentamiento Final', 'La Revelación' y equivalentes vacíos.",
-      "PROHIBIDO el tono de sinopsis genérica: nada de 'la única esperanza', 'la única forma', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo', 'un oscuro secreto' o 'una antigua amenaza'. La imagen poética nunca sustituye el conflicto jugable. Todo texto visible debe poder leerse en voz alta sin vergüenza.",
-      'Respondé SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove","appearance"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[3-5 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4,"isFalse":bool}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"],"npcRelations":[2-3 x {"from","to","nature"}]}. appearance = ficha visual literal y dibujable de 1 frase que SIEMPRE empieza con el TIPO permitido y coincide con description. threat.appearance es obligatoria y sigue la misma regla, incluso si es un fenómeno sin cuerpo. Variá MUCHO los cuerpos. bond = relación dramática con el héroe en 3-8 palabras. whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
+      "PROHIBIDO el tono de sinopsis genérica: nada de 'la única esperanza', 'la única forma', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo', 'un oscuro secreto', 'una antigua amenaza', 'todo cambiará para siempre', 'algo antiguo despierta', 'más de lo que parece' ni 'sin vuelta atrás'. La imagen poética nunca sustituye el conflicto jugable. Todo texto visible debe nombrar una acción, una pérdida o un objeto específico y poder leerse en voz alta sin vergüenza.",
+      'Responde SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove","appearance"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[3-5 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4,"isFalse":bool}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"],"npcRelations":[2-3 x {"from","to","nature"}]}. appearance = ficha visual literal y dibujable de 1 frase que SIEMPRE empieza con el TIPO permitido y coincide con description. threat.appearance es obligatoria y sigue la misma regla, incluso si es un fenómeno sin cuerpo. Varía MUCHO los cuerpos. bond = relación dramática con el héroe en 3-8 palabras. whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
     ].join(" ");
     const messages: GroqMessage[] = [
       { role: "system", content: system },
-      { role: "user", content: JSON.stringify({ pedidoDelEquipo: input.userPrompt.slice(0, 600), heroes: input.playerNames?.slice(0, 4), heroe: input.hero }) }
+      { role: "user", content: JSON.stringify({
+        pedidoDelEquipo: input.userPrompt.slice(0, 600),
+        variacion: input.variationNonce,
+        heroes: input.playerNames?.slice(0, 4),
+        heroe: input.hero,
+        revision: revision ? {
+          motivo: revision.reason,
+          heroeAnterior: revision.previousHero,
+          historiaQueDebeConservarse: revision.preserveStory
+        } : undefined
+      }) }
     ];
     // El LLM a veces devuelve JSON malformado o truncado por límite de tokens:
     // se intenta crudo → reparado, y si nada sirve se pide la historia de nuevo una vez.
@@ -478,7 +516,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
         ...messages,
         {
           role: "user" as const,
-          content: `REVISIÓN EDITORIAL OBLIGATORIA. La versión anterior falló por: ${revisionIssues.slice(0, 10).join("; ")}. Reescribí el JSON completo desde cero. Conservá nombres y requisitos del pedido, pero corregí específicamente título, premise, títulos de escenas y cualquier incoherencia marcada. No expliques la revisión.`
+          content: `REVISIÓN EDITORIAL OBLIGATORIA. La versión anterior falló por: ${revisionIssues.slice(0, 10).join("; ")}. Reescribe el JSON completo desde cero. Conserva nombres y requisitos del pedido, pero corrige específicamente título, premise, títulos de escenas y cualquier incoherencia marcada. No expliques la revisión.`
         }
       ];
       const json = await this.callGroqWithFailover(attemptMessages, { forceJson: true, maxTokens: 4400 }, revisionIssues.length ? "story-forge-editorial-retry" : "story-forge");
@@ -518,7 +556,31 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       }
     }
     if (!story) {
-      throw new Error("El narrador se trabó escribiendo la historia. Tocá Reintentar — suele salir a la segunda.");
+      throw new Error("El narrador se trabó escribiendo la historia. Toca Reintentar; normalmente se resuelve en el segundo intento.");
+    }
+    if (revision) {
+      const previous = revision.preserveStory;
+      const revisedNpcByName = new Map(story.npcs.map((npc) => [npc.name.trim().toLocaleLowerCase("es"), npc]));
+      story = {
+        ...story,
+        title: previous.title,
+        hiddenTruth: previous.hiddenTruth,
+        threat: previous.threat,
+        clues: previous.clues,
+        evidence: previous.evidence,
+        hiddenTwists: previous.hiddenTwists,
+        npcRelations: previous.npcRelations,
+        scenes: previous.scenes.map((scene, index) => ({
+          ...scene,
+          // El objetivo sí puede reconocer el oficio/especie nuevos; lugar,
+          // objeto y ruta siguen siendo la misma arquitectura jugable.
+          objective: story?.scenes[index]?.objective || scene.objective
+        })),
+        npcs: previous.npcs.map((npc) => {
+          const revised = revisedNpcByName.get(npc.name.trim().toLocaleLowerCase("es"));
+          return revised ? { ...npc, bond: revised.bond ?? npc.bond, whyMightLie: revised.whyMightLie ?? npc.whyMightLie } : npc;
+        })
+      };
     }
     logDmEvent("story-forge", { ok: true, title: story.title, scenes: story.scenes.length, npcs: story.npcs.length });
     return story;

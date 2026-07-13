@@ -186,3 +186,40 @@ test("una presentación concreta, sensorial y dramática supera la revisión edi
   const issues = storyCoherenceIssues(story, { userPrompt: "", worldContext: mareaContext });
   assert.deepEqual(issues.filter((issue) => /^(?:titulo|premisa|escena-)/.test(issue)), []);
 });
+
+test("la revisión del héroe conserva reparto, verdad, amenaza, escenas y pistas", () => {
+  const previous = baseStory({ hiddenTruth: "Marga incendió la casa.", storyHook: "El collar no ardió.", genre: "misterio", themeSkill: "mente", twist: "Marga protegía a alguien", stakes: [], evidence: [] });
+  const revised = structuredClone(previous);
+  revised.heroBond = "Tu oficio de archivista permite fechar el collar.";
+  revised.npcs[1].bond = "desconfía de tu nuevo oficio";
+  const issues = storyCoherenceIssues(revised, {
+    userPrompt: "un perro llamado Firulais",
+    hero: { ...hero, gender: "mujer" },
+    revision: { reason: "hero_identity_changed", previousHero: { ...hero, gender: "hombre" }, preserveStory: previous }
+  });
+  assert.ok(!issues.some((issue) => issue.startsWith("revision-cambio")));
+});
+
+test("la revisión del héroe rechaza reemplazar NPCs o misterio", () => {
+  const previous = baseStory({ hiddenTruth: "Marga incendió la casa.", storyHook: "El collar no ardió.", genre: "misterio", themeSkill: "mente", twist: "Marga protegía a alguien", stakes: [] });
+  const revised = structuredClone(previous);
+  revised.hiddenTruth = "El perro provocó el incendio.";
+  revised.npcs[1].name = "Otra Persona";
+  const issues = storyCoherenceIssues(revised, {
+    userPrompt: "un perro llamado Firulais",
+    hero,
+    revision: { reason: "hero_identity_changed", previousHero: hero, preserveStory: previous }
+  });
+  assert.ok(issues.includes("revision-cambio-culpable-o-verdad"));
+  assert.ok(issues.includes("revision-cambio-reparto"));
+});
+
+test("la revisión editorial también rechaza clichés modernos de tráiler", () => {
+  const story = baseStory({
+    title: "Tres Dientes en la Bomba",
+    premise: "El metal caliente huele a sal mientras una oscuridad sin nombre cubre la bomba comunal y todo cambiará para siempre. La capataz cierra el engranaje con una llave de cobre ante dos familias armadas. Debes decidir si entregas el mapa o abres la máquina frente a quienes controlan el último odre.",
+    scenes: [{ title: "El Odre del Niño", objective: "Abrir la bomba" }, { title: "La Casa de Sal", objective: "Seguir el rastro" }, { title: "Los Dientes", objective: "Comparar marcas" }]
+  });
+  const issues = storyCoherenceIssues(story, { userPrompt: "", worldContext: mareaContext });
+  assert.ok(issues.includes("premisa-cliche"));
+});

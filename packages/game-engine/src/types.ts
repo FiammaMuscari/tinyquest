@@ -1150,10 +1150,18 @@ export type ImprovisedWorldContext = {
 
 export type ImprovisedStoryRequest = {
   userPrompt: string;
+  /** Cambia solo al pedir una nueva variación explícita; permite caché estable sin repetir siempre la misma historia. */
+  variationNonce?: number;
   playerNames?: string[];
   worldContext?: ImprovisedWorldContext;
   /** El héroe ya forjado: la historia debe atarse a su identidad (nunca copiar su nombre en NPCs sin explicar el vínculo). */
-  hero?: { name: string; species: string; role: string; petName?: string; concept: string; strengths?: string[]; weakness?: string };
+  hero?: { name: string; gender?: string; species: string; role: string; petName?: string; concept: string; strengths?: string[]; weakness?: string };
+  /** Revisión incremental: conserva la historia y el reparto, adaptando solo su vínculo con un héroe editado. */
+  revision?: {
+    reason: "hero_identity_changed";
+    previousHero?: { name: string; gender?: string; species: string; role: string; petName?: string; concept: string };
+    preserveStory: ImprovisedStoryContent;
+  };
 };
 
 export interface DungeonMasterProvider {

@@ -121,6 +121,18 @@ test("Portada prioriza leyes del mundo y fondo sin figuras", () => {
   assert.ok(prompt.length <= 1960, `prompt de portada truncable: ${prompt.length}`);
 });
 
+test("la portada muestra el fondo rápido y compone al héroe sin bloquear", () => {
+  assert.match(appSource, /const ready = Boolean\(src\)/);
+  assert.doesNotMatch(appSource, /src && heroShotUrl && !composed\)\) return <AssetForging/);
+});
+
+test("editar la identidad adapta la historia sin descartar el reparto", () => {
+  assert.match(appSource, /lastForgedHeroKeyRef\.current !== storyHeroIdentityKey\(character\)/);
+  assert.match(appSource, /revisionOf: lastForgedContentRef\.current/);
+  assert.match(appSource, /lastForgeWishRef\.current/);
+  assert.match(appSource, /storyVariationRef\.current \+= 1/);
+});
+
 test("Escena diferencia ambiente vacío de modo héroe", () => {
   const args = ["Historia", "Archivo", "Hallar el sello", "Marea de Ceniza", "Era sellada", "elfa de ojos verdes", "agua subterránea", ["No hay agua expuesta"], "La ceniza contiene oro"];
   const place = promptFrom(portraits.liveSceneImageUrl("place", ...args));

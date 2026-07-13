@@ -72,6 +72,7 @@ import {
   type DungeonNarrationOutput,
   type GameEvent,
   type GameRoom,
+  type ImprovisedStoryContent,
   type NarrationResponse,
   type Scene,
   type SceneActionChoice,
@@ -79,6 +80,25 @@ import {
   type StoryPerspective,
   type WorldEra
 } from "@tiny-quest/game-engine";
+
+type StoryHeroIdentity = NonNullable<Parameters<NonNullable<ReturnType<typeof createDungeonMasterProvider>["generateImprovisedStory"]>>[0]["hero"]>;
+
+function storyHeroIdentity(character: Character): StoryHeroIdentity {
+  return {
+    name: character.name,
+    gender: character.look?.gender,
+    species: character.species,
+    role: character.role,
+    petName: character.pet.id === "none" ? undefined : character.pet.name,
+    concept: character.concept,
+    strengths: topTwoStats(character.stats).map((stat) => statLabels[stat]),
+    weakness: statLabels[lowStat(character.stats)]
+  };
+}
+
+function storyHeroIdentityKey(character: Character): string {
+  return JSON.stringify(storyHeroIdentity(character));
+}
 
 const statLabels: Record<StatKey, string> = {
   body: "cuerpo",
@@ -183,19 +203,19 @@ function fallbackConsequenceFor(action: string, outcome: CheckResult["outcome"],
   if (outcome === "failure") {
     if (clean.includes("bestia") || clean.includes("combate")) return "La amenaza gana posición: el próximo turno exige defensa, huida o una prueba más difícil.";
     if (clean.includes("falsificación") || clean.includes("asesino")) return "La acusación queda incompleta: alguien usa la duda para proteger al verdadero culpable.";
-    return "La escena pierde margen: una pista se enfría y el peligro gana presencia.";
+    return `Mientras el grupo intenta ${clean || "avanzar"}, un testigo abandona el lugar y alguien retira una prueba del alcance.`;
   }
   if (outcome === "partial_success") {
     if (clean.includes("huella") || clean.includes("marca") || clean.includes("rastro")) return "La pista aparece, pero trae un coste: alguien más descubre que el grupo sabe demasiado.";
     if (clean.includes("calmar") || clean.includes("misericordia")) return "La tensión baja por un momento, aunque un testigo exige una promesa antes de hablar.";
-    return "El grupo avanza, pero deja una deuda abierta para el siguiente turno.";
+    return `El grupo consigue ${clean || "avanzar"}, pero un observador identifica quién tomó la iniciativa y corre a avisar.`;
   }
   if (clean.includes("huella") || clean.includes("marca") || clean.includes("falsificación")) return "Las marcas dejan de parecer ataque animal: alguien midió los cortes con una herramienta.";
   if (clean.includes("hechizo") || clean.includes("magia") || clean.includes("runa")) return "El rastro mágico se vuelve legible y conecta la pista con un pacto antiguo.";
   if (clean.includes("bestia") || clean.includes("combate")) return "La amenaza retrocede y el grupo gana una ventana clara para moverse.";
   if (clean.includes("ruta") || clean.includes("forzar")) return "La salida queda abierta, pero conserva barro removido y una señal de uso anterior.";
   if (clean.includes("objeto") || clean.includes("examinar")) return "El objeto queda identificado: sus marcas podrán compararse con otro testimonio.";
-  return "La acción deja una consecuencia concreta y obliga al grupo a elegir el siguiente paso.";
+  return `Después de ${clean || "la maniobra"}, una posición queda asegurada y el grupo puede actuar sobre una prueba visible.`;
 }
 
 type LocalNarrationContext = {
@@ -209,9 +229,15 @@ type LocalNarrationContext = {
   recentNarrations?: string[];
 };
 
-function pickVariant<T>(items: T[], seed: string) {
-  const index = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0) % items.length;
-  return items[index];
+function pickFreshVariant(items: string[], seed: string, recent: string[] = []): string {
+  const start = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0) % items.length;
+  const memory = recent.join(" ").toLocaleLowerCase("es");
+  for (let offset = 0; offset < items.length; offset += 1) {
+    const candidate = items[(start + offset) % items.length];
+    const fingerprint = candidate.toLocaleLowerCase("es").replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).slice(0, 7).join(" ");
+    if (!memory.includes(fingerprint)) return candidate;
+  }
+  return items[start];
 }
 
 function actionMood(action: string) {
@@ -240,31 +266,38 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
   const successLines: Record<string, string[]> = {
     investigation: [
       `${playerName}${roleHint} levanta ${texture.object} ${place} y limpia el barro con el borde de la manga. Aparecen ${texture.sign}; ${texture.witness}.${petHint}`,
-      `${playerName} examina ${texture.object} sin mover el cadáver. ${texture.sign} quedan a la vista, y ${texture.witness}.`
+      `${playerName} examina ${texture.object} sin mover el cadáver. ${texture.sign} quedan a la vista, y ${texture.witness}.`,
+      `${playerName} alinea ${texture.object} con la luz lateral. El cambio de ángulo separa ${texture.sign} de las manchas recientes; ${texture.witness}.`
     ],
     occult: [
-      `${playerName} sigue el rastro invisible hasta donde la magia empieza a parecer culpa. La señal no nombra al asesino, pero separa la mentira del ruido.${petHint}`,
-      `${playerName} obliga al hechizo a mostrar su borde. Por un instante, el bosque parece recordar quién lo usó como coartada.`
+      `${playerName} sigue el residuo mágico hasta ${texture.object}. La intensidad cae justo donde alguien borró una runa; esa interrupción descarta una de las versiones.${petHint}`,
+      `${playerName} obliga al hechizo a mostrar su borde. La runa pierde brillo en un extremo y señala dónde fue manipulada.`,
+      `${playerName} acerca metal al residuo mágico. La superficie se empaña solo frente a ${texture.object}: alguien alteró ese punto y ningún otro.`
     ],
     combat: [
-      `${playerName} enfrenta la amenaza sin romper la escena. La bestia retrocede lo justo para revelar que no es el único monstruo de esta historia.`,
-      `${playerName} clava los pies entre raíces mojadas y obliga a la criatura a torcer el salto. En la corteza queda una astilla negra que no pertenece a ningún animal.`
+      `${playerName} enfrenta la amenaza sin pisar la prueba. La bestia retrocede y deja caer una correa cortada con un cierre fabricado, no animal.`,
+      `${playerName} clava los pies entre raíces mojadas y obliga a la criatura a torcer el salto. En la corteza queda una astilla negra que no pertenece a ningún animal.`,
+      `${playerName} desvía la embestida contra ${texture.object}. El impacto desprende una pieza trabajada que la criatura llevaba oculta.`
     ],
     social: [
-      `${playerName} baja la violencia de la sala lo suficiente para que una verdad respire. Nadie perdona todavía, pero alguien deja de mentir con tanta seguridad.`,
-      `${playerName} compra silencio, y el silencio compra tiempo. La multitud no se vuelve justa, pero por un momento vuelve a escuchar.`
+      `${playerName} baja el volumen de la disputa y pide que cada testigo repita una hora concreta. Una versión cambia al segundo intento.`,
+      `${playerName} pide una hora, un nombre y una prueba verificable. La multitud acepta la hora; ${texture.witness} reacciona al nombre.`,
+      `${playerName} repite la contradicción sin elevar la voz. Dos testigos dejan de asentir y uno señala ${texture.object}.`
     ],
     defense: [
-      `${playerName} protege lo único que no puede defenderse: la prueba. Desde ese gesto, la acusación pierde parte de su teatro.`,
-      `${playerName} pone el cuerpo entre la escena y quienes quieren deformarla. La verdad queda maltrecha, pero sigue viva.`
+      `${playerName} aparta la prueba de las botas y marca con tiza dónde estaba. La acusación pierde fuerza cuando todos ven que alguien intentó moverla.`,
+      `${playerName} pone el cuerpo entre la escena y quienes quieren alterarla. Aparta ${texture.object}, marca su posición y obliga a todos a retroceder.`,
+      `${playerName} cubre a quien estaba expuesto y conserva ${texture.object} fuera del alcance de la multitud. Ahora hay un testigo y una prueba intacta.`
     ],
     mystery: [
       `${playerName} aparta ${texture.object} y encuentra ${texture.sign}. ${texture.witness} reacciona antes de poder disimularlo.`,
-      `${playerName} fuerza ${texture.path}; ${texture.placeDetail} cambia de manos y deja una marca visible para el grupo.`
+      `${playerName} fuerza ${texture.path}; ${texture.placeDetail} cambia de manos y deja una marca visible para el grupo.`,
+      `${playerName} compara ${texture.object} con ${texture.sign}. Las medidas coinciden y ${texture.witness} deja de mirar al sospechoso equivocado.`
     ],
     route: [
       `${playerName} cruza ${texture.path} y encuentra ${texture.sign}. ${capitalizeSentence(texture.placeDetail)}; la salida queda abierta, pero alguien la había usado antes.`,
-      `${playerName} aparta ${texture.object} del paso y descubre una marca reciente. ${capitalizeSentence(texture.witness)}. No fueron los primeros en usar esa salida.`
+      `${playerName} aparta ${texture.object} del paso y descubre una marca reciente. ${capitalizeSentence(texture.witness)}. No fueron los primeros en usar esa salida.`,
+      `${playerName} mide ${texture.path} antes de cruzarlo. Una pisada reciente evita la parte segura y delata el recorrido de quien huyó.`
     ]
   };
   const partialLines: Record<string, string[]> = {
@@ -273,20 +306,20 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
       `${playerName} rescata ${texture.object} antes de que lo pisen. Sirve como indicio, no como sentencia: falta compararlo con una voz viva.`
     ],
     occult: [
-      `${playerName} toca la forma del hechizo, y el hechizo toca algo de vuelta. La pista aparece, pero deja cansancio y una deuda breve.${petHint}`,
-      `La magia responde a ${playerName} con una obediencia torcida. Muestra el camino, aunque no promete que el camino quiera ser seguido.`
+      `${playerName} toca el borde del hechizo y recibe una quemadura con la misma forma. La pista aparece, pero usarla otra vez tendrá un coste físico.${petHint}`,
+      `La magia dibuja ante ${playerName} una ruta incompleta: tres marcas avanzan hacia la puerta y la cuarta termina bajo ${texture.object}.`
     ],
     combat: [
       `${playerName} sobrevive al choque y arranca una ventaja pequeña. La bestia no cae; aprende el ritmo del grupo.`,
       `El combate no termina, pero cambia de dueño por un instante. ${playerName} gana aire, y la amenaza gana memoria.`
     ],
     social: [
-      `${playerName} consigue que alguien hable, aunque no por confianza. La frase sirve, pero el precio queda pendiente.`,
-      `La palabra de ${playerName} calma una llama y enciende otra. La aldea concede tiempo, no inocencia.`
+      `${playerName} consigue que alguien dé una hora y un lugar, aunque exige protección antes de ofrecer un nombre.`,
+      `${playerName} detiene la acusación durante diez minutos. La aldea concede ese plazo, pero deja dos guardias junto a la salida.`
     ],
     defense: [
-      `${playerName} salva parte de la escena, no toda. Lo perdido dolerá después; lo conservado todavía puede salvar a alguien.`,
-      `La defensa aguanta, pero deja una marca. Quienes miran ya saben dónde tendrán que golpear la próxima vez.`
+      `${playerName} conserva ${texture.object}, pero otra pieza desaparece entre la gente. Habrá que elegir cuál de las dos perseguir.`,
+      `${playerName} sostiene la entrada, aunque el golpe abre una grieta junto al cerrojo. La próxima embestida tendrá un punto débil visible.`
     ],
     mystery: [
       `${playerName} obtiene una mitad útil: ${texture.sign}. ${texture.witness} exige algo antes de dejarla valer como prueba.`,
@@ -303,8 +336,8 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
       `${playerName} busca una marca limpia y solo encuentra agua sucia. ${texture.witness}, aprovechando el ruido, retrocede hacia la gente.`
     ],
     occult: [
-      `${playerName} fuerza el rastro y la magia se cierra como una mano. Nada desaparece, pero todo queda menos dispuesto a hablar.${petHint}`,
-      `El hechizo no se deja leer; castiga la prisa con silencio. ${playerName} entiende que la verdad también sabe esconderse.`
+      `${playerName} fuerza el rastro y la runa se apaga desde el centro. El residuo permanece, pero ya no permite distinguir quién lo activó.${petHint}`,
+      `El hechizo descarga calor sobre ${texture.object} y borra la marca superficial. ${playerName} conserva el objeto, no la lectura inmediata.`
     ],
     combat: [
       `${playerName} entra al choque y la amenaza aprende demasiado. No es derrota final, pero sí una lección que el enemigo usará.`,
@@ -312,7 +345,7 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
     ],
     social: [
       `${playerName} hace la pregunta en voz alta, pero la sala ya eligió a quién creer. El miedo pesa más que la duda.`,
-      `La conversación falla donde más dolía: nadie cambia de bando, solo de máscara.`
+      `La conversación se corta cuando dos guardias ocupan la puerta. Nadie responde y el testigo principal queda separado del grupo.`
     ],
     defense: [
       `${playerName} llega un instante tarde. Algo queda protegido, pero otra cosa se rompe en manos de quienes necesitaban destruirla.`,
@@ -330,15 +363,17 @@ function fallbackNarrationForTurn(playerName: string, action: string, outcome: C
 
   const narration =
     outcome === "failure"
-      ? pickVariant(failureLines[mood], seed)
+      ? pickFreshVariant(failureLines[mood], seed, context.recentNarrations)
       : outcome === "partial_success"
-        ? pickVariant(partialLines[mood], seed)
-        : pickVariant(successLines[mood], seed);
-  const dialogue = pickVariant([
-    `Un testigo murmura: "Eso no salva a nadie todavia, pero cambia a quien debemos temer."`,
-    `Una voz desde el borde del grupo dice: "La verdad acaba de perder un escondite."`,
-    `Alguien aparta la mirada: "Si esto se sabe, nadie dormira bajo el mismo techo."`
-  ], seed);
+        ? pickFreshVariant(partialLines[mood], seed, context.recentNarrations)
+        : pickFreshVariant(successLines[mood], seed, context.recentNarrations);
+  const dialogue = pickFreshVariant([
+    `Un testigo murmura: "Eso no basta para acusar, pero sí para volver a revisar ${texture.object}."`,
+    `Una voz desde el borde del grupo dice: "Esa marca cambia la hora. Alguien mintió sobre cuándo estuvo aquí."`,
+    `Alguien aparta la mirada: "Si movieron ${texture.object}, también pudieron alterar el resto."`,
+    `Una mujer junto a la puerta señala ${texture.object}: "Pregunten quién tuvo tiempo de mover eso."`,
+    `El testigo más cercano cuenta las marcas con el dedo: "Son recientes. Yo pasé por aquí al amanecer."`
+  ], `${seed}-dialogue`, context.recentNarrations);
   const pressure = pressureLine(context.sceneTitle, mood, outcome, beatIndex);
   return {
     narration: [narration, pressure].filter(Boolean).join("\n\n"),
@@ -732,6 +767,13 @@ export function App() {
   function saveHeroPortrait(character: Character) {
     if (heroPairBusy) return;
     draftRef.current = character;
+    if (improvisedCampaign && lastForgedContentRef.current && lastForgedHeroKeyRef.current !== storyHeroIdentityKey(character)) {
+      void forgeStory(lastForgeWishRef.current, undefined, undefined, {
+        heroOverride: character,
+        revisionOf: lastForgedContentRef.current,
+        previousHero: lastForgedHeroRef.current ?? undefined
+      });
+    }
     if (!lookComplete(character) || !heroPortraitNeedsRefresh(character)) return;
     manualAvatarRef.current = false;
     // Guardar aplica las especificaciones conservando la cara/nonce. Solo
@@ -741,6 +783,11 @@ export function App() {
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => readStoredCampaignId());
   // Historia improvisada: campaña generada por el LLM en runtime; no vive en el registro estático.
   const [improvisedCampaign, setImprovisedCampaign] = useState<Campaign | null>(null);
+  const lastForgedContentRef = useRef<ImprovisedStoryContent | null>(null);
+  const lastForgedHeroKeyRef = useRef<string | null>(null);
+  const lastForgedHeroRef = useRef<StoryHeroIdentity | null>(null);
+  const lastForgeWishRef = useRef("");
+  const storyVariationRef = useRef(0);
   const [forgingStory, setForgingStory] = useState(false);
   const [forgeError, setForgeError] = useState<string | null>(null);
   // Mundo sellado + perspectiva: el jugador elige ambiente y punto de entrada; el resto se descubre jugando.
@@ -758,9 +805,9 @@ export function App() {
   const [selectedStat, setSelectedStat] = useState<StatKey>(() => readStoredStat());
   const [usePet, setUsePet] = useState(false);
   const [dice, setDice] = useState<DiceSnapshot | null>(null);
-  const [currentNarration, setCurrentNarration] = useState("Narración: La aventura espera. Elegí una campaña y armá tu personaje para que el narrador abra la primera escena. Consecuencia: el reloj de peligro todavía está quieto. Opciones: investiga, habla o toma un riesgo.");
+  const [currentNarration, setCurrentNarration] = useState("La mesa todavía está en silencio. Elige un mundo y termina de definir a tu héroe; la primera escena comenzará cuando ambos estén listos.");
   const [npcDialogue, setNpcDialogue] = useState<string[]>([]);
-  const [nextOptions, setNextOptions] = useState<string[]>(["Seguir el objetivo.", "Investigar una pista.", "Usar una habilidad."]);
+  const [nextOptions, setNextOptions] = useState<string[]>(["Terminar el héroe.", "Elegir el mundo.", "Forjar la historia."]);
   const [enrichedChoiceLabels, setEnrichedChoiceLabels] = useState<Record<string, string>>({});
   const [dmSections, setDmSections] = useState<NarrationResponse["sections"]>();
   const [plotBeat, setPlotBeat] = useState<NarrationResponse["plotBeat"]>();
@@ -1266,27 +1313,26 @@ export function App() {
   // La forja genera la historia del mundo sellado: el LLM escribe la ficción dentro
   // de las reglas del mundo y del punto de entrada; buildImprovisedCampaign la monta
   // sobre la mecánica probada.
-  async function forgeStory(extraWish: string, worldOverride?: WorldEra, perspectiveOverride?: StoryPerspective): Promise<Campaign | null> {
+  async function forgeStory(extraWish: string, worldOverride?: WorldEra, perspectiveOverride?: StoryPerspective, options: { heroOverride?: Character; revisionOf?: ImprovisedStoryContent; previousHero?: StoryHeroIdentity; variationNonce?: number } = {}): Promise<Campaign | null> {
     const world = worldOverride ?? selectedWorld;
     const chosenPerspective = perspectiveOverride ?? perspective;
+    const storyHero = options.heroOverride ?? draft;
     if (!masterProvider.generateImprovisedStory || forgingStory) return null;
     setForgingStory(true);
     setForgeError(null);
     try {
       const content = await masterProvider.generateImprovisedStory({
         userPrompt: extraWish.trim(),
-        playerNames: [draft.name],
+        variationNonce: options.variationNonce,
+        playerNames: [storyHero.name],
         // La historia debe atarse a la identidad del héroe (y no robarle el nombre a un NPC).
         // strengths/weakness: los stats del jugador tiñen escenas y complicaciones.
-        hero: {
-          name: draft.name,
-          species: draft.species,
-          role: draft.role,
-          petName: draft.pet.id === "none" ? undefined : draft.pet.name,
-          concept: draft.concept,
-          strengths: topTwoStats(draft.stats).map((stat) => statLabels[stat]),
-          weakness: statLabels[lowStat(draft.stats)]
-        },
+        hero: storyHeroIdentity(storyHero),
+        revision: options.revisionOf ? {
+          reason: "hero_identity_changed",
+          previousHero: options.previousHero,
+          preserveStory: options.revisionOf
+        } : undefined,
         worldContext: {
           worldName: world.name,
           era: world.era,
@@ -1305,6 +1351,10 @@ export function App() {
         ...built,
         npcs: built.npcs.map((npc) => ({ ...npc, portraitUrl: beingPortraitUrlWithContext(npc.name, npc.appearance, `${world.era}, ${world.name}`, { description: npc.description, role: npc.role }) }))
       };
+      lastForgedContentRef.current = content;
+      lastForgedHeroKeyRef.current = storyHeroIdentityKey(storyHero);
+      lastForgedHeroRef.current = storyHeroIdentity(storyHero);
+      lastForgeWishRef.current = extraWish.trim();
       setImprovisedCampaign(campaign);
       setImprovisedWorldId(world.id);
       setSelectedCampaignId(campaign.id);
@@ -1636,7 +1686,7 @@ export function App() {
         improvisedCampaign={improvisedWorldId === selectedWorldId ? improvisedCampaign : null}
         forgingStory={forgingStory}
         forgeError={forgeError}
-        onForgeStory={(wish) => { void forgeStory(wish); }}
+        onForgeStory={(wish) => { storyVariationRef.current += 1; void forgeStory(wish, undefined, undefined, { variationNonce: storyVariationRef.current }); }}
         selectedWorld={selectedWorld}
         onSelectWorld={selectWorld}
         perspective={perspective}
@@ -2178,7 +2228,9 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
   const heroShotUrl = isGeneratedPortraitUrl(avatarUrl) ? avatarUrl : hero.look?.fullBodyUrl ?? null;
   const coverCacheKey = `cover-v3:${campaign.id}:${world.id}:${nameHash(backgroundUrl)}:${heroShotUrl ?? "scene-only"}`;
   const [composed, setComposed] = useState<string | null>(null);
-  const ready = composed !== null || (Boolean(src) && !heroShotUrl);
+  // El fondo ya es una portada utilizable: se muestra y habilita el inicio de
+  // inmediato; la composición con el héroe entra después sin bloquear la UI.
+  const ready = Boolean(src);
   useEffect(() => { onReady?.(ready); return () => onReady?.(false); }, [ready]);
   useEffect(() => {
     if (!src || !heroShotUrl) { setComposed(null); return; }
@@ -2216,7 +2268,7 @@ function ForgedStoryBanner({ campaign, world, hero, onReady }: { campaign: Campa
     })();
     return () => { alive = false; };
   }, [src, heroShotUrl, coverCacheKey]);
-  if ((!src && status === "loading") || (src && heroShotUrl && !composed)) return <AssetForging />;
+  if (!src && status === "loading") return <AssetForging />;
   if (!src) return null;
   const cover = composed ?? src;
   const downloadCover = () => {

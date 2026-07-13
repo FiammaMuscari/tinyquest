@@ -70,6 +70,18 @@ test("1-2) prompt expresa el contrato de narración e incluye el ResolutionPlan"
   assert.match(source, /enrichedOptions/);
   assert.match(source, /clueReveals/);
   assert.match(source, /memoryPatch/);
+  assert.match(source, /previousTextToAvoidRepeating:[\s\S]*slice\(0, 5\)/);
+  assert.match(source, /PROSA ACTUAL/);
+});
+
+test("la forja deduplica historias y preserva el canon al adaptar el héroe", async () => {
+  const source = await readFile(new URL("../packages/ai-master/src/groq-dungeon-master.ts", import.meta.url), "utf8");
+  assert.match(source, /pendingStoryRequests/);
+  assert.match(source, /REVISION INCREMENTAL/);
+  assert.match(source, /title: previous\.title/);
+  assert.match(source, /hiddenTruth: previous\.hiddenTruth/);
+  assert.match(source, /npcs: previous\.npcs\.map/);
+  assert.match(source, /VARIACIÓN \$\{input\.variationNonce\}/);
 });
 
 test("3) parser acepta JSON válido", () => {
