@@ -1,8 +1,10 @@
 // ADN del avatar protagonista original aprobado. NPCs, criaturas y escenas deben
 // acercarse A ESTE estilo; nunca al revés.
-export const TINY_QUEST_VISUAL_STYLE = "Premium hand-painted dark-fantasy medieval oil painting, collectible old fantasy novel and RPG art. Semi-realism, natural anatomy, visible brushwork/canvas, rich believable costume, muted jewel tones, sober cinematic chiaroscuro. One lit subject on a simple dark gradient; not anime, cartoon, CGI, studio photo, doll or plastic";
+export const TINY_QUEST_VISUAL_STYLE = "Classic hand-painted dark-fantasy medieval oil illustration, premium old fantasy novel and RPG concept art. Semi-realistic mature refined features, normal-sized eyes, elegant natural anatomy, dry matte pigment, soft visible brushwork, broken painted edges and canvas grain; intricate believable medieval fabric, leather and metal, muted jewel tones, warm side chiaroscuro. One lit subject on an unobtrusive charcoal tonal gradient. No anime, cartoon, CGI, glossy render, studio photo, doll/plastic skin, text or watermark";
 
 export const TINY_QUEST_SCENE_STYLE = "Beautiful hand-painted dark-fantasy RPG environment, semi-realistic oil illustration with old fantasy novel elegance. Wide cinematic composition, visible soft brushwork, subtle canvas texture, atmospheric perspective, warm chiaroscuro, deep shadows, restrained magical glow, refined focal architecture or terrain and looser edges. No anime, cartoon, CGI, photorealism, text or watermark";
+
+export const TINY_QUEST_PAINT_MEDIUM = "MEDIUM: visibly hand-painted matte oil with canvas grain and broken brush edges; never glossy CGI/photo";
 
 /** Reglas comunes deliberadamente cortas: Workers AI corta prompts largos. La
  * identidad/cámara quedan primero y este bloque actúa como control de calidad. */
@@ -79,14 +81,14 @@ function presentationLock(appearance: string | undefined, kind: BeingVisualKind)
 
 export function humanoidPortraitPrompt(name: string, appearance: string | undefined, styleHint: string): string {
   const expression = facialExpressionPrompt(inferFacialExpression(`${appearance ?? ""} ${styleHint}`));
-  return `TINYQUEST NPC PORTRAIT V16. CAMERA: close three-quarter portrait from waist up, face centered, both eyes and entire head visible, no cropped forehead. ${presentationLock(appearance, "humanoid")} CANONICAL IDENTITY: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. ${TINY_QUEST_IDENTITY_RULES}. Explicit skin, iris and hair colors are NON-NEGOTIABLE and override fantasy stereotypes. ${expression} DISTINCT NPC SILHOUETTE: one readable face, characteristic costume outline and one memorable visible trait. ${TINY_QUEST_FACE_QUALITY_RULES}. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  return `TINYQUEST NPC PORTRAIT V16. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: close three-quarter portrait from waist up, face centered, both eyes and entire head visible, no cropped forehead. ${presentationLock(appearance, "humanoid")} CANONICAL IDENTITY: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. ${TINY_QUEST_IDENTITY_RULES}. Explicit skin, iris and hair colors are NON-NEGOTIABLE and override fantasy stereotypes. ${expression} DISTINCT NPC SILHOUETTE: one readable face, characteristic costume outline and one memorable visible trait. ${TINY_QUEST_FACE_QUALITY_RULES}. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
 }
 
 export function creaturePortraitPrompt(name: string, appearance: string | undefined, styleHint = "fantasy adventure", kind: "creature" | "hybrid" = "creature"): string {
   const identity = kind === "hybrid"
     ? "IDENTITY TYPE: anatomical hybrid. Show every human and non-human body region in the exact stated arrangement; never collapse it into a normal human."
     : presentationLock(appearance, "creature");
-  return `TINYQUEST CREATURE PORTRAIT V16. CAMERA: complete head and enough body to read the real distinct silhouette. ${identity} CANONICAL NON-HUMAN IDENTITY: ${name}. ${anatomyFidelityRules(appearance)} The image must literally agree with the description. Render the actual species, never a human in costume; humanoid only when explicitly stated. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  return `TINYQUEST CREATURE PORTRAIT V16. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: complete head and enough body to read the real distinct silhouette. ${identity} CANONICAL NON-HUMAN IDENTITY: ${name}. ${anatomyFidelityRules(appearance)} The image must literally agree with the description. Render the actual species, never a human in costume; humanoid only when explicitly stated. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
 }
 
 export function phenomenonPortraitPrompt(name: string, description: string | undefined, styleHint = "fantasy adventure"): string {

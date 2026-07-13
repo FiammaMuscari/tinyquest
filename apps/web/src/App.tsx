@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 
@@ -612,6 +612,10 @@ export function App() {
   const manualAvatarRef = useRef(false);
   function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.face, urls.fullbody);
+    // Frente ya usa Klein para acercarse desde el Cuerpo master: sumar una sola
+    // referencia estética no agrega otra generación y evita el acabado CGI.
+    // El Worker copia solo óleo/pincel, nunca la persona ni sus colores.
+    linkPortraitStyleReferences(urls.face, ["/assets/style/face-style-oil.jpg"]);
   }
   function forgeHeroPortraitPair(seedNonce: number, source = draftRef.current) {
     const urls = heroImageUrls(source, seedNonce);

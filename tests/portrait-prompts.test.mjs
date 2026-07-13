@@ -30,6 +30,7 @@ test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", ()
   const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
   assert.match(prompt, /HERO FACE VARIANT V20/);
+  assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("CAMERA:") < prompt.indexOf("IDENTITY:"));
   assert.match(prompt.slice(0, 700), /three-quarter portrait.*30 degrees.*VIOLET PURPLE/is);
   assert.match(prompt, /EXPRESSION LOCK: calm alert self-possession/i);
@@ -43,6 +44,7 @@ test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies",
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
   assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V20.*entire head through both feet.*margin above\/below.*BOTH KNEECAPS.*disposable lower band/is);
+  assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("HERO BODY MASTER V20") < prompt.indexOf("IDENTITY:"));
   assert.equal(new URL(url).searchParams.get("width"), "384");
   assert.equal(new URL(url).searchParams.get("height"), "512");
@@ -53,6 +55,7 @@ test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies",
 
 test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
+  assert.match(appSource, /linkPortraitStyleReferences\(urls\.face, \["\/assets\/style\/face-style-oil\.jpg"\]\)/);
   assert.doesNotMatch(appSource, /linkPortraitReference\(urls\.fullbody, urls\.face\)/);
   assert.match(workerSource, /HERO FACE VARIANT V20/);
   assert.match(workerSource, /IMMUTABLE canonical full character and wardrobe master/);

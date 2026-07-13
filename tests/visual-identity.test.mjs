@@ -51,10 +51,10 @@ test("los colores elegidos son restricciones no negociables", () => {
 test("criaturas no se humanizan por defecto y comparten el estilo visual", () => {
   const prompt = visual.creaturePortraitPrompt("Nacar", "quimera escamada de cuatro alas");
   assert.match(prompt, /actual species, never a human in costume/i);
-  assert.match(prompt, /Premium hand-painted dark-fantasy medieval oil painting.*collectible old fantasy novel and RPG art/i);
-  assert.match(prompt, /Preserve every stated anatomical trait exactly: species.*simple dark gradient/is);
+  assert.match(prompt, /Classic hand-painted dark-fantasy medieval oil illustration.*premium old fantasy novel and RPG concept art/i);
+  assert.match(prompt, /Preserve every stated anatomical trait exactly: species.*unobtrusive charcoal tonal gradient/is);
   assert.match(prompt, /Never normalize unusual anatomy into an ordinary human face/i);
-  assert.match(prompt, /not anime, cartoon, CGI, studio photo, doll or plastic/i);
+  assert.match(prompt, /No anime, cartoon, CGI, glossy render, studio photo, doll\/plastic skin/i);
 });
 
 test("la expresión cambia con el hecho sin mutar la geometría facial", () => {
@@ -69,6 +69,7 @@ test("la expresión cambia con el hecho sin mutar la geometría facial", () => {
 
 test("el prompt maestro bloquea género, rostro, colores y artefactos", () => {
   const prompt = visual.humanoidPortraitPrompt("Iriel", "hombre elfo adulto de ojos verdes", "guardián del umbral");
+  assert.match(prompt.slice(0, 180), /visibly hand-painted matte oil/i);
   assert.match(prompt, /gender presentation.*face structure.*skin.*irises.*hair.*scars.*outfit/is);
   assert.match(prompt, /never feminize, masculinize or humanize/i);
   assert.match(prompt, /FACE QUALITY: crisp believable proportions/i);

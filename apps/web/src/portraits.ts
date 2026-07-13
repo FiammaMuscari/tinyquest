@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { anatomyFidelityRules, classifyBeingVisual, creaturePortraitPrompt, facialExpressionPrompt, humanoidPortraitPrompt, inferFacialExpression, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_FACE_QUALITY_RULES, TINY_QUEST_IDENTITY_RULES, TINY_QUEST_NEGATIVE_RULES, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
+import { anatomyFidelityRules, classifyBeingVisual, creaturePortraitPrompt, facialExpressionPrompt, humanoidPortraitPrompt, inferFacialExpression, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_FACE_QUALITY_RULES, TINY_QUEST_IDENTITY_RULES, TINY_QUEST_NEGATIVE_RULES, TINY_QUEST_PAINT_MEDIUM, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
 
 // ─── Retratos generados por IA, con caché persistente ────────────────────────
 // Pollinations (gratis, sin key) genera la imagen a partir de un prompt en la URL.
@@ -46,7 +46,7 @@ export function nameHash(name: string): number {
 // inventaba piernas y hasta recortaba la cabeza; acercar un master es estable.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, styleHint: string) =>
-  ` Character: ${name}. ${styleHint}. COLORS/GEAR LOCK: exact selected skin, irises, hair, clothing, weapons, jewelry and scars in both shots, unaffected by light/species. ${TINY_QUEST_IDENTITY_RULES}. ${facialExpressionPrompt("neutral-alert")}`;
+  ` Character: ${name}. ${styleHint}. COLORS/GEAR: exact skin, irises, hair, clothes, weapons, jewelry and scars in both shots, unchanged by light/species. ${TINY_QUEST_IDENTITY_RULES}. ${facialExpressionPrompt("neutral-alert")}`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
@@ -56,7 +56,7 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V20. CAMERA: close three-quarter portrait, head and shoulders, face turned 30 degrees, both eyes and entire head visible. IDENTITY: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptTail(name, styleHint)} BODY MASTER IS IMMUTABLE: copy its exact person and upper outfit; change only framing. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V20. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: close three-quarter portrait, head and shoulders, face turned 30 degrees, both eyes and entire head visible. IDENTITY: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptTail(name, styleHint)} BODY MASTER IS IMMUTABLE: copy its exact person and upper outfit; change only framing. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -66,7 +66,7 @@ export function fullBodyPortraitUrl(name: string, appearance: string | undefined
   // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V20 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V20. RAW SOURCE FOR KNEE CROP. CAMERA: one standing figure, entire head through both feet in source, 7m away, elegant neutral pose, margin above/below, figure at 72% height. Head, shoulders, hips, BOTH KNEECAPS and feet inside source; client removes disposable lower band. Face 30 degrees, both eyes visible. IDENTITY: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptTail(name, styleHint)} CANONICAL PERSON/WARDROBE MASTER. Natural hands/anatomy; coherent rich medieval costume. ${heroPromptRoot}. AVOID blur, deformities, extra digits/limbs, bad hands, cropped head/knees, ambiguous gender, wrong colors or messy costume.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V20. ${TINY_QUEST_PAINT_MEDIUM}. RAW SOURCE FOR KNEE CROP. CAMERA: one standing figure, entire head through both feet in source, 7m away, elegant neutral pose, margin above/below, figure at 72% height. Head, shoulders, hips, BOTH KNEECAPS and feet inside source; client removes disposable lower band. Face 30 degrees, both eyes visible. IDENTITY: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptTail(name, styleHint)} CANONICAL PERSON/WARDROBE MASTER. Natural hands/anatomy; coherent rich medieval costume. ${heroPromptRoot}. AVOID blur, deformities, extra digits/limbs, bad hands, cropped head/knees, ambiguous gender, wrong colors or messy costume.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
