@@ -4,7 +4,7 @@ import { multiplayerClient, type MultiplayerState } from "./multiplayer/ws-clien
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 import { composeHeroAppearance } from "./hero-visual-spec";
@@ -621,10 +621,9 @@ export function App() {
   const heroPairLoadIdRef = useRef(0);
   function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.face, urls.fullbody);
-    // Frente ya usa Klein para acercarse desde el Cuerpo master: sumar una sola
-    // referencia estética no agrega otra generación y evita el acabado CGI.
-    // El Worker copia solo óleo/pincel, nunca la persona ni sus colores.
-    linkPortraitStyleReferences(urls.face, ["/assets/style/face-style-oil.jpg"]);
+    // Frente se deriva ÚNICAMENTE del Cuerpo master. Una segunda referencia de
+    // estilo hacía que Klein reinterpretara cuello, armadura y telas; el propio
+    // master ya contiene tanto la identidad como el acabado pictórico aprobado.
   }
   function loadHeroPortraitPair(urls: { face: string; fullbody: string }, shot: "face" | "fullbody") {
     const loadId = ++heroPairLoadIdRef.current;
@@ -2429,7 +2428,7 @@ function heroPortraitSpec(draft: Character): { name: string; appearance: string;
   const exactEyes = look.eyeColor ? `exact irises ${lookEyePrompt[look.eyeColor] ?? look.eyeColor}` : "eyes not selected";
   const exactHair = look.hairColor ? `exact hair ${lookHairPrompt[look.hairColor] ?? look.hairColor}` : "hair not selected";
   const exactScar = look.scar && look.scar !== "sin cicatrices"
-    ? `EXACT PERMANENT SCAR: ${lookScarPrompt[look.scar] ?? look.scar}; keep identical in both shots`
+    ? `EXACT PERMANENT SCAR: ${lookScarPrompt[look.scar] ?? look.scar}; mandatory facial landmark, clearly visible and identical in both shots; exactly one scar, never mirrored or moved`
     : "clear unmarked face and body";
   const exactHairLength = look.hairLength ? lookHairLengthPrompt[look.hairLength] ?? look.hairLength : "hair length not selected";
   const identity = selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : draft.species;
@@ -2557,14 +2556,14 @@ const lookHairPrompt: Record<string, string> = {
   "plateado": "metallic silver-gray hair"
 };
 const lookScarPrompt: Record<string, string> = {
-  "ceja izquierda": "one fine healed scar crossing the LEFT eyebrow",
-  "ceja derecha": "one fine healed scar crossing the RIGHT eyebrow",
-  "mejilla izquierda": "one fine healed diagonal scar on the LEFT cheek",
-  "mejilla derecha": "one fine healed diagonal scar on the RIGHT cheek",
+  "ceja izquierda": "one fine healed scar crossing the character's anatomical LEFT eyebrow (viewer RIGHT)",
+  "ceja derecha": "one fine healed scar crossing the character's anatomical RIGHT eyebrow (viewer LEFT)",
+  "mejilla izquierda": "one fine healed diagonal scar centered on the character's anatomical LEFT cheek (viewer RIGHT)",
+  "mejilla derecha": "one fine healed diagonal scar centered on the character's anatomical RIGHT cheek (viewer LEFT)",
   "puente de la nariz": "one fine healed scar across the bridge of the nose",
   "labio": "one small healed vertical scar crossing the lip",
-  "ojo izquierdo": "one distinctive healed scar passing over the LEFT eye, eye intact",
-  "ojo derecho": "one distinctive healed scar passing over the RIGHT eye, eye intact"
+  "ojo izquierdo": "one distinctive healed scar passing over the character's anatomical LEFT eye (viewer RIGHT), eye intact",
+  "ojo derecho": "one distinctive healed scar passing over the character's anatomical RIGHT eye (viewer LEFT), eye intact"
 };
 
 // Avatar del héroe / jugadores: si la URL es generada pasa por la caché con
@@ -3533,6 +3532,7 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
                     <button key={option} type="button" className={(draft.look?.scar ?? "sin cicatrices") === option ? "selected" : ""} onClick={() => chooseLook({ scar: option })} disabled={disabled}>{option}</button>
                   ))}
                 </div>
+                <small className="scarSideHint">Izquierda y derecha son las del personaje, no las del espejo.</small>
               </div>
             </div>
             {heroZoomed && (

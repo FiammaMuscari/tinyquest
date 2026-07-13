@@ -1,6 +1,6 @@
 export { RoomHub } from "./room-hub.js";
 
-const IMAGE_PIPELINE_VERSION = "image-v22";
+const IMAGE_PIPELINE_VERSION = "image-v23";
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status,
@@ -83,10 +83,20 @@ async function cfImage(request, env, ctx) {
     const styleInstruction = styleImages.length
       ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their mature medieval oil technique: dry matte pigment, visible canvas tooth, rough broken brush strokes, believable asymmetry, normal-sized eyes, natural proportions, hand-painted costume and restrained tonal background. Reject anime, doll-face, beauty-render and glossy digital smoothness. NEVER copy their person, elf anatomy, gender, face, skin, eye/hair colors, clothes, weapons or pose; canonical identity overrides every reference.`
       : "";
-    const faceVariant = /^TINYQUEST HERO FACE VARIANT V22\b/.test(input.prompt);
+    const faceVariant = /^TINYQUEST HERO FACE VARIANT V23\b/.test(input.prompt);
+    const scarMatch = input.prompt.match(/EXACT PERMANENT SCAR:\s*([^;.\n]+)/i);
+    const scarSide = scarMatch?.[1] ?? "";
+    const scarCamera = /anatomical LEFT/i.test(scarSide)
+      ? "Turn so the character's anatomical LEFT side is nearest camera; in an unmirrored portrait it appears on viewer RIGHT."
+      : /anatomical RIGHT/i.test(scarSide)
+        ? "Turn so the character's anatomical RIGHT side is nearest camera; in an unmirrored portrait it appears on viewer LEFT."
+        : "";
+    const scarInstruction = scarMatch
+      ? `MANDATORY SCAR OVERRIDE: paint exactly one clearly visible healed scar at this literal facial landmark: ${scarSide}. ${scarCamera} The written landmark overrides Image 0 if its distant face omitted or blurred the scar. Never mirror, relocate, duplicate, hide under hair or turn it into makeup/tattoo.`
+      : "SCAR LOCK: the canonical face is clear and unmarked; do not invent scars, scratches, tattoos or face paint.";
     form.append("prompt", referenceImage
       ? faceVariant
-        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, facial geometry, adult sex/gender presentation, species, anatomy, skin, iris and hair colors/LENGTH, collar, upper garments, armor, jewelry and weapon details. For skin, irises and hair, the explicit text CANONICAL SPEC is mandatory and overrides references when Image 0 is too distant to read; never default irises to brown. Preserve facial marks only when the canonical spec explicitly requires one; otherwise keep the same clear unmarked face from Image 0. The face and torso MUST express the same coherent gender; never attach a masculine torso to a woman or a feminine torso to a man. Keep chest and torso fully clothed in the exact opaque medieval layers from Image 0. Change ONLY camera to close head-and-shoulders at exactly 30 degrees, both eyes and entire head visible. Expression only moves brows, eyelids and mouth; never geometry. Never redesign person, body or outfit. ${styleInstruction} Matte medieval oil; simple dark gradient; one character. ${input.prompt.slice(0, 1050)}`
+        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, facial geometry, adult sex/gender presentation, species, anatomy, skin, iris and hair colors/LENGTH. WARDROBE PIXEL LOCK: reproduce the exact visible neckline, collar shape, layer order, fabric and armor colors, seams, clasps, embroidery, jewelry, weapon details and weathering from Image 0. Never add, remove, recolor, simplify or substitute any garment. For skin, irises and hair, the explicit text CANONICAL SPEC is mandatory and overrides references when Image 0 is too distant to read; never default irises to brown. ${scarInstruction} The face and torso MUST express the same coherent gender; never attach a masculine torso to a woman or a feminine torso to a man. Keep chest and torso fully clothed in the exact opaque medieval layers from Image 0. Change ONLY camera to close head-and-shoulders at exactly 30 degrees, both eyes and entire head visible. Expression only moves brows, eyelids and mouth; never geometry. Never redesign person, body or outfit. ${styleInstruction} Matte medieval oil matching Image 0; simple dark gradient; one character. ${input.prompt.slice(0, 1120)}`
         : `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the exact person and outfit. ${styleInstruction} ${input.prompt.slice(0, 1400)}`
       : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));

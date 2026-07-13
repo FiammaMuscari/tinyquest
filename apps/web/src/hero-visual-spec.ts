@@ -24,8 +24,8 @@ export function composeHeroAppearance(spec: HeroVisualSpec): string {
     `GENDER/BODY: ${compact(spec.gender, 190)}`,
     `COLORS: ${compact(spec.skin, 80)}; ${compact(spec.eyes, 90)}; ${compact(spec.hair, 90)}`,
     `HAIR LENGTH: ${compact(spec.hairLength, 90)}`,
+    `SCAR: ${compact(spec.scar, 160)}`,
     "CLOTHING: fully dressed adult in opaque layered medieval under-tunic and outer clothes covering chest, torso, hips, groin and thighs; no nudity, bare chest, lingerie, loincloth, transparent or fetish armor",
-    `SCAR: ${compact(spec.scar, 90)}`,
     `SPECIES: ${compact(spec.species, 130)}`,
     `ROLE/BUILD: ${compact(spec.role, 70)}, ${compact(spec.physique, 70)}`,
     compact(spec.concept, 100)

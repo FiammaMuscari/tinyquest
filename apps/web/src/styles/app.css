@@ -4047,6 +4047,7 @@ img.npcPortrait[src^="/assets/companions/"] {
   animation: requiredLookPulse 1.35s ease-in-out infinite;
 }
 .lookGroup.requiredNext > span { color: #ff8c82; font-weight: 900; }
+.scarSideHint { display: block; margin-top: 5px; color: #a99c7d; font-size: 9.5px; line-height: 1.3; }
 @keyframes requiredLookPulse { 50% { box-shadow: 0 0 0 4px rgba(255, 55, 55, .22), 0 0 24px rgba(255, 45, 45, .32); } }
 
 .lobbyShell .reimagineButton.forgeAttention {

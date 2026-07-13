@@ -76,17 +76,17 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V22. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. TEXT COLOR LOCK: written skin, iris and hair colors override references; never default irises to brown. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; not frontal/full-body. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and upper clothes; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V23. ${TINY_QUEST_PAINT_MEDIUM}. FACIAL LANDMARK LOCK: the exact SCAR field is mandatory; place it on the stated anatomical side, visibly and only there, never mirror/move/omit it. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. TEXT COLOR LOCK: written skin, iris and hair colors override references; never default irises to brown. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; requested scar side nearest camera. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and pixel-identical neckline, collar, garments, armor, jewelry and colors; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V22 fuerza
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V23 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V22. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA FIRST: distant single standing figure, whole head through feet visible with margins, BOTH KNEES mandatory; client crops below knees. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Face at 30 degrees, both eyes visible. ${heroPromptTail(name, styleHint)} MASTER PERSON/WARDROBE. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V23. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA FIRST: distant single standing figure, whole head through feet visible with margins, BOTH KNEES mandatory; client crops below knees. FACIAL LANDMARK LOCK: exact SCAR field is mandatory and stays on the stated anatomical side; requested scar side faces camera. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Face at 30 degrees, both eyes visible. ${heroPromptTail(name, styleHint)} MASTER PERSON/WARDROBE: establish one precise immutable outfit. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -499,7 +499,7 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
 
 function needsKneeUpCrop(url: string): boolean {
   try {
-    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22)/.test(decodeURIComponent(new URL(url).pathname));
+    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22|23)/.test(decodeURIComponent(new URL(url).pathname));
   } catch {
     return false;
   }
@@ -565,6 +565,81 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
   return promise;
 }
 
+// Vista previa instantánea de Frente: apenas termina el Cuerpo master, recortamos
+// localmente cabeza/hombros y la mostramos mientras Klein pinta el 3/4 definitivo.
+// No hace otra llamada de IA, no ocupa la cola y ya comparte ropa/persona al 100%.
+const referencePreviewObjectUrls = new Map<string, string>();
+const referencePreviewInFlight = new Map<string, Promise<string>>();
+
+export function facePreviewCropGeometry(width: number, height: number): { sx: number; sy: number; side: number; width: number; height: number } {
+  const side = Math.max(1, Math.round(Math.min(width * 0.58, height * 0.5)));
+  return {
+    sx: Math.max(0, Math.round((width - side) / 2)),
+    sy: Math.max(0, Math.round(height * 0.015)),
+    side,
+    width: 512,
+    height: 512
+  };
+}
+
+async function cropFacePreview(blob: Blob): Promise<Blob> {
+  if (typeof document === "undefined") return blob;
+  let source: CanvasImageSource;
+  let sourceWidth: number;
+  let sourceHeight: number;
+  let release: () => void = () => {};
+  if (typeof createImageBitmap !== "undefined") {
+    const bitmap = await createImageBitmap(blob);
+    source = bitmap;
+    sourceWidth = bitmap.width;
+    sourceHeight = bitmap.height;
+    release = () => bitmap.close();
+  } else {
+    const objectUrl = URL.createObjectURL(blob);
+    const image = new Image();
+    image.src = objectUrl;
+    await image.decode();
+    source = image;
+    sourceWidth = image.naturalWidth;
+    sourceHeight = image.naturalHeight;
+    release = () => URL.revokeObjectURL(objectUrl);
+  }
+  try {
+    const crop = facePreviewCropGeometry(sourceWidth, sourceHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = crop.width;
+    canvas.height = crop.height;
+    const context = canvas.getContext("2d");
+    if (!context) return blob;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, crop.sx, crop.sy, crop.side, crop.side, 0, 0, crop.width, crop.height);
+    return await new Promise<Blob>((resolve) => canvas.toBlob((output) => resolve(output ?? blob), "image/jpeg", 0.9));
+  } finally {
+    release();
+  }
+}
+
+function loadLinkedReferencePreview(targetUrl: string): Promise<string> | null {
+  const referenceUrl = portraitReferences.get(targetUrl);
+  if (!referenceUrl) return null;
+  const ready = referencePreviewObjectUrls.get(targetUrl);
+  if (ready) return Promise.resolve(ready);
+  const pending = referencePreviewInFlight.get(targetUrl);
+  if (pending) return pending;
+  const promise = (async () => {
+    const referenceSrc = await loadPortrait(referenceUrl, { priority: true });
+    const referenceBlob = await fetch(referenceSrc).then((response) => response.blob());
+    const previewBlob = await cropFacePreview(referenceBlob);
+    const objectUrl = URL.createObjectURL(previewBlob);
+    referencePreviewObjectUrls.set(targetUrl, objectUrl);
+    return objectUrl;
+  })();
+  promise.catch(() => referencePreviewInFlight.delete(targetUrl));
+  referencePreviewInFlight.set(targetUrl, promise);
+  return promise;
+}
+
 export type PortraitStatus = "idle" | "loading" | "ready" | "failed";
 
 // Hook para <img>: mantiene la imagen anterior mientras llega la nueva (sin parpadeo),
@@ -584,6 +659,12 @@ export function useGeneratedPortrait(url: string | undefined, options: { priorit
     let timer: number | undefined;
     const run = (roundsLeft: number) => {
       setState((prev) => ({ src: prev.src, status: "loading" }));
+      // Si esta URL es Frente, la vista previa aparece en milisegundos cuando el
+      // master ya está listo; la respuesta final nunca es reemplazada por el crop.
+      loadLinkedReferencePreview(url)?.then((previewSrc) => {
+        if (!alive) return;
+        setState((prev) => prev.status === "ready" ? prev : { src: previewSrc, status: "loading" });
+      }).catch(() => undefined);
       loadPortrait(url, { priority })
         .then((src) => alive && setState({ src, status: "ready" }))
         .catch((error) => {
