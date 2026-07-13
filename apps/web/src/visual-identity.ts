@@ -1,8 +1,45 @@
 // ADN del avatar protagonista original aprobado. NPCs, criaturas y escenas deben
 // acercarse A ESTE estilo; nunca al revés.
-export const TINY_QUEST_VISUAL_STYLE = "Classic hand-painted dark-fantasy RPG oil illustration, premium old fantasy novel concept art. Semi-realistic mature refined features, realistic normal-sized eyes, elegant natural anatomy, exact canonical species, soft visible brushwork and broken painted edges, natural species-appropriate surface, intricate medieval fabric leather jewelry or armor when applicable, muted jewel palette, warm side chiaroscuro. Character is the only subject on a simple unobtrusive charcoal-to-black tonal gradient. No anime, manga, cartoon, CGI, doll face, plastic skin, oversized eyes, photorealism, scenery, text, signature or watermark";
+export const TINY_QUEST_VISUAL_STYLE = "Premium hand-painted dark-fantasy medieval oil painting, collectible old fantasy novel and RPG art. Semi-realism, natural anatomy, visible brushwork/canvas, rich believable costume, muted jewel tones, sober cinematic chiaroscuro. One lit subject on a simple dark gradient; not anime, cartoon, CGI, studio photo, doll or plastic";
 
 export const TINY_QUEST_SCENE_STYLE = "Beautiful hand-painted dark-fantasy RPG environment, semi-realistic oil illustration with old fantasy novel elegance. Wide cinematic composition, visible soft brushwork, subtle canvas texture, atmospheric perspective, warm chiaroscuro, deep shadows, restrained magical glow, refined focal architecture or terrain and looser edges. No anime, cartoon, CGI, photorealism, text or watermark";
+
+/** Reglas comunes deliberadamente cortas: Workers AI corta prompts largos. La
+ * identidad/cámara quedan primero y este bloque actúa como control de calidad. */
+export const TINY_QUEST_IDENTITY_RULES = "IDENTITY LOCK: exact selected gender presentation, face structure, species, age, build, skin, irises, hair, scars and outfit. Never feminize, masculinize or humanize; framing/emotion never changes the person";
+
+export const TINY_QUEST_FACE_QUALITY_RULES = "FACE QUALITY: crisp believable proportions, normal coherent eyes, accurate jaw/nose/mouth, natural asymmetry; face clear and lit, never smudged, melted or over-smoothed";
+
+export const TINY_QUEST_NEGATIVE_RULES = "AVOID blur, bad face/hands, broken anatomy, extra digits/limbs, cropped head, ambiguous gender, identity drift, wrong hair/eyes/skin, messy costume, obscured face or exaggeration";
+
+export type FacialExpression = "neutral-alert" | "focused" | "wary" | "defiant" | "relieved" | "sorrowful" | "frightened";
+
+const EXPRESSION_PROMPTS: Record<FacialExpression, string> = {
+  "neutral-alert": "calm alert self-possession, relaxed closed mouth and gently focused brows",
+  focused: "quiet concentration, intent eyes and a subtly tightened brow",
+  wary: "controlled wary tension, watchful eyes and guarded mouth",
+  defiant: "restrained defiance, steady direct eyes and a firm natural jaw",
+  relieved: "subtle believable relief, softened eyes and the faintest natural smile",
+  sorrowful: "contained sorrow, heavy attentive eyes and a quiet unsmiling mouth",
+  frightened: "controlled credible fear, widened attentive eyes and tense lips, never theatrical"
+};
+
+/** Emoción visual derivada solo del beat/rol público. Es determinista: el mismo
+ * hecho produce la misma cara y no convierte cada turno en una imagen nueva. */
+export function inferFacialExpression(context = ""): FacialExpression {
+  const text = context.toLowerCase();
+  if (/fracaso|fall[óo]|derrota|herid|muerte|muert|p[ée]rdida|culpa|duelo|failure|failed|sorrow|grief|loss|wound/.test(text)) return "sorrowful";
+  if (/terror|p[áa]nico|atrapad|huir|acecha|horror|fright|panic|trapped/.test(text)) return "frightened";
+  if (/victoria|triunf|salv[óo]|rescat|alivio|success|victory|relief|rescued/.test(text)) return "relieved";
+  if (/combate|duelo|enemig|amenaza|desaf[íi]|resist|guardi[aá]n|warrior|combat|enemy|defy/.test(text)) return "defiant";
+  if (/pista|secreto|investig|archivo|ritual|clave|misterio|clue|secret|investigat|riddle/.test(text)) return "focused";
+  if (/peligro|crisis|traici|miente|sospech|vigil|danger|crisis|betray|suspect|watch/.test(text)) return "wary";
+  return "neutral-alert";
+}
+
+export function facialExpressionPrompt(expression: FacialExpression): string {
+  return `EXPRESSION LOCK: ${EXPRESSION_PROMPTS[expression]}. Identity unchanged; only brows, eyelids and mouth move naturally.`;
+}
 
 const CREATURE_HINT = /\b(animal|mascota|bestia|criatura|no\s*human[oa]|alien(?:[íi]gena)?|extraterrestre|cuadr[úu]pedo|felin[oa]|gat[oa]|minino|perr[oa]|canino|sabueso|lob[oa]|zorr[oa]|os[oa]|drag[óo]n|drac[óo]nic|serpiente|reptil|lagart|salamandra|ave|p[áa]jaro|cuervo|b[úu]ho|halc[óo]n|[áa]guila|caballo|corcel|potro|pegaso|ciervo|conejo|rat[óo]n|murci[ée]lago|ara[ñn]a|insecto|escarabaj|tigre|le[óo]n|pantera|lince|nutria|hur[óo]n|comadreja|mono|simio|quimera|grifo|f[ée]nix|hocico|pelaje|plumas|escamas|colmillos|bigotes|cat|kitten|kitty|feline|hound|wolf|fox|beast|creature|dragon|serpent|feathers|fur|whiskers?)\b/i;
 const EXPLICIT_HUMANOID_HINT = /\b(humanoid[ea]?|antropomorf[oa]|forma humana|cuerpo humano|torso humano|b[íi]ped[oa]|human-like|human shaped|anthropomorphic)\b/i;
@@ -41,18 +78,19 @@ function presentationLock(appearance: string | undefined, kind: BeingVisualKind)
 }
 
 export function humanoidPortraitPrompt(name: string, appearance: string | undefined, styleHint: string): string {
-  return `TINYQUEST NPC PORTRAIT V15. CAMERA: close three-quarter portrait from waist up, face centered, both eyes and entire head visible, no cropped forehead. ${presentationLock(appearance, "humanoid")} CANONICAL IDENTITY: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. The image must visibly agree with this canonical description, not merely its mood. Preserve exact species, anatomy, apparent age, gender presentation, face, body type, scars, clothing and eye count. Explicit skin, iris and hair colors are NON-NEGOTIABLE and override fantasy stereotypes. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}.`;
+  const expression = facialExpressionPrompt(inferFacialExpression(`${appearance ?? ""} ${styleHint}`));
+  return `TINYQUEST NPC PORTRAIT V16. CAMERA: close three-quarter portrait from waist up, face centered, both eyes and entire head visible, no cropped forehead. ${presentationLock(appearance, "humanoid")} CANONICAL IDENTITY: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. ${TINY_QUEST_IDENTITY_RULES}. Explicit skin, iris and hair colors are NON-NEGOTIABLE and override fantasy stereotypes. ${expression} DISTINCT NPC SILHOUETTE: one readable face, characteristic costume outline and one memorable visible trait. ${TINY_QUEST_FACE_QUALITY_RULES}. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
 }
 
 export function creaturePortraitPrompt(name: string, appearance: string | undefined, styleHint = "fantasy adventure", kind: "creature" | "hybrid" = "creature"): string {
   const identity = kind === "hybrid"
     ? "IDENTITY TYPE: anatomical hybrid. Show every human and non-human body region in the exact stated arrangement; never collapse it into a normal human."
     : presentationLock(appearance, "creature");
-  return `TINYQUEST CREATURE PORTRAIT V15. CAMERA: complete head and enough body to read the real silhouette. ${identity} CANONICAL NON-HUMAN IDENTITY: ${name}. ${anatomyFidelityRules(appearance)} The image must literally agree with the description. Render the actual species, never a human in costume; humanoid only when explicitly stated. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}.`;
+  return `TINYQUEST CREATURE PORTRAIT V16. CAMERA: complete head and enough body to read the real distinct silhouette. ${identity} CANONICAL NON-HUMAN IDENTITY: ${name}. ${anatomyFidelityRules(appearance)} The image must literally agree with the description. Render the actual species, never a human in costume; humanoid only when explicitly stated. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
 }
 
 export function phenomenonPortraitPrompt(name: string, description: string | undefined, styleHint = "fantasy adventure"): string {
-  return `TINYQUEST PHENOMENON V15. SQUARE ICON COMPOSITION: the incorporeal threat itself fills the frame. ${presentationLock(description, "phenomenon")} CANONICAL PHENOMENON: ${name}. Literal visible behavior: ${description?.trim() || "an unnatural force distorting its surroundings"}. Show air, particles, light, debris or space physically reacting in the exact described way. Absolutely no human, humanoid, face, head, eyes, portrait or person. Single clear supernatural phenomenon on a simple dark atmospheric field. ${TINY_QUEST_SCENE_STYLE}. ${styleHint}.`;
+  return `TINYQUEST PHENOMENON V16. SQUARE ICON COMPOSITION: the incorporeal threat itself fills the frame. ${presentationLock(description, "phenomenon")} CANONICAL PHENOMENON: ${name}. Literal visible behavior: ${description?.trim() || "an unnatural force distorting its surroundings"}. Show air, particles, light, debris or space physically reacting in the exact described way. Absolutely no human, humanoid, face, head, eyes, portrait or person. Single clear supernatural phenomenon on a simple dark atmospheric field. ${TINY_QUEST_SCENE_STYLE}. ${styleHint}.`;
 }
 
 export function sceneStylePrompt(): string {

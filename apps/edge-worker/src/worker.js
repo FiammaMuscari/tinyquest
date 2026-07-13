@@ -50,7 +50,7 @@ async function cfImage(request, env, ctx) {
   };
   const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
   const quotaError = (error) => /4006|daily free allocation|neurons/i.test(error instanceof Error ? error.message : String(error));
-  const fastMedallion = /^TINYQUEST (?:NPC PORTRAIT|CREATURE PORTRAIT|PHENOMENON) V15\b/.test(input.prompt);
+  const fastMedallion = /^TINYQUEST (?:NPC PORTRAIT|CREATURE PORTRAIT|PHENOMENON) V16\b/.test(input.prompt);
   const runSchnell = async () => {
     try {
       const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
@@ -81,10 +81,10 @@ async function cfImage(request, env, ctx) {
     const styleInstruction = styleImages.length
       ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful knee-up silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.`
       : "";
-    const faceVariant = /^TINYQUEST HERO FACE VARIANT V19\b/.test(input.prompt);
+    const faceVariant = /^TINYQUEST HERO FACE VARIANT V20\b/.test(input.prompt);
     form.append("prompt", referenceImage
       ? faceVariant
-        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, face, species, anatomy, skin, iris and hair colors, scar, collar, upper garments, armor, jewelry and visible weapon details. Change ONLY camera to a close head-and-torso portrait with the face turned exactly 30 degrees, both eyes visible, entire head and shoulders inside frame. Never redesign the person or outfit. ${styleInstruction} Simple dark tonal gradient; one character only. ${input.prompt.slice(0, 1250)}`
+        ? `Image 0 is the IMMUTABLE canonical full character and wardrobe master. Copy the EXACT same person, facial geometry, gender presentation, species, anatomy, skin, iris and hair colors, scar, collar, upper garments, armor, jewelry and visible weapon details. Change ONLY camera to a close head-and-shoulders portrait with the face turned exactly 30 degrees, both eyes visible, entire head inside frame. Keep the master's calm alert expression; emotion may move brows, eyelids and mouth muscles naturally but may not alter identity. Never redesign the person or outfit. ${styleInstruction} Simple dark tonal gradient; one character only. ${input.prompt.slice(0, 1180)}`
         : `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the exact person and outfit. ${styleInstruction} ${input.prompt.slice(0, 1400)}`
       : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
     form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));

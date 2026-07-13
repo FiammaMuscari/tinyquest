@@ -27,12 +27,23 @@ test("no regenera por un turno ordinario", () => assert.equal(sceneImageBeat(roo
 
 test("usa el último hecho confirmado de la escena", () => {
   const beat = sceneImageBeat(room({ narrativeMemory: { facts: [
-    { sceneId: "scene-1", confirmed: true, type: "clue", text: "La ceniza contiene oro del sello real" }
+    { sceneId: "scene-1", confirmed: true, type: "clue", text: "La ceniza contiene oro del sello real", tags: ["success"] }
   ] } }));
   assert.match(beat, /ceniza contiene oro del sello real/i);
+  assert.match(beat, /Resultado confirmado: success/i);
 });
 
 test("representa una crisis mecánica sin inventar hechos", () => {
   const beat = sceneImageBeat(room({ dangerClock: 8 }));
-  assert.match(beat, /La Deuda.*8 de 10/i);
+  assert.match(beat, /La Deuda.*peligro crítico/i);
+});
+
+test("un evento ordinario no regenera la imagen del turno", () => {
+  assert.equal(sceneImageBeat(room({ narrativeMemory: { facts: [
+    { sceneId: "scene-1", confirmed: true, type: "event", text: "Fiamy inspecciona la sala", tags: ["success"] }
+  ] } })), null);
+});
+
+test("la banda de crisis conserva una clave visual estable", () => {
+  assert.equal(sceneImageBeat(room({ dangerClock: 7 })), sceneImageBeat(room({ dangerClock: 10 })));
 });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { anatomyFidelityRules, classifyBeingVisual, creaturePortraitPrompt, humanoidPortraitPrompt, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
+import { anatomyFidelityRules, classifyBeingVisual, creaturePortraitPrompt, facialExpressionPrompt, humanoidPortraitPrompt, inferFacialExpression, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_FACE_QUALITY_RULES, TINY_QUEST_IDENTITY_RULES, TINY_QUEST_NEGATIVE_RULES, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
 
 // ─── Retratos generados por IA, con caché persistente ────────────────────────
 // Pollinations (gratis, sin key) genera la imagen a partir de un prompt en la URL.
@@ -46,7 +46,7 @@ export function nameHash(name: string): number {
 // inventaba piernas y hasta recortaba la cabeza; acercar un master es estable.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 const heroPromptTail = (name: string, styleHint: string) =>
-  ` Character: ${name}. ${styleHint}. COLOR LOCK: exact selected skin, iris and hair colors, unaffected by species or lighting. Same canonical clothing, weapons, jewelry and scars in both shots. Simple dark tonal gradient only.`;
+  ` Character: ${name}. ${styleHint}. COLORS/GEAR LOCK: exact selected skin, irises, hair, clothing, weapons, jewelry and scars in both shots, unaffected by light/species. ${TINY_QUEST_IDENTITY_RULES}. ${facialExpressionPrompt("neutral-alert")}`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
   // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
@@ -56,17 +56,17 @@ export function characterPortraitUrl(name: string, appearance: string | undefine
   // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
   // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
   // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V19. CAMERA MANDATORY: close three-quarter profile portrait, head and torso, face turned exactly 30 degrees from camera, both eyes visible, entire head and shoulders visible. This 30-degree three-quarter face angle is mandatory, never straight-on. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} SAME PERSON AND SAME UPPER OUTFIT AS BODY MASTER.`;
+  const prompt = `TINYQUEST HERO FACE VARIANT V20. CAMERA: close three-quarter portrait, head and shoulders, face turned 30 degrees, both eyes and entire head visible. IDENTITY: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptTail(name, styleHint)} BODY MASTER IS IMMUTABLE: copy its exact person and upper outfit; change only framing. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V19 fuerza
+  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V20 fuerza
   // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
   // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V19. RAW SOURCE FOR DETERMINISTIC KNEE CROP. CAMERA MANDATORY: full standing figure from entire head through both feet, camera 7 meters away, centered neutral pose, generous empty margin above the head and below the feet, character occupies 72 percent of canvas height. Entire head, hair, both shoulders, torso, hips, BOTH KNEECAPS and both feet must all be inside the frame. The disposable lower band below the knees exists only so the client can remove it. Face turned exactly 30 degrees with both eyes visible. IDENTITY AND WARDROBE LOCK: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptRoot}.${heroPromptTail(name, styleHint)} THIS IS THE CANONICAL PERSON AND WARDROBE MASTER.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V20. RAW SOURCE FOR KNEE CROP. CAMERA: one standing figure, entire head through both feet in source, 7m away, elegant neutral pose, margin above/below, figure at 72% height. Head, shoulders, hips, BOTH KNEECAPS and feet inside source; client removes disposable lower band. Face 30 degrees, both eyes visible. IDENTITY: ${appearance?.trim() || "mysterious fantasy hero"}. ${heroPromptTail(name, styleHint)} CANONICAL PERSON/WARDROBE MASTER. Natural hands/anatomy; coherent rich medieval costume. ${heroPromptRoot}. AVOID blur, deformities, extra digits/limbs, bad hands, cropped head/knees, ambiguous gender, wrong colors or messy costume.`;
   const seed = (nameHash(name) + seedNonce * 7919) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -136,8 +136,9 @@ export function storySceneImageUrl(storyTitle: string, worldName: string, era: s
 // renueva al cambiar de escena. El jugador elige el encuadre: lugar, héroe o ambiente.
 export type SceneImageMode = "place" | "hero" | "mood";
 export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string, ambience = "", worldRules: string[] = [], beat?: string): string {
+  const expression = facialExpressionPrompt(inferFacialExpression(beat ?? objective));
   const base = mode === "hero"
-    ? `Fantasy story illustration: the hero (${heroLine}) inside the scene "${sceneTitle}", taking action. ${objective}.`
+    ? `Fantasy story illustration: the hero (${heroLine}) inside the scene "${sceneTitle}", taking action. ${expression} ${objective}.`
     : mode === "mood"
       ? `Atmospheric fantasy ambience illustration, abstract cinematic mood for "${sceneTitle}". ${objective}.`
       : `Fantasy environment concept art, atmospheric wide view of "${sceneTitle}". ${objective}.`;
@@ -147,7 +148,7 @@ export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, s
   const subjectPolicy = mode === "hero"
     ? "SINGLE-SUBJECT FILM COMPOSITE: one canonical hero alone dominates the subject layer."
     : "CLEAN ENVIRONMENT MATTE-PAINTING BACKGROUND PLATE: abandoned, evacuated and empty before inhabitants arrive; architecture and terrain exclusively.";
-  const prompt = `${storyBeat}ABSOLUTE WORLD CONSTRAINTS: ${laws}. ${subjectPolicy} ${sceneStylePrompt()}. ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. Show the confirmed beat visually without inventing new people, objects or facts. World laws override visual clichés and objective text. Match character and environment light/color when hero mode is active. ${subjectPolicy}`;
+  const prompt = `${storyBeat}ABSOLUTE WORLD CONSTRAINTS: ${laws}. ${subjectPolicy} ${sceneStylePrompt()}. ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. Show the confirmed beat without inventing people, objects or facts. World laws override clichés. In hero mode preserve identity, gender, colors and anatomy; only natural expression responds to the confirmed beat. Match character/environment light.`;
   const seed = nameHash(campaignTitle + sceneTitle + mode + (beat ?? "")) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
 }
@@ -478,7 +479,7 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
 
 function needsKneeUpCrop(url: string): boolean {
   try {
-    return decodeURIComponent(new URL(url).pathname).includes("TINYQUEST HERO BODY MASTER V19");
+    return /TINYQUEST HERO BODY MASTER V(?:19|20)/.test(decodeURIComponent(new URL(url).pathname));
   } catch {
     return false;
   }
