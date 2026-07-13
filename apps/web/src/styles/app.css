@@ -3700,6 +3700,8 @@ img[src^="/assets/companions/"] { background: none !important; border: 0 !import
 .heroPortraitFrame.fullbodyFrame { height: 150px; }
 .heroPortraitFrame.fullbodyFrame .heroPortrait { object-position: top; }
 .portraitStatus.lookNeeded { color: #ffc977; animation: none; }
+.portraitContractHint { color: #bba978; font-size: 10px; line-height: 1.35; text-align: center; max-width: 190px; }
+.previousPortraitButton { width: 100%; font-size: 11px; }
 .sheetBlock strong { display: block; }
 
 /* ── Pulido de lobby: logo contenido, mundos con arte, héroe protagonista ───── */

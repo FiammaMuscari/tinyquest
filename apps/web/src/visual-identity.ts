@@ -1,6 +1,6 @@
 // ADN del avatar protagonista original aprobado. NPCs, criaturas y escenas deben
 // acercarse A ESTE estilo; nunca al revés.
-export const TINY_QUEST_VISUAL_STYLE = "Classic hand-painted dark-fantasy medieval oil illustration, premium old fantasy novel and RPG concept art. Semi-realistic mature refined features, normal-sized eyes, elegant natural anatomy, dry matte pigment, soft visible brushwork, broken painted edges and canvas grain; intricate believable medieval fabric, leather and metal, muted jewel tones, warm side chiaroscuro. One lit subject on an unobtrusive charcoal tonal gradient. No anime, cartoon, CGI, glossy render, studio photo, doll/plastic skin, text or watermark";
+export const TINY_QUEST_VISUAL_STYLE = "Medieval dark-fantasy oil, old novel/RPG art: mature semi-realism, natural anatomy, matte pigment, broken brushwork/canvas, rich textiles/leather/metal, muted jewels, warm chiaroscuro; never anime, CGI, photo or plastic";
 
 export const TINY_QUEST_SCENE_STYLE = "Beautiful hand-painted dark-fantasy RPG environment, semi-realistic oil illustration with old fantasy novel elegance. Wide cinematic composition, visible soft brushwork, subtle canvas texture, atmospheric perspective, warm chiaroscuro, deep shadows, restrained magical glow, refined focal architecture or terrain and looser edges. No anime, cartoon, CGI, photorealism, text or watermark";
 
@@ -8,11 +8,11 @@ export const TINY_QUEST_PAINT_MEDIUM = "MEDIUM: visibly hand-painted matte oil w
 
 /** Reglas comunes deliberadamente cortas: Workers AI corta prompts largos. La
  * identidad/cámara quedan primero y este bloque actúa como control de calidad. */
-export const TINY_QUEST_IDENTITY_RULES = "IDENTITY LOCK: exact selected gender presentation, face structure, species, age, build, skin, irises, hair, scars and outfit. Never feminize, masculinize or humanize; framing/emotion never changes the person";
+export const TINY_QUEST_IDENTITY_RULES = "IDENTITY LOCK: exact gender, face, species, age, build, skin, irises, hair, scars and outfit; framing/emotion never changes the person";
 
 export const TINY_QUEST_FACE_QUALITY_RULES = "FACE QUALITY: crisp believable proportions, normal coherent eyes, accurate jaw/nose/mouth, natural asymmetry; face clear and lit, never smudged, melted or over-smoothed";
 
-export const TINY_QUEST_NEGATIVE_RULES = "AVOID blur, bad face/hands, broken anatomy, extra digits/limbs, cropped head, ambiguous gender, identity drift, wrong hair/eyes/skin, messy costume, obscured face or exaggeration";
+export const TINY_QUEST_NEGATIVE_RULES = "NO blur, deformity, extra digits/limbs, bad face/hands, cropped head/knees, nudity/bare chest, lingerie, transparent/fetish clothes, mixed gender anatomy, identity drift, wrong colors/hair length or anime";
 
 export type FacialExpression = "neutral-alert" | "focused" | "wary" | "defiant" | "relieved" | "sorrowful" | "frightened";
 
@@ -81,18 +81,18 @@ function presentationLock(appearance: string | undefined, kind: BeingVisualKind)
 
 export function humanoidPortraitPrompt(name: string, appearance: string | undefined, styleHint: string): string {
   const expression = facialExpressionPrompt(inferFacialExpression(`${appearance ?? ""} ${styleHint}`));
-  return `TINYQUEST NPC PORTRAIT V16. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: close three-quarter portrait from waist up, face centered, both eyes and entire head visible, no cropped forehead. ${presentationLock(appearance, "humanoid")} CANONICAL IDENTITY: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. ${TINY_QUEST_IDENTITY_RULES}. Explicit skin, iris and hair colors are NON-NEGOTIABLE and override fantasy stereotypes. ${expression} DISTINCT NPC SILHOUETTE: one readable face, characteristic costume outline and one memorable visible trait. ${TINY_QUEST_FACE_QUALITY_RULES}. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  return `TINYQUEST NPC PORTRAIT V17. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: close three-quarter portrait from waist up, face centered, both eyes and entire head visible. FULLY CLOTHED in opaque layered medieval garments covering chest and torso. ${presentationLock(appearance, "humanoid")} CANONICAL IDENTITY: ${name}, ${appearance?.trim() || "figura enigmática con un secreto"}. ${TINY_QUEST_IDENTITY_RULES}. Skin, iris and hair colors/length are NON-NEGOTIABLE. ${expression} DISTINCT NPC SILHOUETTE: readable face, costume outline and one memorable trait. ${TINY_QUEST_FACE_QUALITY_RULES}. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
 }
 
 export function creaturePortraitPrompt(name: string, appearance: string | undefined, styleHint = "fantasy adventure", kind: "creature" | "hybrid" = "creature"): string {
   const identity = kind === "hybrid"
     ? "IDENTITY TYPE: anatomical hybrid. Show every human and non-human body region in the exact stated arrangement; never collapse it into a normal human."
     : presentationLock(appearance, "creature");
-  return `TINYQUEST CREATURE PORTRAIT V16. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: complete head and enough body to read the real distinct silhouette. ${identity} CANONICAL NON-HUMAN IDENTITY: ${name}. ${anatomyFidelityRules(appearance)} The image must literally agree with the description. Render the actual species, never a human in costume; humanoid only when explicitly stated. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  return `TINYQUEST CREATURE PORTRAIT V17. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA: complete head and enough body to read the real distinct silhouette. ${identity} CANONICAL NON-HUMAN IDENTITY: ${name}. ${anatomyFidelityRules(appearance)} The image must literally agree with the description. Render the actual species, never a human in costume; humanoid only when explicitly stated. One subject only. ${TINY_QUEST_VISUAL_STYLE}. ${styleHint}. ${TINY_QUEST_NEGATIVE_RULES}.`;
 }
 
 export function phenomenonPortraitPrompt(name: string, description: string | undefined, styleHint = "fantasy adventure"): string {
-  return `TINYQUEST PHENOMENON V16. SQUARE ICON COMPOSITION: the incorporeal threat itself fills the frame. ${presentationLock(description, "phenomenon")} CANONICAL PHENOMENON: ${name}. Literal visible behavior: ${description?.trim() || "an unnatural force distorting its surroundings"}. Show air, particles, light, debris or space physically reacting in the exact described way. Absolutely no human, humanoid, face, head, eyes, portrait or person. Single clear supernatural phenomenon on a simple dark atmospheric field. ${TINY_QUEST_SCENE_STYLE}. ${styleHint}.`;
+  return `TINYQUEST PHENOMENON V17. SQUARE ICON COMPOSITION: the incorporeal threat itself fills the frame. ${presentationLock(description, "phenomenon")} CANONICAL PHENOMENON: ${name}. Literal visible behavior: ${description?.trim() || "an unnatural force distorting its surroundings"}. Show air, particles, light, debris or space physically reacting in the exact described way. Absolutely no human, humanoid, face, head, eyes, portrait or person. Single clear supernatural phenomenon on a simple dark atmospheric field. ${TINY_QUEST_SCENE_STYLE}. ${styleHint}.`;
 }
 
 export function sceneStylePrompt(): string {

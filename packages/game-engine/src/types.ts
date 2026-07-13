@@ -58,13 +58,16 @@ export type AbilityProgression = {
   progressTarget: number;
 };
 
-// Rasgos visibles elegidos por el jugador; alimentan el prompt del retrato
-// generado. Todos opcionales: sin elección, la IA decide libremente.
+// Rasgos visibles elegidos por el jugador; alimentan el prompt del retrato.
+// Son opcionales en el tipo por compatibilidad/migración, pero la UI exige los
+// cinco antes de generar: género, piel, ojos, color y largo del pelo.
 export type CharacterLook = {
   gender?: string;
   skinTone?: string;
   eyeColor?: string;
   hairColor?: string;
+  /** Largo elegido explícitamente; nunca se deja al azar entre Frente/Cuerpo. */
+  hairLength?: "corto" | "largo";
   scar?: string;
   /** Qué imagen usa de avatar: retrato 3/4 o cuerpo hasta las rodillas. */
   avatarShot?: "face" | "fullbody";
@@ -79,6 +82,11 @@ export type CharacterLook = {
    * "Guardar" aplica cambios con ESTE MISMO nonce → misma cara, colores nuevos.
    * "Reimaginar" lo cambia por uno al azar → cara nueva. */
   portraitNonce?: number;
+  /** Una sola versión anterior recuperable: reimaginar nunca destruye de golpe
+   * el último par aprobado por el jugador. */
+  previousFaceUrl?: string;
+  previousFullBodyUrl?: string;
+  previousPortraitNonce?: number;
 };
 
 export type Character = {

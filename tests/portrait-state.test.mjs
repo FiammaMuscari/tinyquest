@@ -11,7 +11,7 @@ const output = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 }
 }).outputText;
 await writeFile(join(dir, "portrait-state.mjs"), output);
-const { heroPortraitIdentityKey, heroPortraitNeedsRefresh } = await import(`file://${join(dir, "portrait-state.mjs")}`);
+const { HERO_PORTRAIT_IDENTITY_VERSION, heroPortraitIdentityKey, heroPortraitNeedsRefresh } = await import(`file://${join(dir, "portrait-state.mjs")}`);
 
 function hero(overrides = {}) {
   const base = {
@@ -26,6 +26,7 @@ function hero(overrides = {}) {
       skinTone: "cálida",
       eyeColor: "violeta",
       hairColor: "dorado",
+      hairLength: "largo",
       scar: "ceja izquierda",
       faceUrl: "/prompt/face?seed=7",
       fullBodyUrl: "/prompt/body?seed=7"
@@ -46,9 +47,17 @@ test("raza y rasgos visuales dejan la imagen pendiente", () => {
     hero({ species: "Enano de Brasa", look: { portraitIdentity: original.look.portraitIdentity } }),
     hero({ look: { eyeColor: "turquesa", portraitIdentity: original.look.portraitIdentity } }),
     hero({ look: { hairColor: "azul", portraitIdentity: original.look.portraitIdentity } }),
+    hero({ look: { hairLength: "corto", portraitIdentity: original.look.portraitIdentity } }),
     hero({ look: { skinTone: "oscura", portraitIdentity: original.look.portraitIdentity } }),
     hero({ look: { scar: "sin cicatrices", portraitIdentity: original.look.portraitIdentity } })
   ]) assert.equal(heroPortraitNeedsRefresh(changed), true);
+});
+
+test("la firma versionada migra caché y contiene el largo de pelo", () => {
+  const key = heroPortraitIdentityKey(hero());
+  assert.equal(HERO_PORTRAIT_IDENTITY_VERSION, "hero-v21");
+  assert.match(key, /^hero-v21\|/);
+  assert.match(key, /\|largo\|/);
 });
 
 test("nombre, oficio, concepto y stat dominante forman parte de la identidad", () => {

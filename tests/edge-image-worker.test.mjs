@@ -41,25 +41,25 @@ async function generate(prompt, width, height, setup) {
 test("NPC 448² usa seis pasos mientras el héroe conserva ocho", async () => {
   stored.clear();
   const npc = harness();
-  const npcResponse = await generate("TINYQUEST NPC PORTRAIT V16. mujer elfa", 448, 448, npc);
+  const npcResponse = await generate("TINYQUEST NPC PORTRAIT V17. mujer elfa", 448, 448, npc);
   assert.equal(npcResponse.status, 200);
   assert.equal(npc.calls[0].input.steps, 6);
   assert.equal(npc.calls[0].input.width, 448);
   assert.equal(npc.calls[0].input.height, 448);
 
   const hero = harness();
-  await generate("TINYQUEST HERO BODY MASTER V20. full standing figure", 384, 512, hero);
+  await generate("TINYQUEST HERO BODY MASTER V21. full standing figure", 384, 512, hero);
   assert.equal(hero.calls[0].input.steps, 8);
 });
 
 test("el segundo payload idéntico sale de caché sin ejecutar IA", async () => {
   stored.clear();
   const first = harness();
-  await generate("TINYQUEST CREATURE PORTRAIT V16. dragon", 448, 448, first);
+  await generate("TINYQUEST CREATURE PORTRAIT V17. dragon", 448, 448, first);
   assert.equal(first.calls.length, 1);
 
   const second = harness();
-  const response = await generate("TINYQUEST CREATURE PORTRAIT V16. dragon", 448, 448, second);
+  const response = await generate("TINYQUEST CREATURE PORTRAIT V17. dragon", 448, 448, second);
   assert.equal(response.status, 200);
   assert.equal(second.calls.length, 0);
 });

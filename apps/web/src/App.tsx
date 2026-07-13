@@ -7,6 +7,7 @@ import { characterStatAssets, characterTalentAssets } from "./character-assets";
 import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
+import { composeHeroAppearance } from "./hero-visual-spec";
 
 // Play/pausa del ambiente (song-of-the-north) — vive en los popups de ayuda y ajustes.
 function AmbientRow() {
@@ -577,7 +578,10 @@ type DiceSnapshot = {
 
 function readStoredDraft() {
   try {
-    const raw = localStorage.getItem(draftStorageKey);
+    // El héroe es temporal por pestaña: cerrar la pestaña descarta ficha, URLs y
+    // nonce. Nunca revivimos una generación mala de una sesión anterior.
+    localStorage.removeItem(draftStorageKey); // limpia persistencia legacy
+    const raw = sessionStorage.getItem(draftStorageKey);
     return raw ? createCharacter(JSON.parse(raw) as Partial<Character>) : createCharacter();
   } catch {
     return createCharacter();
@@ -610,12 +614,23 @@ export function App() {
   // rasgos NO regenera nada — el par fijado en look.faceUrl/fullBodyUrl es la
   // verdad y el toggle Frente/Cuerpo solo alterna entre esas dos variables.
   const manualAvatarRef = useRef(false);
+  const [heroPairBusy, setHeroPairBusy] = useState(false);
+  const heroPairLoadIdRef = useRef(0);
   function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.face, urls.fullbody);
     // Frente ya usa Klein para acercarse desde el Cuerpo master: sumar una sola
     // referencia estética no agrega otra generación y evita el acabado CGI.
     // El Worker copia solo óleo/pincel, nunca la persona ni sus colores.
     linkPortraitStyleReferences(urls.face, ["/assets/style/face-style-oil.jpg"]);
+  }
+  function loadHeroPortraitPair(urls: { face: string; fullbody: string }, shot: "face" | "fullbody") {
+    const loadId = ++heroPairLoadIdRef.current;
+    setHeroPairBusy(true);
+    const first = loadPortrait(urls[shot], { priority: true });
+    const second = loadPortrait(urls[shot === "face" ? "fullbody" : "face"], { priority: false });
+    void Promise.allSettled([first, second]).finally(() => {
+      if (heroPairLoadIdRef.current === loadId) setHeroPairBusy(false);
+    });
   }
   function forgeHeroPortraitPair(seedNonce: number, source = draftRef.current) {
     const urls = heroImageUrls(source, seedNonce);
@@ -627,11 +642,22 @@ export function App() {
     const shot = source.look?.avatarShot ?? "fullbody";
     // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
     // primer lugar de la cola; la otra queda precargada para el toggle instantáneo.
-    void loadPortrait(urls[shot], { priority: true }).catch(() => undefined);
-    void loadPortrait(urls[shot === "face" ? "fullbody" : "face"], { priority: false }).catch(() => undefined);
+    loadHeroPortraitPair(urls, shot);
+    const identity = heroPortraitIdentityKey(source);
+    const identityChanged = Boolean(source.look?.portraitIdentity && source.look.portraitIdentity !== identity);
+    const reimagining = Boolean(source.look?.faceUrl && source.look?.fullBodyUrl && seedNonce !== (source.look.portraitNonce ?? 0) && !identityChanged);
     const next = createCharacter({
       ...source,
-      look: { ...source.look, faceUrl: urls.face, fullBodyUrl: urls.fullbody, portraitIdentity: heroPortraitIdentityKey(source), portraitNonce: seedNonce },
+      look: {
+        ...source.look,
+        faceUrl: urls.face,
+        fullBodyUrl: urls.fullbody,
+        portraitIdentity: identity,
+        portraitNonce: seedNonce,
+        previousFaceUrl: reimagining ? source.look?.faceUrl : identityChanged ? undefined : source.look?.previousFaceUrl,
+        previousFullBodyUrl: reimagining ? source.look?.fullBodyUrl : identityChanged ? undefined : source.look?.previousFullBodyUrl,
+        previousPortraitNonce: reimagining ? source.look?.portraitNonce : identityChanged ? undefined : source.look?.previousPortraitNonce
+      },
       avatarUrl: urls[shot]
     });
     draftRef.current = next;
@@ -656,8 +682,7 @@ export function App() {
     const fullbody = seed ? expected.fullbody.replace(/seed=\d+$/, `seed=${seed}`) : expected.fullbody;
     prepareHeroPortraitPair({ face, fullbody });
     const shot = current.look?.avatarShot ?? "fullbody";
-    void loadPortrait(face, { priority: true }).catch(() => undefined);
-    void loadPortrait(fullbody, { priority: true }).catch(() => undefined);
+    loadHeroPortraitPair({ face, fullbody }, shot);
     setDraft(createCharacter({
       ...current,
       look: { ...current.look, faceUrl: face, fullBodyUrl: fullbody },
@@ -669,9 +694,33 @@ export function App() {
     if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
   }, [draft.avatarUrl]);
   function reimagineHeroPortrait(seedNonce: number) {
-    if (!lookComplete(draftRef.current)) return;
+    if (!lookComplete(draftRef.current) || heroPairBusy) return;
     manualAvatarRef.current = false;
     forgeHeroPortraitPair(seedNonce);
+  }
+  function restorePreviousHeroPortrait() {
+    const current = draftRef.current;
+    const look = current.look;
+    if (!look?.previousFaceUrl || !look.previousFullBodyUrl || heroPairBusy) return;
+    const shot = look.avatarShot ?? "fullbody";
+    const restored = { face: look.previousFaceUrl, fullbody: look.previousFullBodyUrl };
+    prepareHeroPortraitPair(restored);
+    loadHeroPortraitPair(restored, shot);
+    const next = createCharacter({
+      ...current,
+      look: {
+        ...look,
+        faceUrl: restored.face,
+        fullBodyUrl: restored.fullbody,
+        portraitNonce: look.previousPortraitNonce,
+        previousFaceUrl: look.faceUrl,
+        previousFullBodyUrl: look.fullBodyUrl,
+        previousPortraitNonce: look.portraitNonce
+      },
+      avatarUrl: shot === "face" ? restored.face : restored.fullbody
+    });
+    draftRef.current = next;
+    setDraft(next);
   }
   // Elegir un rasgo sale del modo avatar fijo, pero NO genera: queda pendiente
   // hasta Guardar o Reimaginar explícitamente.
@@ -679,6 +728,7 @@ export function App() {
     manualAvatarRef.current = false;
   }
   function saveHeroPortrait(character: Character) {
+    if (heroPairBusy) return;
     draftRef.current = character;
     if (!lookComplete(character) || !heroPortraitNeedsRefresh(character)) return;
     manualAvatarRef.current = false;
@@ -935,7 +985,7 @@ export function App() {
   }
 
   useEffect(() => {
-    localStorage.setItem(draftStorageKey, JSON.stringify(draft));
+    try { sessionStorage.setItem(draftStorageKey, JSON.stringify(draft)); } catch { /* sesión sin storage */ }
   }, [draft]);
 
   // Precalienta los retratos del elenco apenas arranca la partida: cuando el modal
@@ -1588,6 +1638,8 @@ export function App() {
         perspective={perspective}
         onChoosePerspective={choosePerspective}
         onReimagineHero={reimagineHeroPortrait}
+        onRestoreHero={restorePreviousHeroPortrait}
+        heroPairBusy={heroPairBusy}
         onSaveHero={saveHeroPortrait}
         onUnlockAutoPortrait={unlockAutoPortrait}
         sceneImageMode={sceneImageMode}
@@ -1659,7 +1711,7 @@ export function App() {
   );
 }
 
-function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, onReimagineHero, onSaveHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; onReimagineHero: (seedNonce: number) => void; onSaveHero: (character: Character) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
+function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplayerHost, onMultiplayerJoin, improvisedCampaign, forgingStory, forgeError, onForgeStory, selectedWorld, onSelectWorld, perspective, onChoosePerspective, onReimagineHero, onRestoreHero, heroPairBusy, onSaveHero, onUnlockAutoPortrait, sceneImageMode, onSceneImageMode }: { selectedCampaign: Campaign; draft: Character; setDraft: (character: Character) => void; startSolo: () => void; onMultiplayerHost: () => void; onMultiplayerJoin: () => void; improvisedCampaign: Campaign | null; forgingStory: boolean; forgeError: string | null; onForgeStory: (prompt: string) => void; selectedWorld: WorldEra; onSelectWorld: (worldId: string) => void; perspective: StoryPerspective; onChoosePerspective: (perspective: StoryPerspective) => void; onReimagineHero: (seedNonce: number) => void; onRestoreHero: () => void; heroPairBusy: boolean; onSaveHero: (character: Character) => void; onUnlockAutoPortrait: () => void; sceneImageMode: SceneImageMode; onSceneImageMode: (mode: SceneImageMode) => void }) {
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
@@ -1676,13 +1728,13 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   // Hasta que TODOS los assets estén pintados (retrato del héroe + portada con el
   // héroe en escena), no se puede empezar el mundo.
   const [bannerReady, setBannerReady] = useState(false);
-  const assetsForging = (heroLookDone && heroPortrait.status === "loading") || (improvisedSelected && !bannerReady);
+  const assetsForging = heroPairBusy || (heroLookDone && heroPortrait.status === "loading") || (improvisedSelected && !bannerReady);
   // La forja es SIEMPRE un click explícito, con las ideas como aporte opcional:
   // primero se elige mundo/entrada/recorrido, después se forja.
   const canForge = !forgingStory;
   // El anfitrión trae su héroe a la sala; solo pedimos que esté listo. La historia
   // (autoral o forjada) se resuelve al arrancar la party, no al crear la sala.
-  const mpBlocked = !heroLookDone || editingHero;
+  const mpBlocked = !heroLookDone || editingHero || heroPairBusy;
   return (
     <main className="appShell lobbyShell">
       <HelpButton open={showHelp} setOpen={setShowHelp} />
@@ -1700,8 +1752,8 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
       <section className="lobbyLayout">
         {editingHero ? (
           <section className="heroEditWrap lobbyHeroGrid soloHero heroSpecial">
-            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} onReimagine={onReimagineHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
-            <button className={`ghostButton heroDone ${heroLookDone && heroImageHasPendingChanges ? "forgeAttention" : ""}`} type="button" disabled={!heroLookDone} onClick={() => { onSaveHero(draft); setEditingHero(false); }} title={!heroLookDone ? "Elegí género, piel, ojos y pelo" : heroImageHasPendingChanges ? "Guardar y aplicar las nuevas opciones a Frente y Cuerpo" : "Guardar sin regenerar: la imagen ya está al día"}>
+            <CharacterDesigner draft={draft} setDraft={setDraft} disabled={heroPairBusy} onReimagine={onReimagineHero} onRestorePrevious={onRestoreHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
+            <button className={`ghostButton heroDone ${heroLookDone && heroImageHasPendingChanges ? "forgeAttention" : ""}`} type="button" disabled={!heroLookDone || heroPairBusy} onClick={() => { onSaveHero(draft); setEditingHero(false); }} title={!heroLookDone ? "Elegí género, piel, ojos, color y largo del pelo" : heroImageHasPendingChanges ? "Guardar y aplicar las nuevas opciones a Frente y Cuerpo" : "Guardar sin regenerar: la imagen ya está al día"}>
               ✔ {heroImageHasPendingChanges ? "Guardar y actualizar imagen" : "Guardar héroe y continuar"}
             </button>
           </section>
@@ -1717,13 +1769,15 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
               </div>
               <div className="heroSummaryActions">
                 <button className="ghostButton framedButton" type="button" onClick={() => setEditingHero(true)}><img className="uiIcon" src={uiIcon("editar_heroe")} alt="" /> Editar héroe</button>
-                <button className="reimagineButton framedButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone} title={heroLookDone ? "La IA imagina otra cara para tu identidad" : "Primero elegí género, piel, ojos y pelo en Editar héroe"}>
+                <button className="reimagineButton framedButton" type="button" onClick={() => onReimagineHero(1 + Math.floor(Math.random() * 9000))} disabled={!heroLookDone || heroPairBusy} title={heroLookDone ? "Crea un nuevo par sin borrar el anterior" : "Primero elegí género, piel, ojos, color y largo del pelo en Editar héroe"}>
                   <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> Reimaginar héroe
                 </button>
+                {draft.look?.previousFaceUrl && draft.look?.previousFullBodyUrl && <button className="ghostButton framedButton" type="button" onClick={onRestoreHero} disabled={heroPairBusy}>↶ Versión anterior</button>}
               </div>
             </div>
-            {!heroLookDone && <button type="button" className="startHint heroBuildCta" onClick={() => setEditingHero(true)}><strong>✨ Tu héroe espera una identidad</strong><span>Elegí raza, piel, ojos, pelo y cicatrices para imaginarlo.</span><b>Armar mi héroe →</b></button>}
+            {!heroLookDone && <button type="button" className="startHint heroBuildCta" onClick={() => setEditingHero(true)}><strong>✨ Tu héroe espera una identidad</strong><span>Elegí género, raza, piel, ojos, color/largo del pelo y cicatrices.</span><b>Armar mi héroe →</b></button>}
             {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
+            {heroPairBusy && <p className="portraitStatus">Cuerpo master primero · Frente 3/4 se deriva después. No se cambia identidad ni ropa.</p>}
           </section>
         )}
 
@@ -1842,7 +1896,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
             <UserPlus size={17} /> Jugar con amigos — abrí la sala y compartí el código
           </button>
           <p className="inviteHint">Se crea un código de 6 letras: tus amigos entran con <strong>Unirse con código</strong> (hasta 4), traen su propio héroe y juegan sus turnos en esta misma historia.</p>
-          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel, ojos y pelo para que el narrador lo vea.</p>}
+          {!heroLookDone && !editingHero && <p className="startHint">Falta el paso 1: tu héroe necesita género, piel, ojos, color y largo del pelo para que el narrador lo vea.</p>}
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
         </section>
       </section>
@@ -2217,7 +2271,7 @@ type CastPeek = { name: string; role?: string; description: string; desire?: str
 
 // La personalización física del héroe es obligatoria antes de forjar su retrato.
 function lookComplete(draft: Character): boolean {
-  return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor);
+  return Boolean(draft.look?.gender && draft.look?.skinTone && draft.look?.eyeColor && draft.look?.hairColor && draft.look?.hairLength);
 }
 
 // Las dos imágenes del héroe con la MISMA identidad: Cuerpo es el master canónico
@@ -2338,27 +2392,48 @@ const statHints: Record<StatKey, string> = {
 function heroPortraitSpec(draft: Character): { name: string; appearance: string; styleHint: string } {
   const selectedSpecies = species.find((item) => item.name === draft.species);
   const look = draft.look ?? {};
-  const exactColors = [
-    look.skinTone && `EXACT SKIN COLOR: ${lookSkinPrompt[look.skinTone] ?? look.skinTone}`,
-    look.eyeColor && `EXACT IRIS COLOR: ${lookEyePrompt[look.eyeColor] ?? look.eyeColor}`,
-    look.hairColor && `EXACT HAIR COLOR: ${lookHairPrompt[look.hairColor] ?? look.hairColor}`
-  ].filter(Boolean).join(", ");
+  const exactGender = look.gender ? lookGenderPrompt[look.gender] ?? look.gender : undefined;
+  const exactSkin = look.skinTone ? `exact skin ${lookSkinPrompt[look.skinTone] ?? look.skinTone}` : "skin not selected";
+  const exactEyes = look.eyeColor ? `exact irises ${lookEyePrompt[look.eyeColor] ?? look.eyeColor}` : "eyes not selected";
+  const exactHair = look.hairColor ? `exact hair ${lookHairPrompt[look.hairColor] ?? look.hairColor}` : "hair not selected";
   const exactScar = look.scar && look.scar !== "sin cicatrices"
     ? `EXACT PERMANENT SCAR: ${lookScarPrompt[look.scar] ?? look.scar}; keep identical in both shots`
     : "NO SCARS anywhere on face or body";
-  const identity = [look.gender, selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : undefined].filter(Boolean).join(", ");
-  // Los tres colores abren Y cierran la descripción: Flux tiende a obedecer
-  // mejor las restricciones repetidas en ambos extremos de prompts largos.
-  // `visualFlavor` queda afuera a propósito: algunos linajes traen defaults como
+  const exactHairLength = look.hairLength ? lookHairLengthPrompt[look.hairLength] ?? look.hairLength : "hair length not selected";
+  const identity = selectedSpecies ? raceLook[selectedSpecies.id] ?? selectedSpecies.name : draft.species;
+  // El spec composable ordena género → colores/largo → ropa → anatomía para que
+  // Flux reciba lo crítico antes del límite del proveedor. `visualFlavor` queda
+  // afuera: algunos linajes traen defaults como
   // "ojos plateados", "iris dorado" o "piel fría" que competían con la elección
   // del usuario. La anatomía racial vive en raceLook; el color lo decide SOLO UI.
-  const appearance = [exactColors, exactScar, identity, `${draft.role}, heroic protagonist, ${statPhysique[topStat(draft.stats)]}`, draft.concept, `FINAL IDENTITY CHECK — ${exactColors}; ${exactScar}`].filter(Boolean).join(". ");
+  const appearance = composeHeroAppearance({
+    gender: exactGender ?? "adult androgynous presentation",
+    species: identity,
+    skin: exactSkin,
+    eyes: exactEyes,
+    hair: exactHair,
+    hairLength: exactHairLength,
+    scar: exactScar,
+    role: draft.role,
+    physique: statPhysique[topStat(draft.stats)],
+    concept: draft.concept
+  });
   return { name: draft.name.trim() || "Aventurera", appearance, styleHint: "epic fantasy adventure, hero portrait" };
 }
 
 // Opciones de rasgos del retrato: etiquetas en español (van directo al prompt)
 // + color de muestra para el swatch. Click en el elegido = soltar la elección.
 const lookGenderOptions = ["femenino", "masculino", "andrógino"] as const;
+const lookGenderPrompt: Record<string, string> = {
+  "femenino": "UNMISTAKABLY ADULT FEMALE; feminine face and clothed female body proportions stay coherent head-to-hips; never male torso/chest",
+  "masculino": "UNMISTAKABLY ADULT MALE; masculine face and clothed male body proportions stay coherent head-to-hips; never female torso/breasts",
+  "andrógino": "UNMISTAKABLY ADULT ANDROGYNOUS; balanced androgynous face/body stay coherent head-to-hips; never mismatched sex traits"
+};
+const lookHairLengthOptions = ["corto", "largo"] as const;
+const lookHairLengthPrompt: Record<string, string> = {
+  "corto": "short, ending above jaw; never shoulder-length/long",
+  "largo": "long, visibly below shoulders; never short/cropped"
+};
 const lookSkinOptions = [
   { label: "pálida", color: "#f2e3d5" },
   { label: "clara", color: "#eac9a8" },
@@ -3266,7 +3341,7 @@ const builderTabList = [
 ] as const;
 type BuilderTab = typeof builderTabList[number]["id"];
 
-function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAutoPortrait }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; onReimagine?: (seedNonce: number) => void; onUnlockAutoPortrait?: () => void }) {
+function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onRestorePrevious, onUnlockAutoPortrait }: { draft: Character; setDraft: (character: Character) => void; disabled: boolean; onReimagine?: (seedNonce: number) => void; onRestorePrevious?: () => void; onUnlockAutoPortrait?: () => void }) {
   const spentPoints = totalExtraPoints(draft.stats);
   const remainingPoints = 8 - spentPoints;
   const selectedSpecies = species.find((item) => item.name === draft.species) ?? species[0];
@@ -3288,7 +3363,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
   const currentShot = draft.look?.avatarShot ?? "fullbody";
   const hasForgedPortrait = Boolean(draft.look?.faceUrl && draft.look?.fullBodyUrl && isGeneratedPortraitUrl(draft.avatarUrl));
   const portraitNeedsRefresh = heroPortraitNeedsRefresh(draft);
-  const firstMissingLook = !draft.look?.gender ? "gender" : !draft.look?.skinTone ? "skin" : !draft.look?.eyeColor ? "eyes" : !draft.look?.hairColor ? "hair" : null;
+  const firstMissingLook = !draft.look?.gender ? "gender" : !draft.look?.skinTone ? "skin" : !draft.look?.eyeColor ? "eyes" : !draft.look?.hairColor ? "hair" : !draft.look?.hairLength ? "hairLength" : null;
   function chooseLook(patch: Partial<CharacterLook>) {
     onUnlockAutoPortrait?.();
     setDraft(createCharacter({ ...draft, look: { avatarShot: draft.look?.avatarShot ?? "fullbody", ...draft.look, ...patch } }));
@@ -3365,12 +3440,16 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
             )}
             {/* Nonce al azar: cada click es una cara nueva (en ambas tomas); la elegida persiste. */}
             {onReimagine && (
-              <button type="button" className={`reimagineButton ${heroLookDone && portraitNeedsRefresh ? "forgeAttention" : ""}`} onClick={() => onReimagine(hasForgedPortrait ? 1 + Math.floor(Math.random() * 9000) : 0)} disabled={disabled || !heroLookDone} title={heroLookDone ? (hasForgedPortrait ? "La IA imagina otra cara respetando tu identidad" : "Crear retrato con los rasgos elegidos") : "Elegí género, piel, ojos y pelo primero"}>
+              <button type="button" className={`reimagineButton ${heroLookDone && portraitNeedsRefresh ? "forgeAttention" : ""}`} onClick={() => onReimagine(hasForgedPortrait ? 1 + Math.floor(Math.random() * 9000) : 0)} disabled={disabled || !heroLookDone} title={heroLookDone ? (hasForgedPortrait ? "La IA imagina otra cara respetando tu identidad" : "Crear retrato con los rasgos elegidos") : "Elegí género, piel, ojos, color y largo del pelo primero"}>
                 <img className="uiIcon" src={uiIcon("reimaginar_heroe")} alt="" /> {hasForgedPortrait ? "Reimaginar héroe" : "Imaginar héroe"}
               </button>
             )}
+            {onRestorePrevious && draft.look?.previousFaceUrl && draft.look?.previousFullBodyUrl && (
+              <button type="button" className="ghostButton previousPortraitButton" onClick={onRestorePrevious} disabled={disabled}>↶ Recuperar versión anterior</button>
+            )}
+            {heroLookDone && <small className="portraitContractHint">Cuerpo = master canónico · Frente = variante 3/4 del mismo personaje</small>}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
-            {!heroLookDone && <span className="portraitStatus lookNeeded">Elegí género, piel, ojos y pelo →</span>}
+            {!heroLookDone && <span className="portraitStatus lookNeeded">Elegí género, piel, ojos, color y largo del pelo →</span>}
           </div>
           <div className="heroIdentityFields">
             <label>Nombre<input value={draft.name} onChange={(event) => setDraft(createCharacter({ ...draft, name: event.target.value }))} disabled={disabled} /></label>
@@ -3404,6 +3483,14 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
                 <div className="lookSwatches">
                   {lookHairOptions.map((option) => (
                     <button key={option.label} type="button" title={`Pelo ${option.label}`} aria-label={`Pelo ${option.label}`} className={draft.look?.hairColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ hairColor: draft.look?.hairColor === option.label ? undefined : option.label })} disabled={disabled} />
+                  ))}
+                </div>
+              </div>
+              <div className={`lookGroup ${firstMissingLook === "hairLength" ? "requiredNext" : ""}`}>
+                <span>Largo del pelo<small>{draft.look?.hairLength}</small></span>
+                <div className="lookPills">
+                  {lookHairLengthOptions.map((option) => (
+                    <button key={option} type="button" className={draft.look?.hairLength === option ? "selected" : ""} onClick={() => chooseLook({ hairLength: draft.look?.hairLength === option ? undefined : option })} disabled={disabled}>{option}</button>
                   ))}
                 </div>
               </div>
@@ -3558,7 +3645,7 @@ function CharacterDesigner({ draft, setDraft, disabled, onReimagine, onUnlockAut
         </div>
         <div className="heroSheet">
           <h3>Ficha viva</h3>
-          <p className="sheetBlock who"><strong>Quién sos</strong>{draft.name || "Tu héroe"}, {selectedSpecies.name.toLowerCase()} y {selectedRole.name.toLowerCase()}{hasPet(draft) ? `, junto a ${selectedPet.name}` : ", sin mascota al comenzar"}.{draft.look?.gender ? ` ${draft.look.gender}, piel ${draft.look.skinTone ?? "?"}, ojos ${draft.look.eyeColor ?? "?"}, pelo ${draft.look.hairColor ?? "?"}.` : ""}</p>
+          <p className="sheetBlock who"><strong>Quién sos</strong>{draft.name || "Tu héroe"}, {selectedSpecies.name.toLowerCase()} y {selectedRole.name.toLowerCase()}{hasPet(draft) ? `, junto a ${selectedPet.name}` : ", sin mascota al comenzar"}.{draft.look?.gender ? ` ${draft.look.gender}, piel ${draft.look.skinTone ?? "?"}, ojos ${draft.look.eyeColor ?? "?"}, pelo ${draft.look.hairColor ?? "?"} ${draft.look.hairLength ?? "?"}.` : ""}</p>
           <p className="sheetBlock helps"><strong>Qué te ayuda</strong>{selectedSpecies.passiveTrait} {selectedRole.specialAbility} {hasPet(draft) ? selectedPet.activeAbility : "Podés vincular una criatura si aparece durante la aventura."}</p>
           <p className="sheetBlock trouble"><strong>Qué te complica</strong>{selectedSpecies.quirk} {selectedRole.limitation}</p>
           <p className="sheetBlock story"><strong>En la historia</strong>Tus fuertes: {topTwoStats(draft.stats).map((stat) => statLabels[stat]).join(" y ")}. Tu flanco débil: {statLabels[lowStat(draft.stats)]}. El narrador los va a usar.</p>
