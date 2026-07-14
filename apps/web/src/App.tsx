@@ -5,7 +5,7 @@ import { canonicalMultiplayerCharacter, multiplayerAvatarSignature, validateChat
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 import { composeHeroAppearance } from "./hero-visual-spec";
@@ -657,9 +657,9 @@ export function App() {
   const heroPairLoadIdRef = useRef(0);
   function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.face, urls.fullbody);
-    // Frente se deriva ÚNICAMENTE del Cuerpo master. Una segunda referencia de
-    // estilo hacía que Klein reinterpretara cuello, armadura y telas; el propio
-    // master ya contiene tanto la identidad como el acabado pictórico aprobado.
+    // Pipeline visual estable V22: el cuerpo fija la identidad y la referencia
+    // aprobada aporta únicamente el óleo medieval al acercamiento de Frente.
+    linkPortraitStyleReferences(urls.face, ["/assets/style/face-style-oil.jpg"]);
   }
   function loadHeroPortraitPair(urls: { face: string; fullbody: string }, shot: "face" | "fullbody") {
     const loadId = ++heroPairLoadIdRef.current;

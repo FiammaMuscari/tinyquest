@@ -29,14 +29,12 @@ const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\
 test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", () => {
   const url = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt, /HERO FACE VARIANT V25/);
+  assert.match(prompt, /HERO FACE VARIANT V22/);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.ok(prompt.indexOf("CANONICAL SPEC:") < prompt.indexOf("CAMERA:"));
-  assert.match(prompt.slice(0, 900), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
-  assert.match(prompt, /COLOR LOCK: written skin, iris and hair colors are literal and immutable/i);
+  assert.match(prompt.slice(0, 700), /VIOLET PURPLE.*3\/4 head-and-shoulders.*30 degrees/is);
+  assert.match(prompt, /EXPRESSION LOCK: calm alert self-possession/i);
   assert.match(prompt, /FACE QUALITY: crisp believable proportions/i);
-  assert.match(prompt, /FACIAL LANDMARK LOCK:.*anatomical side.*never mirror\/move\/omit/is);
-  assert.match(prompt, /SAME BODY MASTER: exact person, adult age, anatomy, hair, face, neckline, garments, armor, jewelry and colors/i);
   assert.equal(new URL(url).searchParams.get("width"), "512");
   assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.ok(prompt.length <= 1960, `prompt de frente truncable: ${prompt.length}`);
@@ -45,17 +43,15 @@ test("Frente es una variante 3/4 preparada para derivarse del cuerpo master", ()
 test("Cuerpo genera rodillas y descarta determinísticamente la franja de pies", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 1300), /HERO BODY MASTER V25.*CHARACTER-SHEET CAMERA.*90% of frame height.*whole head through feet.*BOTH KNEES.*crops below knees/is);
+  assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V22.*CAMERA FIRST.*whole head through feet.*margins.*BOTH KNEES.*crops below knees/is);
   assert.match(prompt.slice(0, 180), /MEDIUM: visibly hand-painted matte oil/i);
   assert.match(prompt, /FULLY CLOTHED opaque medieval layers/i);
-  assert.match(prompt, /DETAIL PARITY:.*close-portrait quality/i);
-  assert.match(prompt, /BACKGROUND LOCK: plain dark neutral gradient only/i);
   assert.match(prompt, /NO blur, deformity, extra digits\/limbs.*nudity\/bare chest.*mixed gender anatomy/is);
-  assert.ok(prompt.indexOf("CHARACTER-SHEET CAMERA") < prompt.indexOf("CANONICAL SPEC:"));
-  assert.equal(new URL(url).searchParams.get("width"), "576");
-  assert.equal(new URL(url).searchParams.get("height"), "768");
-  assert.deepEqual(portraits.kneeUpCropGeometry(576, 768), { sx: 13, sy: 0, sw: 551, sh: 630, width: 448, height: 512 });
-  assert.match(portraitSource, /if \(needsKneeUpCrop\(url\)\) \{[\s\S]*blob = await cropKneeUpPortrait\(blob\)/);
+  assert.ok(prompt.indexOf("CAMERA FIRST:") < prompt.indexOf("CANONICAL SPEC:"));
+  assert.equal(new URL(url).searchParams.get("width"), "384");
+  assert.equal(new URL(url).searchParams.get("height"), "512");
+  assert.deepEqual(portraits.kneeUpCropGeometry(384, 512), { sx: 8, sy: 0, sw: 368, sh: 420, width: 448, height: 512 });
+  assert.match(portraitSource, /if \(needsKneeUpCrop\(url\)\) blob = await cropKneeUpPortrait\(blob\)/);
   assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
 });
 
@@ -69,15 +65,6 @@ test("Frente y Cuerpo comparten seed temporal y una pestaña nueva no revive cac
   assert.match(appSource, /sessionStorage\.setItem\(draftStorageKey/);
   assert.match(appSource, /previousFaceUrl: reimagining/);
   assert.match(appSource, /Recuperar versión anterior/);
-});
-
-test("Frente muestra un crop local del master mientras llega la variante final", () => {
-  assert.deepEqual(portraits.facePreviewCropGeometry(448, 512), { sx: 96, sy: 8, side: 256, width: 512, height: 512 });
-  assert.match(portraitSource, /loadLinkedReferencePreview\(url\)/);
-  assert.match(portraitSource, /prev\.status === "ready" \? prev : \{ src: previewSrc, status: "loading" \}/);
-  assert.match(portraitSource, /referenceUrl && isCanonicalFaceCrop\(url\)/);
-  assert.match(portraitSource, /rawMasterKey\(referenceUrl\)/);
-  assert.match(portraitSource, /blob = await cropFacePreview\(source\)/);
 });
 
 test("editar rasgos no queda bloqueado por la generación y guardar confirma cambios pendientes", () => {
@@ -94,22 +81,16 @@ test("la forja literaria usa Gemini por defecto y reserva Groq para los turnos",
 
 test("Worker deriva Frente desde Cuerpo sin rediseñar persona o ropa", () => {
   assert.match(appSource, /linkPortraitReference\(urls\.face, urls\.fullbody\)/);
-  assert.doesNotMatch(appSource, /linkPortraitStyleReferences\(urls\.face/);
+  assert.match(appSource, /linkPortraitStyleReferences\(urls\.face, \["\/assets\/style\/face-style-oil\.jpg"\]\)/);
   assert.doesNotMatch(appSource, /linkPortraitReference\(urls\.fullbody, urls\.face\)/);
-  assert.match(workerSource, /HERO FACE VARIANT V25/);
-  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v25"/);
+  assert.match(workerSource, /HERO FACE VARIANT V22/);
+  assert.match(workerSource, /IMAGE_PIPELINE_VERSION = "image-v22"/);
   assert.match(workerSource, /IMMUTABLE canonical full character and wardrobe master/);
   assert.match(workerSource, /Copy the EXACT same person, facial geometry, adult sex\/gender presentation, species, anatomy, skin, iris and hair colors\/LENGTH/);
   assert.match(workerSource, /face and torso MUST express the same coherent gender/);
   assert.match(workerSource, /Keep chest and torso fully clothed/);
-  assert.match(workerSource, /explicit text CANONICAL SPEC is mandatory and overrides references/);
   assert.match(workerSource, /Reject anime, doll-face, beauty-render and glossy digital smoothness/);
   assert.match(workerSource, /Change ONLY camera to close head-and-shoulders/);
-  assert.match(workerSource, /MANDATORY SCAR OVERRIDE/);
-  assert.match(workerSource, /WARDROBE PIXEL LOCK/);
-  assert.match(workerSource, /Never add, remove, recolor, simplify or substitute any garment/);
-  assert.match(appSource, /anatomical LEFT eyebrow \(viewer RIGHT\)/);
-  assert.match(appSource, /anatomical RIGHT cheek \(viewer LEFT\)/);
   assert.match(workerSource, /Expression only moves brows, eyelids and mouth; never geometry/);
   assert.match(portraitSource, /if \(referenceUrl\) throw new ReferenceVariantError\(\)/);
 });

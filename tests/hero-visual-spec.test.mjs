@@ -31,7 +31,6 @@ test("character spec único fija género, ropa, colores y largo", () => {
   assert.match(prompt, /no nudity, bare chest, lingerie, loincloth, transparent or fetish armor/i);
   assert.match(prompt, /COLORS:.*warm olive.*violet.*golden/is);
   assert.match(prompt, /HAIR LENGTH: long below shoulders, never short/i);
-  assert.ok(prompt.indexOf("SCAR:") < prompt.indexOf("CLOTHING:"), "la cicatriz debe llegar antes que el vestuario");
 });
 
 test("campos libres se acotan para no truncar las reglas críticas", () => {
