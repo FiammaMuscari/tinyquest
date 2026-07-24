@@ -158,6 +158,25 @@ function shortLine(text: string | undefined, fallback: string): string {
   return clean.length > 110 ? `${clean.slice(0, 107).trimEnd()}…` : clean;
 }
 
+// El nombre de un reloj es una ETIQUETA de track, no una frase. Los objetivos que
+// escribe el LLM vienen como oración completa ("Impugná la deuda falsa antes de que
+// el consejo la cobre") y en el rail de la partida —279px— eso parte en dos líneas y
+// el reloj deja de leerse como reloj. Cortamos en la primera subordinada, que es
+// justo donde termina la acción y empieza la condición.
+const SUBORDINATE = /\s+(?:antes de que|antes del|antes de|para que|sin que|hasta que|mientras|aunque|cuando|si no|o el|o la)\b/i;
+const CLOCK_LABEL_MAX = 34;
+
+function clockLabel(text: string | undefined, fallback: string): string {
+  const clean = (text ?? "").trim().replace(/[.;:]+$/, "");
+  if (!clean) return fallback;
+  const head = clean.split(SUBORDINATE)[0].trim() || clean;
+  if (head.length <= CLOCK_LABEL_MAX) return head;
+  // Recorte en borde de palabra: cortar a mitad de palabra se lee como error.
+  const cut = head.slice(0, CLOCK_LABEL_MAX);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > CLOCK_LABEL_MAX * 0.5 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
 /**
  * Siembra los relojes de una campaña. Funciona con campañas escritas a mano Y con
  * historias forjadas por el LLM: si la campaña no declara relojes, los deriva de sus
@@ -168,7 +187,7 @@ export function createClocksForCampaign(campaign: Campaign): StoryClock[] {
   if (authored?.length) {
     return authored.slice(0, 4).map((seed, index) => ({
       id: seed.id || `clock-${index + 1}`,
-      name: seed.name,
+      name: clockLabel(seed.name, `Reloj ${index + 1}`),
       kind: seed.kind,
       segments: clampSegments(seed.segments, seed.kind),
       filled: 0,
@@ -184,7 +203,7 @@ export function createClocksForCampaign(campaign: Campaign): StoryClock[] {
   const threat = campaign.threats?.[0];
   clocks.push({
     id: "clock-threat",
-    name: threat?.name ? `${threat.name} se cierra` : "La amenaza te encuentra",
+    name: threat?.name ? clockLabel(`${threat.name} se cierra`, "La amenaza te encuentra") : "La amenaza te encuentra",
     kind: "threat",
     segments: DEFAULT_SEGMENTS.threat,
     filled: 0,
@@ -211,7 +230,7 @@ export function createClocksForCampaign(campaign: Campaign): StoryClock[] {
   const objective = campaign.forgeNotes?.summary?.objective;
   clocks.push({
     id: "clock-opportunity",
-    name: objective ? shortLine(objective, "Tu objetivo") : "Tu ventaja crece",
+    name: objective ? clockLabel(objective, "Tu ventaja crece") : "Tu ventaja crece",
     kind: "opportunity",
     segments: DEFAULT_SEGMENTS.opportunity,
     filled: 0,

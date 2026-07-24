@@ -135,3 +135,34 @@ test("11) la UI solo ve relojes revelados; el narrador los ve todos y marca los 
   const done = clocks.clockPressureLines([threatClock({ filled: 4, firedAtTurn: 2 })]);
   assert.match(done[0], /CUMPLIDO/);
 });
+
+test("12) el nombre del reloj es etiqueta, no oración: cabe en el rail de la partida", () => {
+  // El LLM escribe objetivos como frase completa. En el rail de 279px eso parte en
+  // dos líneas y el reloj deja de leerse como reloj.
+  const largo = clocks.createClocksForCampaign({
+    id: "larga", title: "X", clues: [],
+    forgeNotes: { summary: { objective: "Impugná la deuda falsa antes de que el consejo la cobre." } }
+  });
+  const oportunidad = largo.find((clock) => clock.kind === "opportunity");
+  assert.equal(oportunidad.name, "Impugná la deuda falsa", "corta en la subordinada, no a mitad de idea");
+
+  // Sin subordinada donde cortar: recorte por longitud, siempre en borde de palabra.
+  const sinCorte = clocks.createClocksForCampaign({
+    id: "sincorte", title: "X", clues: [],
+    forgeNotes: { summary: { objective: "Recuperar el sello menor del archivo inundado de Veldaran" } }
+  });
+  const recortado = sinCorte.find((clock) => clock.kind === "opportunity");
+  assert.ok(recortado.name.length <= 35, `demasiado largo: ${recortado.name}`);
+  assert.match(recortado.name, /…$/, "avisa que hay más texto");
+  assert.doesNotMatch(recortado.name, /\s…$/, "no deja espacio colgando antes de los puntos");
+
+  // El pago conserva la frase entera: el recorte es solo de UI.
+  assert.ok(recortado.payoff.length > 0);
+
+  // Un nombre que ya es etiqueta no se toca.
+  const corto = clocks.createClocksForCampaign({
+    id: "corta", title: "X", clues: [],
+    forgeNotes: { summary: { objective: "Robar el sello" } }
+  });
+  assert.equal(corto.find((clock) => clock.kind === "opportunity").name, "Robar el sello");
+});

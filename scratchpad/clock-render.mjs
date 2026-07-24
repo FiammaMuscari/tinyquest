@@ -23,9 +23,10 @@ const html = `<!doctype html><html lang="es"><head><meta charset="utf-8">
   <h3>El recorrido</h3>
   <div class="journeyClocks">
     <h4>Lo que corre</h4>
-    ${clock("threat", "La Guardia del Umbral cierra los muros", 5, 8)}
+    ${/* Nombres tal como los deja clockLabel() del motor: etiqueta corta, una línea. */ ""}
+    ${clock("threat", "La Guardia del Umbral se cierra", 5, 8)}
     ${clock("mystery", "La verdad toma forma", 3, 6)}
-    ${clock("opportunity", "Salvar a Nicolás antes del juicio", 2, 6)}
+    ${clock("opportunity", "Salvar a Nicolás", 2, 6)}
     ${clock("threat", "El Cobrador reclama la deuda", 4, 4, "El Cobrador reclama la deuda en sangre.")}
   </div>
   <div class="journeyLaws"><h4>Leyes de Veldaran</h4>
