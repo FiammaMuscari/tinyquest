@@ -209,6 +209,27 @@ tiene cacheado, y transportada dentro del `Character`. Contactos:
   personaje es viejo y no tiene miniatura.
 - Verificación en navegador real, sin cuota: `node scratchpad/thumb-check.mjs`.
 
+Prueba de extremo a extremo con el relay Go de verdad: `node scratchpad/lobby-avatar.mjs`
+(necesita `npm run dev` en 5173 y `go run ./cmd/server` en 8787). Dos **contextos
+aislados**, anfitrión con FRENTE amarilla y CUERPO violeta sembradas en IndexedDB,
+invitado con la caché vacía y toda generación cortada. Lee el píxel real dibujado, no
+el atributo. Resultado esperado:
+
+```
+Annie: miniatura · rgb(232,198,90) · 102x128   ← la FRENTE que eligió el anfitrión
+ernie: placeholder · 128x128                   ← sin caché y sin red: marcador de posición
+```
+
+Dos trampas que invalidan esta prueba si se repiten:
+
+- `browser.newPage()` **comparte IndexedDB y localStorage**. Hay que usar
+  `browser.newContext()` o el "invitado" hereda la caché del anfitrión, que es justo la
+  condición que la prueba tiene que descartar.
+- Los retratos **no salen por el dominio de pollinations**: van por los proxys del
+  propio dev server (`/api/cf-image` y `/api/pollinations`, portraits.ts:288 y :444).
+  Bloquear por dominio deja pasar la generación real — el invitado resuelve el retrato
+  grande igual, la prueba deja de probar nada y encima gasta cuota.
+
 ## Hard rules (violating these wastes a whole session)
 
 1. `App.tsx` is ~2500 lines. **Never read it whole.** Grep the anchor, then read ±40 lines.
