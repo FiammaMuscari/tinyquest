@@ -5,7 +5,7 @@ import { improvisedStorySchema, narrationResponseSchema } from "./schemas";
 import { repairLooseJson } from "./json-repair";
 import { buildDungeonMasterSystemPrompt } from "./prompt-builder";
 import { buildFallbackNarrationOutput, parseDungeonNarrationOutput, toLegacyNarrationFields } from "./narration-contract";
-import { buildCompactGroqPrompt, createLlmBudgetState, DEFAULT_CHEAP_LLM_POLICY, getNarrationCacheKey, recordGroqCall, recordSkippedCall, shouldCallGroq, type LlmBudgetPolicy, type LlmBudgetState } from "./llm-budget";
+import { buildCompactGroqPrompt, buildFinalRecapContext, createLlmBudgetState, DEFAULT_CHEAP_LLM_POLICY, FINAL_RECAP_RULES, getNarrationCacheKey, recordGroqCall, recordSkippedCall, shouldCallGroq, type LlmBudgetPolicy, type LlmBudgetState } from "./llm-budget";
 
 type GroqEnv = {
   GROQ_API_KEY?: string;
@@ -159,6 +159,7 @@ function compactGroqMessages(messages: GroqMessage[], emergency = false): GroqMe
 }
 
 export class GroqDungeonMasterProvider implements DungeonMasterProvider {
+  private static readonly STORY_CACHE_VERSION = "story-v2-opening";
   private readonly apiKey?: string;
   private readonly model: string;
   private readonly useLocalProxy: boolean;
@@ -244,7 +245,10 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       { role: "system", content: buildDungeonMasterSystemPrompt(input.selectedCampaign?.narratorVoice) },
       { role: "user", content: input.resolutionPlan ? buildCompactGroqPrompt(input.resolutionPlan, this.policy.maxPromptChars, input, bundle) : "{}" }
     ];
-    const json = await this.callGroqWithFailover(messages, { route: "cheap" }, "groq-chat");
+    // maxTokens 1400: la narración objetivo (160-240 palabras) + diálogo + enrichedOptions
+    // + memoryPatch no entran en el default ~800 y el JSON se truncaba (parse falla →
+    // fallback en cada turno). Va por Groq (route cheap, miles/día), sin costo de cuota.
+    const json = await this.callGroqWithFailover(messages, { route: "cheap", maxTokens: 1400 }, "groq-chat");
     if (input.resolutionPlan) recordGroqCall(this.budgetState, input.resolutionPlan);
     const parsed = await this.parseValidateOrFallback(json, input);
 
@@ -295,8 +299,8 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
   async generateFinalRecap(input: FinalRecapRequest): Promise<FinalRecapResponse> {
     if (!this.apiKey && !this.useLocalProxy) throw new Error("Groq no esta configurado. Falta GROQ_API_KEY o el proxy local.");
     const json = await this.callGroq([
-      { role: "system", content: "Resume una partida de Tiny Quest como cierre de capitulo de saga oscura. Responde SOLO JSON valido con {\"recap\":\"...\"}. No uses markdown." },
-      { role: "user", content: JSON.stringify({ campaign: input.room.campaign.title, players: input.room.players.map((player) => player.name), clues: input.room.mysteryClues, memory: input.room.memorySummary, log: input.room.sessionLog.slice(0, 8) }) }
+      { role: "system", content: "Cierra una partida de Tiny Quest como epilogo de saga oscura, ganado por las decisiones acumuladas de la mesa. Responde SOLO JSON valido con {\"recap\":\"...\"}. No uses markdown." },
+      { role: "user", content: JSON.stringify({ ...buildFinalRecapContext(input.room), rules: FINAL_RECAP_RULES }) }
     ], {}, "final-recap");
     const parsed = JSON.parse(json) as FinalRecapResponse;
     if (typeof parsed.recap !== "string") throw new Error("Groq respondio un recap invalido.");
@@ -423,6 +427,11 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     const storyCacheKey = JSON.stringify(input);
     const cachedStory = this.storyCache.get(storyCacheKey);
     if (cachedStory) return cachedStory;
+    const persistedStory = this.readPersistentStory(storyCacheKey);
+    if (persistedStory) {
+      this.storyCache.set(storyCacheKey, persistedStory);
+      return persistedStory;
+    }
     const pendingStory = this.pendingStoryRequests.get(storyCacheKey);
     if (pendingStory) return pendingStory;
     const request = this.generateImprovisedStoryUncached(input);
@@ -430,6 +439,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     try {
       const story = await request;
       this.storyCache.set(storyCacheKey, story);
+      this.writePersistentStory(storyCacheKey, story);
       if (this.storyCache.size > 12) {
         const oldest = this.storyCache.keys().next().value;
         if (oldest) this.storyCache.delete(oldest);
@@ -491,7 +501,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       "PREMISE LITERARIA (CRÍTICO): 2-3 oraciones completas y 55-105 palabras. Empieza un latido DESPUÉS del punto de entrada ya dado. Presenta (1) una persona o fuerza que hace algo irreversible, (2) un detalle sensorial y un objeto físico memorable, y (3) una pérdida o elección que obligue al héroe a actuar. No enumeres lore, no expliques las reglas del mundo y no reveles la verdad oculta.",
       "ESCENAS CON AUTORÍA: cada título señala un lugar, objeto o acontecimiento irrepetible de ESA escena. Prohibidos 'La Verdad Torcida', 'La Decisión Final', 'El Enfrentamiento Final', 'La Revelación' y equivalentes vacíos.",
       "PROHIBIDO el tono de sinopsis genérica: nada de 'la única esperanza', 'la única forma', 'antes de que sea demasiado tarde', 'nada es lo que parece', 'una carrera contra el tiempo', 'un oscuro secreto', 'una antigua amenaza', 'todo cambiará para siempre', 'algo antiguo despierta', 'más de lo que parece' ni 'sin vuelta atrás'. La imagen poética nunca sustituye el conflicto jugable. Todo texto visible debe nombrar una acción, una pérdida o un objeto específico y poder leerse en voz alta sin vergüenza.",
-      'Responde SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove","appearance"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[3-5 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4,"isFalse":bool}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"],"npcRelations":[2-3 x {"from","to","nature"}]}. appearance = ficha visual literal y dibujable de 1 frase que SIEMPRE empieza con el TIPO permitido y coincide con description. threat.appearance es obligatoria y sigue la misma regla, incluso si es un fenómeno sin cuerpo. Varía MUCHO los cuerpos. bond = relación dramática con el héroe en 3-8 palabras. whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
+      'Responde SOLO JSON válido, sin markdown, con esta forma exacta: {"title","genre","premise","storyHook","hiddenTruth","themeSkill","twist","stakes":["..."],"threat":{"name","description","specialMove","appearance"},"scenes":[4 x {"title","objective","keyObject","escapeRoute"}],"npcs":[3-5 x {"name","role","description","motive","secret","desire","fear","appearance","bond","whyMightLie"}],"clues":[3 x {"title","text","sceneIndex":1-4,"isFalse":bool}],"summary":{"objective","risk","firstMystery","timeLimit"},"keywordsUsed":[{"idea","how"}],"heroBond","evidence":["..."],"hiddenTwists":["3 giros secretos"],"npcRelations":[2-3 x {"from","to","nature"}],"opening":{"narration":"2 párrafos, 90-160 palabras","dialogue":"Nombre: línea breve"}}. opening empieza en la escena 1, usa solo NPCs públicos de esta salida, no revela secretos y termina exigiendo una decisión. appearance = ficha visual literal y dibujable de 1 frase que SIEMPRE empieza con el TIPO permitido y coincide con description. threat.appearance es obligatoria y sigue la misma regla, incluso si es un fenómeno sin cuerpo. Varía MUCHO los cuerpos. bond = relación dramática con el héroe en 3-8 palabras. whyMightLie = por qué podría mentirte, SIN revelar su secreto real.'
     ].join(" ");
     const messages: GroqMessage[] = [
       { role: "system", content: system },
@@ -536,15 +546,19 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     // con menos problemas (regenerar "solo una parte" no es posible sin otra llamada).
     const first = await attempt();
     const firstIssues = first ? storyCoherenceIssues(first, input) : ["no-parse"];
+    // Una segunda llamada cara solo se justifica por incoherencias funcionales.
+    // Título/prosa mejorables no deben duplicar latencia ni cuota free.
+    const blockingPrefixes = ["no-parse", "nombre-", "compañero-", "npc-fusionado", "reloj-", "hero-sin-", "revision-"];
+    const blockingIssues = firstIssues.filter((issue) => blockingPrefixes.some((prefix) => issue.startsWith(prefix)));
     let story = first;
-    if (!first || firstIssues.length > 0) {
+    if (!first || blockingIssues.length > 0) {
       if (first) logDmEvent("story-forge", { ok: false, coherence: firstIssues });
       // Una revisión inmediata puede chocar con el TPM gratuito aun cuando la
       // primera historia era JSON válido. En ese caso conservamos la primera en
       // vez de convertir una mejora editorial opcional en un error total.
       let second: ImprovisedStoryContent | null = null;
       try {
-        second = await attempt(firstIssues);
+        second = await attempt(blockingIssues);
       } catch (error) {
         logDmEvent("story-forge", { ok: false, editorialRetry: error instanceof Error ? error.message.slice(0, 160) : "retry failed" });
         if (!first) throw error;
@@ -584,6 +598,28 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     }
     logDmEvent("story-forge", { ok: true, title: story.title, scenes: story.scenes.length, npcs: story.npcs.length });
     return story;
+  }
+
+  private persistentStoryKey(cacheKey: string) {
+    let hash = 2166136261;
+    const value = `${GroqDungeonMasterProvider.STORY_CACHE_VERSION}:${cacheKey}`;
+    for (let index = 0; index < value.length; index += 1) hash = Math.imul(hash ^ value.charCodeAt(index), 16777619);
+    return `tiny-quest:story:${GroqDungeonMasterProvider.STORY_CACHE_VERSION}:${(hash >>> 0).toString(36)}`;
+  }
+
+  private readPersistentStory(cacheKey: string): ImprovisedStoryContent | undefined {
+    if (typeof localStorage === "undefined") return undefined;
+    try {
+      const raw = localStorage.getItem(this.persistentStoryKey(cacheKey));
+      if (!raw) return undefined;
+      const parsed = improvisedStorySchema.safeParse(JSON.parse(raw));
+      return parsed.success ? parsed.data : undefined;
+    } catch { return undefined; }
+  }
+
+  private writePersistentStory(cacheKey: string, story: ImprovisedStoryContent) {
+    if (typeof localStorage === "undefined") return;
+    try { localStorage.setItem(this.persistentStoryKey(cacheKey), JSON.stringify(story)); } catch { /* cache opcional */ }
   }
 
   private async callGroq(messages: GroqMessage[], options: { model?: string; forceJson?: boolean; forceProvider?: "groq"; maxTokens?: number } = {}, debugLabel = "chat") {
@@ -628,6 +664,7 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(22000)
     });
+    this.captureQuotaHeaders(response, useGemini ? "gemini" : "groq");
     if (response.status === 413) {
       body = { ...body, messages: compactGroqMessages(messages, true), max_tokens: 420 };
       response = await fetch(endpoint, {
@@ -636,10 +673,14 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(22000)
       });
+      this.captureQuotaHeaders(response, useGemini ? "gemini" : "groq");
     }
     if (!response.ok) {
       const provider = useGemini ? "Gemini" : "Groq";
-      const error = response.status === 429 ? `${provider} rate limit: espera unos segundos antes del siguiente turno.` : `${provider} request failed: ${response.status}`;
+      const retryAfter = response.headers.get("retry-after");
+      const error = response.status === 429
+        ? `${provider} rate limit${retryAfter ? `: reintentar en ${retryAfter}s` : ": espera antes del siguiente turno"}.`
+        : `${provider} request failed: ${response.status}`;
       writeLlmDebug({ ...debugBase, error });
       throw new Error(error);
     }
@@ -652,6 +693,24 @@ export class GroqDungeonMasterProvider implements DungeonMasterProvider {
     }
     writeLlmDebug({ ...debugBase, response: content });
     return content;
+  }
+
+  private captureQuotaHeaders(response: Response, provider: "groq" | "gemini") {
+    if (typeof localStorage === "undefined") return;
+    const names = [
+      "x-ratelimit-limit-requests", "x-ratelimit-remaining-requests", "x-ratelimit-reset-requests",
+      "x-ratelimit-limit-tokens", "x-ratelimit-remaining-tokens", "x-ratelimit-reset-tokens", "retry-after"
+    ];
+    const values = Object.fromEntries(names.map((name) => [name, response.headers.get(name)]).filter((entry): entry is [string, string] => Boolean(entry[1])));
+    try {
+      localStorage.setItem(`tiny-quest:quota:${provider}`, JSON.stringify({
+        provider,
+        capturedAt: new Date().toISOString(),
+        cache: response.headers.get("x-tiny-quest-cache") ?? "direct",
+        status: response.status,
+        ...values
+      }));
+    } catch { /* telemetría local opcional */ }
   }
 
   private readSessionCache(cacheKey: string) {

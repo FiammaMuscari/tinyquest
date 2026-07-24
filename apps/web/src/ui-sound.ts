@@ -78,6 +78,7 @@ export function ambientPlaying(): boolean {
 export function toggleAmbient(): boolean {
   if (!ambient) {
     ambient = new Audio(AMBIENT_SRC);
+    ambient.preload = "none";
     ambient.loop = true;
   }
   ambient.volume = Number(localStorage.getItem("tiny-quest-volume") ?? "0.35");

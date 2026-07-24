@@ -54,6 +54,11 @@ import {
   sceneImageBeat,
   legendaryPets,
   roles,
+  talents as talentCatalog,
+  getTalent,
+  isTalentAvailable,
+  getCurrentScene,
+  DEFAULT_TALENT_ID,
   resolvePlayerAction,
   shouldGrantCreativeBonus,
   species,
@@ -614,13 +619,16 @@ type DiceSnapshot = {
 
 function readStoredDraft() {
   try {
-    // El héroe es temporal por pestaña: cerrar la pestaña descarta ficha, URLs y
-    // nonce. Nunca revivimos una generación mala de una sesión anterior.
-    localStorage.removeItem(draftStorageKey); // limpia persistencia legacy
-    const raw = sessionStorage.getItem(draftStorageKey);
-    return raw ? createCharacter(JSON.parse(raw) as Partial<Character>) : createCharacter();
+    // El héroe y sus dos imágenes son costosos: conservar la ficha guardada evita
+    // regenerarlos al cerrar la pestaña. "Reimaginar" sigue siendo la vía explícita
+    // para descartar una propuesta visual que no guste.
+    const raw = localStorage.getItem(draftStorageKey) ?? sessionStorage.getItem(draftStorageKey);
+    const hero = raw ? createCharacter(JSON.parse(raw) as Partial<Character>) : createCharacter();
+    // Todo héroe arranca con un talento (afinidades + activo 1/escena); si la ficha
+    // guardada es vieja o el jugador nunca tocó la pestaña, se aplica el default.
+    return hero.talent ? hero : createCharacter({ ...hero, talent: DEFAULT_TALENT_ID });
   } catch {
-    return createCharacter();
+    return createCharacter({ talent: DEFAULT_TALENT_ID });
   }
 }
 
@@ -655,78 +663,62 @@ export function App() {
   const manualAvatarRef = useRef(false);
   const [heroPairBusy, setHeroPairBusy] = useState(false);
   const heroPairLoadIdRef = useRef(0);
+  const heroPairRetryRef = useRef<{ identity: string; nonce: number } | null>(null);
   function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.face, urls.fullbody);
-    // Pipeline visual estable V22: el cuerpo fija la identidad y la referencia
-    // aprobada aporta únicamente el óleo medieval al acercamiento de Frente.
     linkPortraitStyleReferences(urls.face, ["/assets/style/face-style-oil.jpg"]);
   }
-  function loadHeroPortraitPair(urls: { face: string; fullbody: string }, shot: "face" | "fullbody") {
+  function loadHeroPortraitPair(urls: { face: string; fullbody: string }, shot: "face" | "fullbody"): Promise<boolean> {
     const loadId = ++heroPairLoadIdRef.current;
     setHeroPairBusy(true);
     const first = loadPortrait(urls[shot], { priority: true });
     const second = loadPortrait(urls[shot === "face" ? "fullbody" : "face"], { priority: false });
-    void Promise.allSettled([first, second]).finally(() => {
-      if (heroPairLoadIdRef.current === loadId) setHeroPairBusy(false);
-    });
+    return Promise.all([first, second])
+      .then(() => heroPairLoadIdRef.current === loadId)
+      .catch(() => false)
+      .finally(() => {
+        if (heroPairLoadIdRef.current === loadId) setHeroPairBusy(false);
+      });
   }
   function forgeHeroPortraitPair(seedNonce: number, source = draftRef.current) {
     const urls = heroImageUrls(source, seedNonce);
-    // Cuerpo es el master inmutable y Frente es su recorte local 3/4.
-    // Recortar conserva los mismos píxeles; expandir o reinterpretar un rostro
-    // inventaba edad, colores y cuerpo. Esta única fuente de
-    // verdad garantiza misma persona, ropa, armas, colores y cicatrices.
+    // Un solo máster garantiza la misma persona, ropa, colores y cicatrices.
     prepareHeroPortraitPair(urls);
     const shot = source.look?.avatarShot ?? "fullbody";
-    // Las DOS variantes se generan SIEMPRE juntas, pero la elegida obtiene el
-    // primer lugar de la cola; la otra queda precargada para el toggle instantáneo.
-    loadHeroPortraitPair(urls, shot);
     const identity = heroPortraitIdentityKey(source);
     const identityChanged = Boolean(source.look?.portraitIdentity && source.look.portraitIdentity !== identity);
     const reimagining = Boolean(source.look?.faceUrl && source.look?.fullBodyUrl && seedNonce !== (source.look.portraitNonce ?? 0) && !identityChanged);
-    const next = createCharacter({
-      ...source,
-      look: {
-        ...source.look,
-        faceUrl: urls.face,
-        fullBodyUrl: urls.fullbody,
-        portraitIdentity: identity,
-        portraitNonce: seedNonce,
-        previousFaceUrl: reimagining ? source.look?.faceUrl : identityChanged ? undefined : source.look?.previousFaceUrl,
-        previousFullBodyUrl: reimagining ? source.look?.fullBodyUrl : identityChanged ? undefined : source.look?.previousFullBodyUrl,
-        previousPortraitNonce: reimagining ? source.look?.portraitNonce : identityChanged ? undefined : source.look?.previousPortraitNonce
-      },
-      avatarUrl: urls[shot]
+    // Commit atómico: Cuerpo y Frente se generan juntos, pero las URLs aprobadas
+    // solo se reemplazan cuando AMBOS están listos y cacheados. Ante fallo o cuota,
+    // el héroe anterior queda intacto. Solo Reimaginar llama a este flujo.
+    void loadHeroPortraitPair(urls, shot).then((ready) => {
+      if (!ready) {
+        // Si Cuerpo llegó pero Frente agotó cuota, el próximo Reimaginar reusa
+        // exactamente este seed/caché en vez de pagar otro Cuerpo innecesario.
+        heroPairRetryRef.current = { identity, nonce: seedNonce };
+        return;
+      }
+      heroPairRetryRef.current = null;
+      const current = draftRef.current;
+      const currentShot = current.look?.avatarShot ?? shot;
+      const next = createCharacter({
+        ...current,
+        look: {
+          ...current.look,
+          faceUrl: urls.face,
+          fullBodyUrl: urls.fullbody,
+          portraitIdentity: identity,
+          portraitNonce: seedNonce,
+          previousFaceUrl: reimagining ? source.look?.faceUrl : identityChanged ? undefined : source.look?.previousFaceUrl,
+          previousFullBodyUrl: reimagining ? source.look?.fullBodyUrl : identityChanged ? undefined : source.look?.previousFullBodyUrl,
+          previousPortraitNonce: reimagining ? source.look?.portraitNonce : identityChanged ? undefined : source.look?.previousPortraitNonce
+        },
+        avatarUrl: currentShot === "face" ? urls.face : urls.fullbody
+      });
+      draftRef.current = next;
+      setDraft(next);
     });
-    draftRef.current = next;
-    setDraft(next);
   }
-  // CURACIÓN al arrancar: si el par guardado apunta a un template de prompt que
-  // ya no existe (p. ej. quedó estampado durante un experimento de estilo), se
-  // re-deriva del template VIGENTE conservando el seed — la imagen cacheada de
-  // antes vuelve instantánea. Idempotente: si ya coincide, no toca nada.
-  useEffect(() => {
-    const current = draftRef.current;
-    const stored = current.look?.faceUrl;
-    if (!stored || !isGeneratedPortraitUrl(stored)) return;
-    // Identidad distinta = edición pendiente del usuario, no migración de
-    // template. Se aplica solo al guardar o tocar Reimaginar.
-    if (current.look?.portraitIdentity && current.look.portraitIdentity !== heroPortraitIdentityKey(current)) return;
-    const expected = heroImageUrls(current);
-    const strip = (url: string) => url.replace(/seed=\d+$/, "");
-    if (strip(stored) === strip(expected.face)) return; // par sano, no tocar
-    const seed = stored.match(/seed=(\d+)$/)?.[1];
-    const face = seed ? expected.face.replace(/seed=\d+$/, `seed=${seed}`) : expected.face;
-    const fullbody = seed ? expected.fullbody.replace(/seed=\d+$/, `seed=${seed}`) : expected.fullbody;
-    prepareHeroPortraitPair({ face, fullbody });
-    const shot = current.look?.avatarShot ?? "fullbody";
-    loadHeroPortraitPair({ face, fullbody }, shot);
-    setDraft(createCharacter({
-      ...current,
-      look: { ...current.look, faceUrl: face, fullBodyUrl: fullbody },
-      avatarUrl: shot === "fullbody" ? fullbody : face
-    }));
-  }, []);
   useEffect(() => {
     const current = draftRef.current.avatarUrl;
     if (current.startsWith("/assets/") && current !== avatarOptions[0]) manualAvatarRef.current = true;
@@ -734,7 +726,19 @@ export function App() {
   function reimagineHeroPortrait(seedNonce: number) {
     if (!lookComplete(draftRef.current) || heroPairBusy) return;
     manualAvatarRef.current = false;
-    forgeHeroPortraitPair(seedNonce);
+    const current = draftRef.current;
+    // Toda reimaginación empieza visualmente y en la cola por Cuerpo. Frente se
+    // deriva recién después desde ese máster canónico.
+    const bodyFirst = createCharacter({
+      ...current,
+      look: { ...current.look, avatarShot: "fullbody" },
+      avatarUrl: current.look?.fullBodyUrl ?? current.avatarUrl
+    });
+    draftRef.current = bodyFirst;
+    setDraft(bodyFirst);
+    const identity = heroPortraitIdentityKey(bodyFirst);
+    const retry = heroPairRetryRef.current;
+    forgeHeroPortraitPair(retry?.identity === identity ? retry.nonce : seedNonce, bodyFirst);
   }
   function restorePreviousHeroPortrait() {
     const current = draftRef.current;
@@ -743,7 +747,7 @@ export function App() {
     const shot = look.avatarShot ?? "fullbody";
     const restored = { face: look.previousFaceUrl, fullbody: look.previousFullBodyUrl };
     prepareHeroPortraitPair(restored);
-    loadHeroPortraitPair(restored, shot);
+    void loadHeroPortraitPair(restored, shot);
     const next = createCharacter({
       ...current,
       look: {
@@ -760,13 +764,11 @@ export function App() {
     draftRef.current = next;
     setDraft(next);
   }
-  // Elegir un rasgo sale del modo avatar fijo, pero NO genera: queda pendiente
-  // hasta Guardar o Reimaginar explícitamente.
+  // Editar un rasgo nunca toca el par visual. Solo Reimaginar puede reemplazarlo.
   function unlockAutoPortrait() {
     manualAvatarRef.current = false;
   }
   function saveHeroPortrait(character: Character) {
-    if (heroPairBusy) return;
     draftRef.current = character;
     if (improvisedCampaign && lastForgedContentRef.current && lastForgedHeroKeyRef.current !== storyHeroIdentityKey(character)) {
       void forgeStory(lastForgeWishRef.current, undefined, undefined, {
@@ -775,11 +777,8 @@ export function App() {
         previousHero: lastForgedHeroRef.current ?? undefined
       });
     }
-    if (!lookComplete(character) || !heroPortraitNeedsRefresh(character)) return;
-    manualAvatarRef.current = false;
-    // Guardar aplica las especificaciones conservando la cara/nonce. Solo
-    // Reimaginar cambia el nonce y, por tanto, propone una identidad nueva.
-    forgeHeroPortraitPair(character.look?.portraitNonce ?? 0, character);
+    // Guardar la ficha NUNCA genera ni cambia Frente/Cuerpo. Los rasgos editados
+    // quedan pendientes hasta que el usuario pulse Reimaginar explícitamente.
   }
   const [selectedCampaignId, setSelectedCampaignId] = useState(() => readStoredCampaignId());
   // Historia improvisada: campaña generada por el LLM en runtime; no vive en el registro estático.
@@ -805,6 +804,7 @@ export function App() {
   const [usingCustomAction, setUsingCustomAction] = useState(false);
   const [selectedStat, setSelectedStat] = useState<StatKey>(() => readStoredStat());
   const [usePet, setUsePet] = useState(false);
+  const [useTalent, setUseTalent] = useState(false);
   const [dice, setDice] = useState<DiceSnapshot | null>(null);
   const [currentNarration, setCurrentNarration] = useState("La mesa todavía está en silencio. Elige un mundo y termina de definir a tu héroe; la primera escena comenzará cuando ambos estén listos.");
   const [npcDialogue, setNpcDialogue] = useState<string[]>([]);
@@ -1066,7 +1066,11 @@ export function App() {
   }
 
   useEffect(() => {
-    try { sessionStorage.setItem(draftStorageKey, JSON.stringify(draft)); } catch { /* sesión sin storage */ }
+    try {
+      const serialized = JSON.stringify(draft);
+      localStorage.setItem(draftStorageKey, serialized);
+      sessionStorage.setItem(draftStorageKey, serialized);
+    } catch { /* sesión sin storage */ }
   }, [draft]);
 
   // Precalienta los retratos del elenco apenas arranca la partida: cuando el modal
@@ -1075,10 +1079,24 @@ export function App() {
   useEffect(() => {
     if (!room) return;
     const styleHint = `${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`;
-    for (const npc of room.campaign.npcs) {
-      loadPortrait(npc.portraitUrl ?? beingPortraitUrlWithContext(npc.name, npc.appearance, styleHint, { description: npc.description, role: npc.role })).catch(() => undefined);
-    }
-  }, [room?.selectedCampaignId]);
+    const currentScene = getRoomScenes(room)[room.currentSceneIndex];
+    const presentIds = new Set(currentScene?.npcIds ?? []);
+    const ordered = [...room.campaign.npcs].sort((left, right) => Number(presentIds.has(right.id)) - Number(presentIds.has(left.id)));
+    const prefetch = (npc: CampaignNPC) => loadPortrait(
+      npc.portraitUrl ?? beingPortraitUrlWithContext(npc.name, npc.appearance, styleHint, { description: npc.description, role: npc.role })
+    ).catch(() => undefined);
+    // Un único NPC presente se precalienta enseguida. El resto espera tiempo
+    // ocioso para no competir con héroe y escena actual.
+    if (ordered[0]) void prefetch(ordered[0]);
+    const runRest = () => { for (const npc of ordered.slice(1)) void prefetch(npc); };
+    const idleWindow = window as Window & { requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const idleId = idleWindow.requestIdleCallback?.(runRest, { timeout: 5000 });
+    const timerId = idleId === undefined ? window.setTimeout(runRest, 1500) : undefined;
+    return () => {
+      if (idleId !== undefined) idleWindow.cancelIdleCallback?.(idleId);
+      if (timerId !== undefined) window.clearTimeout(timerId);
+    };
+  }, [room?.selectedCampaignId, room?.currentSceneIndex]);
 
   useEffect(() => {
     localStorage.setItem(campaignStorageKey, selectedCampaignId);
@@ -1254,7 +1272,18 @@ export function App() {
     setNextOptions(opening.sections.options);
     setDmSections(opening.sections);
     setPlotBeat(opening.plotBeat);
-    requestLlmOpening(nextRoom, firstScene, campaignToPlay);
+    const forgedOpening = campaignToPlay.id === "historia-improvisada" ? lastForgedContentRef.current?.opening : undefined;
+    if (forgedOpening) {
+      setCurrentNarration(forgedOpening.narration);
+      if (forgedOpening.dialogue) setNpcDialogue([forgedOpening.dialogue]);
+      setDmSections((prev) => prev ? {
+        ...prev,
+        narration: forgedOpening.narration,
+        dialogue: forgedOpening.dialogue ?? prev.dialogue
+      } : prev);
+    } else {
+      requestLlmOpening(nextRoom, firstScene, campaignToPlay);
+    }
   }
 
   // Host + invitado: montar una sala multijugador ya construida. La apertura es
@@ -1529,6 +1558,8 @@ export function App() {
       const turnAction = chosenAction;
       const displayAction = chosenChoice?.label ?? decodeCustomAction(turnAction) ?? cleanActionText(turnAction);
       const petActive = (overrideUsePet ?? usePet) && active.type === "human" && hasPet(active.character);
+      // Activar el talento 1/escena: solo humano, con talento y aún disponible esta escena.
+      const talentActive = useTalent && active.type === "human" && Boolean(active.character.talent) && isTalentAvailable(room, active.id, scene.id);
       const turnStat = botStat ?? selectedStat;
       const actionCountInScene = room.sessionLog.filter((event) =>
         event.sceneId === scene.id && (event.actionLabel === displayAction || cleanActionText(event.action) === displayAction)
@@ -1544,7 +1575,8 @@ export function App() {
         sceneTurnCount,
         recentNarrations: room.sessionLog.slice(0, 5).map((event) => event.narration)
       };
-      resolution = resolvePlayerAction(room, turnAction, turnStat, petActive);
+      resolution = resolvePlayerAction(room, turnAction, turnStat, petActive, talentActive);
+      if (talentActive) setUseTalent(false);
       setDice({
         check: resolution.check,
         playerId: active.id,
@@ -1557,30 +1589,28 @@ export function App() {
         consequenceRoll: resolution.consequence?.roll.value,
         combatNote: resolution.combatNote
       });
-      await wait(DICE_REVEAL_MS);
-
-      // RAG: retrieve past memories and attach to narration request before calling LLM
-      if (narrativeIndexRef.current) {
-        const retrieved = await retrieveNarrativeMemories({ room, resolution, memoryIndex: narrativeIndexRef.current, limit: 5 });
-        const moralProfile = room.narrativeMemory.moralProfile;
-        const moralProfileSummary = moralProfile ? summarizeMoralProfileForPrompt(moralProfile, active.name) : undefined;
-        resolution.narrationRequest.narrativeContext = {
-          retrievedMemories: retrieved,
-          moralProfileSummary: moralProfileSummary || undefined
-        };
-      }
-
-      let narration: NarrationResponse;
-      const importantTurn = active.type === "human" || resolution.check.outcome !== "success" || Boolean(resolution.consequence) || nextOptions.length === 0;
-      if (!importantTurn) {
-        narration = fallbackNarrationForTurn(active.name, displayAction, resolution.check.outcome, resolution.consequence?.text, localNarrationContext);
-      } else {
-        try {
-          narration = await masterProvider.generateNarration(resolution.narrationRequest);
-        } catch {
-          narration = fallbackNarrationForTurn(active.name, displayAction, resolution.check.outcome, resolution.consequence?.text, localNarrationContext);
+      // Mientras los dados completan su animación, RAG y red ya trabajan. Esto
+      // conserva calidad/contrato y elimina hasta DICE_REVEAL_MS de espera ociosa.
+      const diceReveal = wait(DICE_REVEAL_MS);
+      const narrationPromise = (async (): Promise<NarrationResponse> => {
+        if (narrativeIndexRef.current) {
+          const retrieved = await retrieveNarrativeMemories({ room, resolution, memoryIndex: narrativeIndexRef.current, limit: 5 });
+          const moralProfile = room.narrativeMemory.moralProfile;
+          const moralProfileSummary = moralProfile ? summarizeMoralProfileForPrompt(moralProfile, active.name) : undefined;
+          resolution.narrationRequest.narrativeContext = {
+            retrievedMemories: retrieved,
+            moralProfileSummary: moralProfileSummary || undefined
+          };
         }
-      }
+        const importantTurn = active.type === "human" || resolution.check.outcome !== "success" || Boolean(resolution.consequence) || nextOptions.length === 0;
+        if (!importantTurn) return fallbackNarrationForTurn(active.name, displayAction, resolution.check.outcome, resolution.consequence?.text, localNarrationContext);
+        try {
+          return await masterProvider.generateNarration(resolution.narrationRequest);
+        } catch {
+          return fallbackNarrationForTurn(active.name, displayAction, resolution.check.outcome, resolution.consequence?.text, localNarrationContext);
+        }
+      })();
+      const [narration] = await Promise.all([narrationPromise, diceReveal]);
       let nextRoom = applyNarration(room, resolution, narration);
 
       // RAG: index memories from this turn (async, fire-and-forget)
@@ -1736,6 +1766,9 @@ export function App() {
 
   const isMultiplayer = mpLobbyMode !== null;
   const mpBlockActions = isMultiplayer && (mpState.phase !== "active" || !mpState.yourTurn);
+  // Talento activo 1/escena: solo solo-play por ahora (MP no lo transporta aún).
+  const talentDef = getTalent(currentCharacter.talent);
+  const talentReady = Boolean(talentDef) && !isMultiplayer && activePlayer?.type === "human" && Boolean(room) && isTalentAvailable(room as GameRoom, activePlayer.id, scene.id);
   // Host resuelve su propio turno contra el motor local y difunde; el invitado
   // solo manda su acción y espera el estado autoritativo.
   const handleHumanTurn = !isMultiplayer ? () => runTurn() : mpState.isHost ? () => runTurn() : runMultiplayerTurn;
@@ -1786,7 +1819,7 @@ export function App() {
         <section className="centerColumn actionColumn">
           {!room.sessionComplete && <ScenePanel sceneTitle={scene.title} objective={scene.objective} clues={room?.mysteryClues ?? [scene.mysteryClue]} choices={visibleChoices} selectedActionDraftId={(isBotTurn(room) || mpBlockActions) ? "" : selectedActionDraftId} onChoice={chooseSceneAction} imageUrl={sceneImageUrl} energy={currentCharacter.energy} enrichedLabels={enrichedChoiceLabels} roundInScene={room.roundInScene} />}
           {!room.sessionComplete && <CastPanel sceneId={scene.id} npcIds={scene.npcIds ?? []} npcs={room.campaign.npcs} styleHint={`${selectedWorld.era}, ${normalizeUiText(room.campaign.genre)}`} />}
-          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} customAction={customAction} setCustomAction={setCustomAction} usingCustomAction={usingCustomAction} setUsingCustomAction={setUsingCustomAction} />}
+          {!room.sessionComplete && <ActionComposer room={room} activeType={activePlayer?.type} busy={busy || (isMultiplayer && mpState.phase === "narrating")} botTurnPaused={!isMultiplayer && botTurnPaused} turnError={turnError ?? mpState.errorMessage} sceneChoices={visibleChoices} selectedChoice={selectedActionDraft} selectedStat={selectedStat} setSelectedStat={setSelectedStat} character={currentCharacter} usePet={usePet} setUsePet={setUsePet} talentReady={talentReady} talentName={talentDef?.activeName} useTalent={useTalent} setUseTalent={setUseTalent} runHuman={handleHumanTurn} runBot={runBotTurn} multiplayerBlock={mpBlockActions} customAction={customAction} setCustomAction={setCustomAction} usingCustomAction={usingCustomAction} setUsingCustomAction={setUsingCustomAction} />}
           <DiceResultBar dice={dice} activePlayerId={activePlayer?.id} />
         </section>
         <div className="colHandle colHandleLeft" role="separator" aria-orientation="vertical" title="Arrastrá para redimensionar · doble click restablece" onPointerDown={(event) => startColumnDrag("left", event)} onDoubleClick={() => resetColumn("left")} />
@@ -1801,7 +1834,6 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   const [showHelp, setShowHelp] = useState(false);
   const [forgePrompt, setForgePrompt] = useState("");
   const [editingHero, setEditingHero] = useState(false);
-  const [confirmPortraitUpdate, setConfirmPortraitUpdate] = useState(false);
   // Ficha rápida de un personaje forjado (click en un chip del teaser).
   const [castPeek, setCastPeek] = useState<CastPeek | null>(null);
   // Estado del retrato del héroe: avisa que la personalización tarda (con prioridad en la cola).
@@ -1824,14 +1856,9 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
   const mpBlocked = !heroLookDone || editingHero || heroPairBusy;
   function saveHeroAndClose() {
     onSaveHero(draft);
-    setConfirmPortraitUpdate(false);
     setEditingHero(false);
   }
   function requestHeroSave() {
-    if (heroImageHasPendingChanges) {
-      setConfirmPortraitUpdate(true);
-      return;
-    }
     saveHeroAndClose();
   }
   return (
@@ -1852,16 +1879,18 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
         {editingHero ? (
           <section className="heroEditWrap lobbyHeroGrid soloHero heroSpecial">
             <CharacterDesigner draft={draft} setDraft={setDraft} disabled={false} portraitBusy={heroPairBusy} onReimagine={onReimagineHero} onRestorePrevious={onRestoreHero} onUnlockAutoPortrait={onUnlockAutoPortrait} />
-            <button className={`ghostButton heroDone ${heroLookDone && heroImageHasPendingChanges ? "forgeAttention" : ""}`} type="button" disabled={!heroLookDone || heroPairBusy} onClick={requestHeroSave} title={!heroLookDone ? "Elegí género, piel, ojos, color y largo del pelo" : heroImageHasPendingChanges ? "Hay cambios físicos pendientes; vas a poder confirmarlos antes de actualizar la imagen" : "Guardar sin regenerar: la imagen ya está al día"}>
+            <button className="ghostButton heroDone" type="button" disabled={!heroLookDone} onClick={requestHeroSave} title={!heroLookDone ? "Elegí género, piel, ojos, color y largo del pelo" : "Guardar ficha sin regenerar Frente ni Cuerpo"}>
               ✔ Guardar héroe y continuar
             </button>
-            {heroPairBusy && <p className="heroEditBusyNote">Podés seguir cambiando rasgos mientras termina la imagen actual. Esos cambios no se aplican hasta que reimagines o confirmes Guardar.</p>}
+            {heroPairBusy && <p className="heroEditBusyNote">Podés seguir editando: el par actual no se reemplaza hasta que Frente y Cuerpo nuevos estén completos.</p>}
           </section>
         ) : (
           <section className="panel heroSummary heroSpecial">
             <LobbyStepTitle number={1} title="Forjá tu héroe" />
             <div className="heroSummaryRow">
-              <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={draft.look?.avatarShot === "face" ? draft.look?.fullBodyUrl : undefined} name={draft.name} className={draft.look?.avatarShot === "fullbody" ? "summaryShot fullShot" : "summaryShot"} priority />
+              {heroPairBusy
+                ? <img src={loadingSpinnerDataUri} className="summaryShot imgLoadingBg" alt="Reimaginando héroe" />
+                : <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={draft.look?.avatarShot === "face" ? draft.look?.fullBodyUrl : undefined} name={draft.name} className={draft.look?.avatarShot === "fullbody" ? "summaryShot fullShot" : "summaryShot"} priority />}
               <div className="heroSummaryInfo">
                 <strong>{draft.name}</strong>
                 <span>{draft.species} · {draft.role}</span>
@@ -1878,6 +1907,7 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
             {!heroLookDone && <button type="button" className="startHint heroBuildCta" onClick={() => setEditingHero(true)}><strong>✨ Tu héroe espera una identidad</strong><span>Elegí género, raza, piel, ojos, color/largo del pelo y cicatrices.</span><b>Armar mi héroe →</b></button>}
             {heroPortrait.status === "loading" && <p className="portraitStatus">✨ Personalizando tu retrato… puede tardar un minuto, seguí armando tu historia.</p>}
             {heroPairBusy && <p className="portraitStatus">Cuerpo master primero · Frente 3/4 se deriva después. No se cambia identidad ni ropa.</p>}
+            {heroImageHasPendingChanges && draft.look?.faceUrl && draft.look?.fullBodyUrl && <p className="portraitStatus">La ficha cambió, pero el retrato anterior permanece. Solo “Reimaginar héroe” crea otro.</p>}
           </section>
         )}
 
@@ -2000,19 +2030,6 @@ function LobbyScreen({ selectedCampaign, draft, setDraft, startSolo, onMultiplay
           {editingHero && <p className="startHint">Guardá tu héroe (arriba) para desbloquear el comienzo.</p>}
         </section>
       </section>
-      {confirmPortraitUpdate && (
-        <div className="heroSaveConfirmBackdrop" role="presentation" onClick={() => setConfirmPortraitUpdate(false)}>
-          <section className="heroSaveConfirm" role="dialog" aria-modal="true" aria-labelledby="hero-save-confirm-title" onClick={(event) => event.stopPropagation()}>
-            <strong id="hero-save-confirm-title">Actualizar la imagen del héroe</strong>
-            <p>Cambiaste rasgos físicos que todavía no aparecen en Frente y Cuerpo. Al continuar, ambas imágenes se volverán a crear con esos cambios.</p>
-            <span>¿Querés guardar y actualizar el retrato ahora?</span>
-            <div>
-              <button type="button" className="ghostButton" onClick={() => setConfirmPortraitUpdate(false)}>Seguir editando</button>
-              <button type="button" className="soloButton" onClick={saveHeroAndClose}>Sí, guardar y actualizar</button>
-            </div>
-          </section>
-        </div>
-      )}
     </main>
   );
 }
@@ -2062,7 +2079,7 @@ function TurnQueue({ room, draft, multiplayerPlayers, localPlayerId, audioRef, a
         );
       })}
       <div className="queueAudio">
-        <audio ref={audioRef} src={audioUrl} onError={() => setPlaying(false)} />
+        <audio ref={audioRef} src={audioUrl} preload="none" onError={() => setPlaying(false)} />
         <button className="iconButton queueAudioBtn" type="button" onClick={() => setPlaying(!isPlaying)} title={isPlaying ? "Pausar" : "Reproducir"}>
           {isPlaying ? <Pause size={13} /> : <Play size={13} />}
         </button>
@@ -2460,12 +2477,12 @@ function ForgeRitual() {
 // Rasgos raciales explícitos para la imagen: el nombre del linaje solo no alcanza
 // (el modelo no sabe que "Elfo del Velo" implica orejas puntiagudas).
 const raceLook: Record<string, string> = {
-  "human-oath": "humano",
-  "duskelder": "elfo de orejas puntiagudas y rasgos finos",
-  "rune-dwarf": "enano fornido de baja estatura y barba trenzada",
-  "road-halfling": "mediano pequeño de rostro pícaro",
-  "dragon-marked": "humano con escamas dracónicas sutiles, sin alterar el color de ojos elegido",
-  "grave-touched": "humano de aura espectral y mirada fría, sin alterar el tono de piel elegido"
+  "human-oath": "adult human; exactly two eyes, two arms and two legs; natural human anatomy",
+  "duskelder": "adult veil elf; exactly two eyes, two arms and two legs; long pointed elven ears and refined facial structure",
+  "rune-dwarf": "adult rune dwarf; exactly two eyes, two arms and two legs; short stocky proportions and braided beard where compatible with chosen presentation",
+  "road-halfling": "adult halfling; exactly two eyes, two arms and two legs; clearly short small-statured adult proportions, never a child",
+  "dragon-marked": "adult dragon-marked human; exactly two eyes, two arms and two legs; subtle symmetrical draconic scales that never alter user-selected colors",
+  "grave-touched": "adult grave-touched human; exactly two eyes, two arms and two legs; subtle spectral presence without changing user-selected skin or eye colors"
 };
 
 // La stat dominante también se ve: el cuerpo cuenta la build del personaje.
@@ -2529,6 +2546,8 @@ function heroPortraitSpec(draft: Character): { name: string; appearance: string;
     eyes: exactEyes,
     hair: exactHair,
     hairLength: exactHairLength,
+    bangs: look.bangs ?? "sin flequillo",
+    mutation: look.mutation ?? "ninguna",
     scar: exactScar,
     role: draft.role,
     physique: statPhysique[topStat(draft.stats)],
@@ -2538,7 +2557,8 @@ function heroPortraitSpec(draft: Character): { name: string; appearance: string;
 }
 
 // Opciones de rasgos del retrato: etiquetas en español (van directo al prompt)
-// + color de muestra para el swatch. Click en el elegido = soltar la elección.
+// + color de muestra para el swatch. Se comportan como radio: nunca se desmarcan
+// al volver a tocar la opción activa.
 const lookGenderOptions = ["femenino", "masculino", "andrógino"] as const;
 const lookGenderPrompt: Record<string, string> = {
   "femenino": "UNMISTAKABLY ADULT FEMALE; feminine face and clothed female body proportions stay coherent head-to-hips; never male torso/chest",
@@ -2546,6 +2566,8 @@ const lookGenderPrompt: Record<string, string> = {
   "andrógino": "UNMISTAKABLY ADULT ANDROGYNOUS; balanced androgynous face/body stay coherent head-to-hips; never mismatched sex traits"
 };
 const lookHairLengthOptions = ["corto", "largo"] as const;
+const lookBangsOptions = ["sin flequillo", "con flequillo"] as const;
+const lookMutationOptions = ["ninguna", "ojo extra", "alienígena", "licantropía parcial"] as const;
 const lookHairLengthPrompt: Record<string, string> = {
   "corto": "short, ending above jaw; never shoulder-length/long",
   "largo": "long, visibly below shoulders; never short/cropped"
@@ -2753,6 +2775,28 @@ function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcI
 
 // Ajustes del lobby: el engranaje del mockup, con las preferencias reales que
 // hoy viven en localStorage (encuadre de la imagen de escena en partida).
+function LocalUsageSummary() {
+  const day = new Date().toISOString().slice(0, 10);
+  const read = (key: string) => { try { return JSON.parse(localStorage.getItem(key) ?? "null") as Record<string, string | number> | null; } catch { return null; } };
+  const images = read(`tiny-quest:image-usage:${day}`);
+  const groq = read("tiny-quest:quota:groq");
+  const gemini = read("tiny-quest:quota:gemini");
+  const count = Number(images?.count ?? 0);
+  const average = count ? Math.round(Number(images?.totalMs ?? 0) / count / 100) / 10 : 0;
+  const quotaLine = (name: string, quota: Record<string, string | number> | null) => quota
+    ? `${name}: ${quota["x-ratelimit-remaining-requests"] ?? "?"} requests y ${quota["x-ratelimit-remaining-tokens"] ?? "?"} tokens disponibles`
+    : `${name}: sin datos todavía`;
+  return (
+    <div className="localUsageSummary">
+      <strong>Cuota local de hoy</strong>
+      <p>Imágenes nuevas: {count}{average ? ` · promedio ${average}s` : ""}</p>
+      <p>{quotaLine("Groq", groq)}</p>
+      <p>{quotaLine("Gemini", gemini)}</p>
+      <small>Los límites reales llegan en los headers del proveedor; “?” significa que ese proveedor no los expuso.</small>
+    </div>
+  );
+}
+
 function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode: SceneImageMode) => void }) {
   const [open, setOpen] = useState(false);
   const [sound, setSound] = useState(() => uiSoundEnabled());
@@ -2764,7 +2808,7 @@ function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode:
       {open && (
         <div className="settingsPop" role="dialog" aria-label="Ajustes de Tiny Quest">
           <strong>Imagen de escena en partida</strong>
-          <p>Qué pinta la IA mientras jugás cada escena.</p>
+          <p>Qué aspecto del entorno pinta la IA; nunca reinventa personajes.</p>
           {sceneImageModeOptions.map((option) => (
             <button key={option.id} type="button" className={mode === option.id ? "selected" : ""} onClick={() => { onMode(option.id); setOpen(false); }}>
               <span aria-hidden="true">{option.icon}</span> {option.label}
@@ -2776,6 +2820,7 @@ function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode:
           </button>
           <strong>Sonido de ambiente</strong>
           <AmbientRow />
+          <LocalUsageSummary />
         </div>
       )}
     </>
@@ -2784,7 +2829,7 @@ function SettingsButton({ mode, onMode }: { mode: SceneImageMode; onMode: (mode:
 
 const sceneImageModeOptions: Array<{ id: SceneImageMode; icon: string; label: string }> = [
   { id: "place", icon: "🏞️", label: "El lugar de la escena" },
-  { id: "hero", icon: "🧝", label: "Tu héroe en escena" },
+  { id: "hero", icon: "🧭", label: "Huellas de tu acción" },
   { id: "mood", icon: "🌫️", label: "El ambiente" }
 ];
 
@@ -2813,8 +2858,11 @@ function ScenePanel({ sceneTitle, objective, clues, choices, selectedActionDraft
           const roundsLeft = choice.expiresAfterRound !== undefined ? choice.expiresAfterRound - roundInScene : null;
           const isCrisis = choice.skillTag === "crisis";
           const fullLabel = enrichedLabels?.[choice.id] ?? choice.label;
+          // El tooltip suma el stake autorado (possibleOutcomeHint): revelación opt-in de
+          // lo que está en juego, sin spoilear el final en la etiqueta visible.
+          const hoverHint = choice.possibleOutcomeHint ? `${fullLabel} — ${choice.possibleOutcomeHint}` : fullLabel;
           return (
-            <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""} ${isCrisis ? "crisisChoice" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button" title={fullLabel}>
+            <button className={`choiceCard ${choice.category ?? "investigate"} ${choice.id === selectedActionDraftId ? "selected" : ""} ${disabled ? "unavailable" : ""} ${isCrisis ? "crisisChoice" : ""}`} key={choice.id} onClick={() => onChoice(choice.id)} type="button" title={hoverHint}>
               <strong>{fullLabel}</strong>
               {/* Un solo tag por opción: el stat principal. Excepciones puntuales:
                   expiración inminente y costo solo cuando bloquea por falta de energía. */}
@@ -2858,7 +2906,7 @@ function SceneMemoryPanel({ room, sceneClue }: { room: GameRoom; sceneClue: stri
 function AmbienceControl({ audioRef, audioUrl, ambienceName, mood, isPlaying, setPlaying, volume, setVolume }: { audioRef: RefObject<HTMLAudioElement | null>; audioUrl: string; ambienceName: string; mood: string; isPlaying: boolean; setPlaying: (playing: boolean) => void; volume: number; setVolume: (volume: number) => void }) {
   return (
     <section className="panel ambiencePanel">
-      <audio ref={audioRef} src={audioUrl} onError={() => setPlaying(false)} />
+      <audio ref={audioRef} src={audioUrl} preload="none" onError={() => setPlaying(false)} />
       <button className="iconButton" onClick={() => setPlaying(!isPlaying)}>{isPlaying ? <Pause size={16} /> : <Play size={16} />}</button>
       <div><strong>{ambienceName}</strong><span>{mood.slice(0, 140)}</span></div>
       <input type="range" min="0" max="1" step="0.05" value={volume} onChange={(event) => setVolume(Number(event.target.value))} />
@@ -2866,7 +2914,7 @@ function AmbienceControl({ audioRef, audioUrl, ambienceName, mood, isPlaying, se
   );
 }
 
-function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; runHuman: () => void; runBot: () => void; multiplayerBlock?: boolean; customAction: string; setCustomAction: (value: string) => void; usingCustomAction: boolean; setUsingCustomAction: (value: boolean) => void }) {
+function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "bot"; busy: boolean; botTurnPaused: boolean; turnError: string | null; sceneChoices: SceneActionChoice[]; selectedChoice?: SceneActionChoice; selectedStat: StatKey; setSelectedStat: (stat: StatKey) => void; character: Character; usePet: boolean; setUsePet: (value: boolean) => void; talentReady?: boolean; talentName?: string; useTalent: boolean; setUseTalent: (value: boolean) => void; runHuman: () => void; runBot: () => void; multiplayerBlock?: boolean; customAction: string; setCustomAction: (value: string) => void; usingCustomAction: boolean; setUsingCustomAction: (value: boolean) => void }) {
   const allowedStats = Array.from(new Set(props.sceneChoices.flatMap((choice) => choice.recommendedStats)));
   const isBot = props.activeType === "bot";
   const petAvailable = hasPet(props.character);
@@ -2891,6 +2939,7 @@ function ActionComposer(props: { room: GameRoom | null; activeType?: "human" | "
             </div>
             <label className="statSelectCompact">Stat<select value={props.selectedStat} onChange={(event) => props.setSelectedStat(event.target.value as StatKey)} disabled={isBot || props.busy || blocked}>{allowedStats.map((stat) => <option key={stat} value={stat}>{statLabels[stat]} +{props.character.stats[stat]}</option>)}</select></label>
             {petAvailable ? <label className="petToggle compactPet"><input type="checkbox" checked={!isBot && props.usePet} onChange={(event) => props.setUsePet(event.target.checked)} disabled={isBot || props.busy || blocked} /> Mascota d4</label> : <span className="noPetHint">Sin mascota vinculada</span>}
+            {!isBot && props.talentReady && <label className="petToggle talentToggle" title="Habilidad de talento, una vez por escena"><input type="checkbox" checked={props.useTalent} onChange={(event) => props.setUseTalent(event.target.checked)} disabled={props.busy || blocked} /> {props.talentName ?? "Talento"} ✦</label>}
             <button className="primaryButton" onClick={isBot ? props.runBot : props.runHuman} disabled={blocked || (!isBot && (props.busy || !canPaySelectedAction || !customReady))}>{isBot ? <Bot size={18} /> : <Dices size={18} />}{props.busy ? "Narrando..." : blocked ? "Esperar turno" : isBot ? (props.botTurnPaused ? "Continuar bot" : "Avanzar bot") : !canPaySelectedAction ? "Sin energía" : !customReady ? "Escribí tu acción" : "Tirar dados"}</button>
           </div>
           {props.turnError && <p className="turnError">{props.turnError}</p>}
@@ -2917,6 +2966,19 @@ function buildFinalRecap(room: GameRoom) {
   const rewards = resolved?.rewards ?? [];
   const marks = resolved?.persistentMarks?.length ? resolved.persistentMarks : room.memorySummary.forbiddenContradictions.slice(-2);
   const truth = room.memorySummary.currentTwist || room.memorySummary.confirmedFacts.slice(-1)[0] || ending?.description || "El miedo intentó escribir una versión cómoda antes de que la verdad tuviera voz.";
+  // Tono moral: derivado del endingScore dominante acumulado turno a turno. Hace que el
+  // cierre local (sin LLM) también se sienta ganado por las decisiones de la mesa.
+  const endingScore = (room.livingState?.endingScore ?? {}) as Record<string, number>;
+  const dominantAxis = Object.entries(endingScore).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const moralToneByAxis: Record<string, string> = {
+    truth: "El grupo eligió la verdad por encima de la comodidad, y esa elección tiene testigos.",
+    mercy: "Hubo misericordia donde la ley solo pedía un culpable, y eso también deja deuda.",
+    sacrifice: "Alguien pagó de su bolsillo lo que la historia necesitaba para cerrar.",
+    corruption: "Algo se compró en el camino, y las deudas compradas siempre cobran interés.",
+    chaos: "El desorden que abrieron no se cierra con el telón: alguien lo heredará.",
+    violence: "La fuerza resolvió lo que las palabras no pudieron, y la sangre se recuerda."
+  };
+  const moralTone = dominantAxis ? moralToneByAxis[dominantAxis] : undefined;
   const summary = decisiveClues.length
     ? `La escena no se cierra por bondad, sino por peso de pruebas: ${decisiveClues.join("; ")}.`
     : (resolved?.narration ?? ending?.description ?? "La mesa cierra la escena con las consecuencias acumuladas.");
@@ -2924,6 +2986,7 @@ function buildFinalRecap(room: GameRoom) {
     `Título: ${title}`,
     `Resumen: ${dedupeSentence(summary)}`,
     `Verdad: ${dedupeSentence(truth)}`,
+    ...(moralTone ? [`Tono moral: ${moralTone}`] : []),
     `Precio: ${price.length ? price.join(" ") : "La victoria no queda limpia; la aldea conserva vergüenza y miedo."}`,
     `Destino de NPCs: ${npcDestiny.length ? npcDestiny.join(" ") : "Los testigos recuerdan quién habló, quién calló y quién sonrió tarde."}`,
     `Recompensa: ${rewards.length ? rewards.join("; ") : "La ruta queda marcada en la memoria del grupo."}`,
@@ -3471,9 +3534,14 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
   const selectedSpecies = species.find((item) => item.name === draft.species) ?? species[0];
   const selectedRole = roles.find((item) => item.name === draft.role) ?? roles[0];
   const selectedPet = legendaryPets.find((pet) => pet.id === draft.pet.id) ?? legendaryPets[0];
-  const [selectedTalent, setSelectedTalent] = useState<string>(characterTalentAssets[0].id);
+  const selectedTalent = draft.talent ?? characterTalentAssets[0].id;
+  const activeTalent = getTalent(selectedTalent);
   const [builderTab, setBuilderTab] = useState<BuilderTab>("species");
   const [heroZoomed, setHeroZoomed] = useState(false);
+  // Evita que clicks rápidos en piel→ojos→pelo se construyan todos desde el
+  // mismo render viejo y el último borre las elecciones anteriores.
+  const editorDraftRef = useRef(draft);
+  useEffect(() => { editorDraftRef.current = draft; }, [draft]);
   const speciesAffinity = Object.keys(selectedSpecies.statBonus ?? {})[0] as StatKey | undefined;
   const tabValue: Record<BuilderTab, string> = { species: selectedSpecies.name, role: selectedRole.name, pet: selectedPet.name };
   function updateStats(stat: StatKey, delta: number) {
@@ -3485,37 +3553,32 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
   const heroPortrait = useGeneratedPortrait(isGeneratedPortraitUrl(draft.avatarUrl) ? draft.avatarUrl : undefined, { priority: true });
   const heroLookDone = lookComplete(draft);
   const currentShot = draft.look?.avatarShot ?? "fullbody";
-  const hasForgedPortrait = Boolean(draft.look?.faceUrl && draft.look?.fullBodyUrl && isGeneratedPortraitUrl(draft.avatarUrl));
+  const hasForgedPortrait = Boolean(draft.look?.faceUrl && draft.look?.fullBodyUrl);
   const portraitNeedsRefresh = heroPortraitNeedsRefresh(draft);
   const firstMissingLook = !draft.look?.gender ? "gender" : !draft.look?.skinTone ? "skin" : !draft.look?.eyeColor ? "eyes" : !draft.look?.hairColor ? "hair" : !draft.look?.hairLength ? "hairLength" : null;
   function chooseLook(patch: Partial<CharacterLook>) {
     onUnlockAutoPortrait?.();
-    setDraft(createCharacter({ ...draft, look: { avatarShot: draft.look?.avatarShot ?? "fullbody", ...draft.look, ...patch } }));
+    const current = editorDraftRef.current;
+    const next = createCharacter({ ...current, look: { avatarShot: current.look?.avatarShot ?? "fullbody", ...current.look, ...patch } });
+    editorDraftRef.current = next;
+    setDraft(next);
   }
   // Alterna entre retrato de frente y cuerpo hasta las rodillas SIN regenerar: conserva la seed
   // actual (mismo rostro en ambas tomas) reescribiéndola en la URL de la otra toma.
   function chooseShot(shot: "face" | "fullbody") {
-    // El toggle alterna entre el par FIJADO al generar/reimaginar: mismo personaje
-    // garantizado (el frente es el frente real de ese cuerpo). Solo si un draft
-    // viejo no tiene par guardado se reconstruye por seed (legacy).
+    // El toggle es SOLO navegación sobre el par fijado. Nunca deriva URLs, cambia
+    // seed, toca identidad ni llama a un proveedor.
     const stored = shot === "face" ? draft.look?.faceUrl : draft.look?.fullBodyUrl;
-    const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
-    const legacy = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl)
-      ? heroImageUrls(draft)[shot].replace(/seed=\d+$/, `seed=${currentSeed}`)
-      : heroImageUrls(draft)[shot];
-    onUnlockAutoPortrait?.();
-    setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: stored ?? legacy }));
+    if (!stored) return;
+    setDraft(createCharacter({ ...draft, look: { ...draft.look, avatarShot: shot }, avatarUrl: stored }));
   }
   // Descarga la toma pedida (frente o cuerpo hasta rodillas) — siempre del par fijado, exportada
   // como PNG con el fondo superior fundido a TRANSPARENTE (la cabeza queda
   // flotando, nítida, sin fondo arriba — el mismo look que en la UI).
   async function downloadShot(shot: "face" | "fullbody") {
     const stored = shot === "face" ? draft.look?.faceUrl : draft.look?.fullBodyUrl;
-    const currentSeed = draft.avatarUrl.match(/seed=(\d+)/)?.[1];
-    const legacy = currentSeed && isGeneratedPortraitUrl(draft.avatarUrl)
-      ? heroImageUrls(draft)[shot].replace(/seed=\d+$/, `seed=${currentSeed}`)
-      : heroImageUrls(draft)[shot];
-    const src = await loadPortrait(stored ?? legacy, { priority: true });
+    if (!stored) return;
+    const src = await loadPortrait(stored, { priority: true });
     const image = new Image();
     image.src = src;
     await image.decode();
@@ -3547,16 +3610,18 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
         <div className="heroIdentity">
           <div className="heroPortraitColumn">
             <div className={`heroPortraitFrame ${currentShot === "fullbody" ? "fullbodyFrame" : ""}`}>
-              <button type="button" className="heroPortraitZoomButton" onClick={() => heroLookDone && setHeroZoomed(true)} disabled={!heroLookDone} aria-label="Ver retrato en pantalla completa">
-                <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={currentShot === "face" ? draft.look?.fullBodyUrl : undefined} name={draft.name} className="heroPortrait" priority />
+              <button type="button" className="heroPortraitZoomButton" onClick={() => heroLookDone && !portraitBusy && setHeroZoomed(true)} disabled={!heroLookDone || portraitBusy} aria-label="Ver retrato en pantalla completa">
+                {portraitBusy
+                  ? <img src={loadingSpinnerDataUri} className="heroPortrait imgLoadingBg" alt="Reimaginando héroe" />
+                  : <HeroAvatarImg url={draft.avatarUrl} fallbackUrl={currentShot === "face" ? draft.look?.fullBodyUrl : undefined} name={draft.name} className="heroPortrait" priority />}
               </button>
-              {heroLookDone && (
+              {hasForgedPortrait && (
                 <button className="bannerDownload" type="button" onClick={() => void downloadShot(currentShot)} disabled={disabled || portraitBusy} title={currentShot === "face" ? "Descargar la imagen de frente 3/4" : "Descargar la imagen de cuerpo hasta las rodillas"} aria-label="Descargar esta toma">
                   <Download size={14} />
                 </button>
               )}
             </div>
-            {heroLookDone && (
+            {hasForgedPortrait && (
               <div className="shotToggle" role="group" aria-label="Tipo de imagen del avatar">
                 <button type="button" className={currentShot === "face" ? "selected" : ""} onClick={() => chooseShot("face")} disabled={disabled}>Frente</button>
                 <button type="button" className={currentShot === "fullbody" ? "selected" : ""} onClick={() => chooseShot("fullbody")} disabled={disabled}>Cuerpo</button>
@@ -3571,7 +3636,7 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
             {onRestorePrevious && draft.look?.previousFaceUrl && draft.look?.previousFullBodyUrl && (
               <button type="button" className="ghostButton previousPortraitButton" onClick={onRestorePrevious} disabled={disabled || portraitBusy}>↶ Recuperar versión anterior</button>
             )}
-            {heroLookDone && <small className="portraitContractHint">Cuerpo = master canónico · Frente = variante 3/4 del mismo personaje</small>}
+            {hasForgedPortrait && <small className="portraitContractHint">Cuerpo = master canónico · Frente = variante 3/4 del mismo personaje</small>}
             {heroPortrait.status === "loading" && <span className="portraitStatus">✨ Personalizando…</span>}
             {!heroLookDone && <span className="portraitStatus lookNeeded">Elegí género, piel, ojos, color y largo del pelo →</span>}
           </div>
@@ -3582,7 +3647,7 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
                 <span>Género</span>
                 <div className="lookPills">
                   {lookGenderOptions.map((option) => (
-                    <button key={option} type="button" className={draft.look?.gender === option ? "selected" : ""} onClick={() => chooseLook({ gender: draft.look?.gender === option ? undefined : option })} disabled={disabled}>{option}</button>
+                    <button key={option} type="button" aria-pressed={draft.look?.gender === option} className={draft.look?.gender === option ? "selected" : ""} onClick={() => chooseLook({ gender: option })} disabled={disabled}>{option}</button>
                   ))}
                 </div>
               </div>
@@ -3590,7 +3655,7 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
                 <span>Piel<small>{draft.look?.skinTone}</small></span>
                 <div className="lookSwatches">
                   {lookSkinOptions.map((option) => (
-                    <button key={option.label} type="button" title={`Piel ${option.label}`} aria-label={`Piel ${option.label}`} className={draft.look?.skinTone === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ skinTone: draft.look?.skinTone === option.label ? undefined : option.label })} disabled={disabled} />
+                    <button key={option.label} type="button" title={`Piel ${option.label}`} aria-label={`Piel ${option.label}`} aria-pressed={draft.look?.skinTone === option.label} className={draft.look?.skinTone === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ skinTone: option.label })} disabled={disabled} />
                   ))}
                 </div>
               </div>
@@ -3598,7 +3663,7 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
                 <span>Ojos<small>{draft.look?.eyeColor}</small></span>
                 <div className="lookSwatches">
                   {lookEyeOptions.map((option) => (
-                    <button key={option.label} type="button" title={`Ojos ${option.label}`} aria-label={`Ojos ${option.label}`} className={draft.look?.eyeColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ eyeColor: draft.look?.eyeColor === option.label ? undefined : option.label })} disabled={disabled} />
+                    <button key={option.label} type="button" title={`Ojos ${option.label}`} aria-label={`Ojos ${option.label}`} aria-pressed={draft.look?.eyeColor === option.label} className={draft.look?.eyeColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ eyeColor: option.label })} disabled={disabled} />
                   ))}
                 </div>
               </div>
@@ -3606,7 +3671,7 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
                 <span>Pelo<small>{draft.look?.hairColor}</small></span>
                 <div className="lookSwatches">
                   {lookHairOptions.map((option) => (
-                    <button key={option.label} type="button" title={`Pelo ${option.label}`} aria-label={`Pelo ${option.label}`} className={draft.look?.hairColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ hairColor: draft.look?.hairColor === option.label ? undefined : option.label })} disabled={disabled} />
+                    <button key={option.label} type="button" title={`Pelo ${option.label}`} aria-label={`Pelo ${option.label}`} aria-pressed={draft.look?.hairColor === option.label} className={draft.look?.hairColor === option.label ? "selected" : ""} style={{ background: option.color }} onClick={() => chooseLook({ hairColor: option.label })} disabled={disabled} />
                   ))}
                 </div>
               </div>
@@ -3614,7 +3679,23 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
                 <span>Largo del pelo<small>{draft.look?.hairLength}</small></span>
                 <div className="lookPills">
                   {lookHairLengthOptions.map((option) => (
-                    <button key={option} type="button" className={draft.look?.hairLength === option ? "selected" : ""} onClick={() => chooseLook({ hairLength: draft.look?.hairLength === option ? undefined : option })} disabled={disabled}>{option}</button>
+                    <button key={option} type="button" aria-pressed={draft.look?.hairLength === option} className={draft.look?.hairLength === option ? "selected" : ""} onClick={() => chooseLook({ hairLength: option })} disabled={disabled}>{option}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="lookGroup">
+                <span>Flequillo<small>{draft.look?.bangs ?? "sin flequillo"}</small></span>
+                <div className="lookPills">
+                  {lookBangsOptions.map((option) => (
+                    <button key={option} type="button" aria-pressed={(draft.look?.bangs ?? "sin flequillo") === option} className={(draft.look?.bangs ?? "sin flequillo") === option ? "selected" : ""} onClick={() => chooseLook({ bangs: option })} disabled={disabled}>{option}</button>
+                  ))}
+                </div>
+              </div>
+              <div className="lookGroup mutationLookGroup">
+                <span>Mutación<small>{draft.look?.mutation ?? "ninguna"}</small></span>
+                <div className="lookPills">
+                  {lookMutationOptions.map((option) => (
+                    <button key={option} type="button" aria-pressed={(draft.look?.mutation ?? "ninguna") === option} className={(draft.look?.mutation ?? "ninguna") === option ? "selected" : ""} onClick={() => chooseLook({ mutation: option })} disabled={disabled}>{option}</button>
                   ))}
                 </div>
               </div>
@@ -3760,12 +3841,17 @@ function CharacterDesigner({ draft, setDraft, disabled, portraitBusy = false, on
             <h3>Talentos</h3>
             <div>
               {characterTalentAssets.map((talent) => (
-                <button className={`talentOption ${selectedTalent === talent.id ? "selected" : ""}`} type="button" key={talent.id} onClick={() => setSelectedTalent(talent.id)} disabled={disabled}>
+                <button className={`talentOption ${selectedTalent === talent.id ? "selected" : ""}`} type="button" key={talent.id} onClick={() => setDraft(createCharacter({ ...draft, talent: talent.id }))} disabled={disabled}>
                   <img src={talent.url} alt="" />
                   <span>{talent.name}</span>
                 </button>
               ))}
             </div>
+            {activeTalent && (
+              <p className="talentDetail">
+                <strong>{activeTalent.name}.</strong> {activeTalent.tagline} Afín a {activeTalent.affinities.map((stat) => statLabels[stat]).join(" y ")} (+{activeTalent.passiveBonus}). Activo 1/escena — <em>{activeTalent.activeName}</em>: {activeTalent.activeDescription}
+              </p>
+            )}
           </div>
         </div>
         <div className="heroSheet">

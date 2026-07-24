@@ -10,6 +10,7 @@ export * from "./checks";
 export * from "./consequences";
 export * from "./species";
 export * from "./roles";
+export * from "./talents";
 export * from "./pets";
 export * from "./abilities";
 export * from "./character";

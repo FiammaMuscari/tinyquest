@@ -6,6 +6,7 @@ import { createCharacter } from "./character";
 import { capDangerGainForRound, dangerCapForParty, getDangerBand } from "./danger";
 import { rollConsequence } from "./consequences";
 import { resolveCheck } from "./checks";
+import { getTalent, isTalentAvailable, talentPassiveBonus } from "./talents";
 import { createBotPlayers } from "./bots";
 import { initialMemory } from "./memory";
 import { getNarrativeActionType, narrativeDoDont } from "./narrative-contract";
@@ -354,7 +355,7 @@ function buildCausalObligations(params: {
   };
 }
 
-export function resolvePlayerAction(room: GameRoom, action: string, selectedStat: StatKey, usePet = false): ActionResolution {
+export function resolvePlayerAction(room: GameRoom, action: string, selectedStat: StatKey, usePet = false, useTalent = false): ActionResolution {
   const currentScene = getCurrentScene(room);
   const activePlayer = getActivePlayer(room);
   const customAction = decodeCustomAction(action);
@@ -364,7 +365,22 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
     throw new Error(`${selectedStat} is not allowed in ${currentScene.title}.`);
   }
 
-  const check = resolveCheck(activePlayer.character.stats, selectedStat, currentScene.difficulty, resolvedAction, usePet);
+  // Talento: bono pasivo (si el stat es afín) + activo 1/escena. El motor es la
+  // verdad — decide acá qué suma al tiro y si el activo está disponible.
+  const talent = getTalent(activePlayer.character.talent);
+  const talentActive = useTalent && Boolean(talent) && isTalentAvailable(room, activePlayer.id, currentScene.id);
+  const passiveBonus = talentPassiveBonus(talent, selectedStat);
+  const activeBonus = talentActive ? talent!.activeEffect.bonus ?? 0 : 0;
+  const talentFlatBonus = passiveBonus + activeBonus;
+
+  const check = resolveCheck(activePlayer.character.stats, selectedStat, currentScene.difficulty, resolvedAction, usePet, talentFlatBonus);
+  // Presciencia (Arcano): el activo sube el resultado un escalón antes de que la
+  // consecuencia, el peligro y el progreso lo lean.
+  if (talentActive && talent!.activeEffect.liftOutcome) {
+    if (check.outcome === "failure") check.outcome = "partial_success";
+    else if (check.outcome === "partial_success") check.outcome = "success";
+  }
+  const talentMoment = talentActive ? `${talent!.activeName}: ${talent!.activeDescription}` : undefined;
   const selectedChoice = customAction
     ? createCustomActionChoice(customAction, selectedStat)
     : findSceneChoiceForAction(getVisibleActionChoices(currentScene, room), resolvedAction);
@@ -534,6 +550,11 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
     result: check.outcome === "partial_success" ? "partial" : check.outcome,
     concreteChange: selectedChoice?.possibleOutcomeHint ?? consequence?.text ?? "La acción cambia la posición del grupo."
   };
+  // Muro (Custodia): el activo neutraliza cualquier escalada de peligro de este
+  // turno (conserva reducciones). Todas las fuentes de peligro confluyen acá.
+  if (talentActive && talent!.activeEffect.negateDanger) {
+    statePatch.dangerDelta = Math.min(0, statePatch.dangerDelta);
+  }
   const patchedDangerClock = Math.max(0, Math.min(10, room.dangerClock + statePatch.dangerDelta));
   const livingState = applyStatePatch(room.livingState, statePatch);
 
@@ -574,6 +595,8 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
     check,
     consequence,
     combatNote,
+    talentActivated: talentActive || undefined,
+    talentMoment,
     turnResolution: {
       check,
       dice: check,
@@ -610,6 +633,7 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
       selectedStat,
       skillUsed: activePlayer.character.abilityProgression.currentSkill,
       petUsed: usePet ? activePlayer.character.pet.name : undefined,
+      ...(talent ? { talent: { name: talent.name, ...(talentActive ? { activeMoment: talentMoment } : {}) } } : {}),
       visualPrompt: currentScene.atmosphere.visualPrompt,
       ambientSoundPrompt: currentScene.atmosphere.ambientSoundPrompt,
       atmosphereTags: currentScene.atmosphere.atmosphereTags,
@@ -703,6 +727,7 @@ export function applyNarration(room: GameRoom, resolution: ActionResolution, nar
     source: activePlayer.type === "bot" ? "bot-auto" : "human",
     outcome: resolution.check.outcome,
     total: resolution.check.total,
+    talentActivated: resolution.talentActivated,
     narration: sanitizePlayerNarration(resolution, narration.playerNarration ?? narration.sections?.narration ?? narration.narration),
     consequenceText: deathCause ?? buildVisibleConsequence(resolution.turnResolution) ?? resolution.consequence?.text ?? narration.consequenceText ?? narration.sections?.consequence ?? narration.consequence,
     dangerDelta: dangerClock - room.dangerClock,

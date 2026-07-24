@@ -6,14 +6,14 @@ export function shouldGrantCreativeBonus(action: string, selectedStat: StatKey, 
   return selectedStat === "creativity" || usePet || text.includes("mascota usada:");
 }
 
-export function resolveCheck(stats: Stats, selectedStat: StatKey, difficulty: number, action: string, usePet = false): CheckResult {
+export function resolveCheck(stats: Stats, selectedStat: StatKey, difficulty: number, action: string, usePet = false, flatBonus = 0): CheckResult {
   const d20 = rollDie("d20");
   const creativeBonus = shouldGrantCreativeBonus(action, selectedStat, usePet) ? rollDie("d4") : undefined;
   const rollBreakdown = calculateRollTotal({
     d20: d20.value,
     statModifier: stats[selectedStat],
     d4Bonus: creativeBonus?.value ?? 0,
-    flatBonus: 0,
+    flatBonus,
     penalties: 0
   });
   const total = rollBreakdown.total;

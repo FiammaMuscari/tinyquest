@@ -62,7 +62,11 @@ export const improvisedStorySchema = z.object({
     from: z.string().catch(""),
     to: z.string().catch(""),
     nature: z.string().catch("")
-  })).optional().catch(undefined)
+  })).optional().catch(undefined),
+  opening: z.object({
+    narration: z.string().min(60),
+    dialogue: z.string().optional().catch(undefined)
+  }).optional().catch(undefined)
 });
 
 export const memorySummarySchema = z.object({

@@ -35,6 +35,30 @@ export type Role = {
   playstyle: string;
 };
 
+export type TalentId = "flame" | "shield" | "arcane" | "verdant";
+
+// Efecto del activo 1/escena. Data-driven: tres perillas que el motor combina.
+//   bonus         → suma plana al tiro de ese turno
+//   negateDanger  → el peligro no escala este turno (Custodia)
+//   liftOutcome   → sube el resultado un escalón: fallo→parcial→éxito (Arcano)
+export type TalentActiveEffect = {
+  bonus?: number;
+  negateDanger?: boolean;
+  liftOutcome?: boolean;
+};
+
+export type Talent = {
+  id: TalentId;
+  name: string;
+  tagline: string;
+  affinities: StatKey[];       // stats con bono pasivo
+  passiveBonus: number;         // bono plano a checks con un stat afín
+  passiveDescription: string;
+  activeName: string;           // nombre de la habilidad activa 1/escena
+  activeDescription: string;    // cómo se narra
+  activeEffect: TalentActiveEffect;
+};
+
 export type LegendaryPet = {
   id: string;
   name: string;
@@ -68,6 +92,9 @@ export type CharacterLook = {
   hairColor?: string;
   /** Largo elegido explícitamente; nunca se deja al azar entre Frente/Cuerpo. */
   hairLength?: "corto" | "largo";
+  bangs?: "sin flequillo" | "con flequillo";
+  /** Alteración anatómica explícita. Tiene prioridad sobre la anatomía racial. */
+  mutation?: "ninguna" | "ojo extra" | "alienígena" | "licantropía parcial";
   scar?: string;
   /** Qué imagen usa de avatar: retrato 3/4 o cuerpo hasta las rodillas. */
   avatarShot?: "face" | "fullbody";
@@ -79,8 +106,8 @@ export type CharacterLook = {
    * retrato quedó desactualizado sin regenerarlo silenciosamente. */
   portraitIdentity?: string;
   /** Nonce del seed del par actual (0 = primera imaginación; >0 = reimaginado).
-   * "Guardar" aplica cambios con ESTE MISMO nonce → misma cara, colores nuevos.
-   * "Reimaginar" lo cambia por uno al azar → cara nueva. */
+   * Guardar la ficha no lo toca. Solo "Reimaginar" genera y, después de validar
+   * ambas tomas, cambia el nonce y reemplaza el par de forma atómica. */
   portraitNonce?: number;
   /** Una sola versión anterior recuperable: reimaginar nunca destruye de golpe
    * el último par aprobado por el jugador. */
@@ -109,6 +136,7 @@ export type Character = {
   resolve: number;
   pet: LegendaryPet;
   abilityProgression: AbilityProgression;
+  talent?: TalentId;
 };
 
 export type Player = {
@@ -615,6 +643,7 @@ export type GameEvent = {
   source?: "human" | "bot-auto";
   outcome: CheckOutcome;
   total: number;
+  talentActivated?: boolean;
   narration: string;
   consequenceText?: string;
   dangerDelta?: number;
@@ -924,6 +953,8 @@ export type ActionResolution = {
   combatNote?: string;
   turnResolution: TurnResolution;
   narrationRequest: NarrationRequest;
+  talentActivated?: boolean;      // el activo 1/escena se usó este turno
+  talentMoment?: string;          // descripción del activo para que el narrador lo teja
 };
 
 export type NarrationRequest = {
@@ -939,6 +970,7 @@ export type NarrationRequest = {
   selectedStat: StatKey;
   skillUsed?: string;
   petUsed?: string;
+  talent?: { name: string; activeMoment?: string };
   visualPrompt: string;
   ambientSoundPrompt: string;
   atmosphereTags: string[];
@@ -1117,6 +1149,8 @@ export type ImprovisedStoryContent = {
   hiddenTwists?: string[];
   /** Capa ENGINE: relaciones SECRETAS entre NPCs (no con el héroe) que reinterpretan sus bonds públicos. Jamás se muestran al crear. */
   npcRelations?: Array<{ from: string; to: string; nature: string }>;
+  /** Apertura generada en la misma llamada que la forja; evita otra request al empezar. */
+  opening?: { narration: string; dialogue?: string };
 };
 
 // Mundo sellado: ambiente central + reglas inmutables que el narrador respeta

@@ -72,12 +72,17 @@ section** — an outdated map costs more than no map.
   accept `{ priority: true }` — hero portraits jump the download queue.
 - El par del héroe está congelado mientras se edita. Cambiar raza, oficio,
   concepto, stat dominante, género, piel, ojos, pelo o cicatriz solo marca
-  `heroPortraitNeedsRefresh`; no hace IO ni prefetch. **Guardar** aplica las
-  opciones con el mismo `portraitNonce` (preserva identidad); **Reimaginar** usa
-  nonce aleatorio (cara nueva). `portraitIdentity` incluye exactamente los campos
+  `heroPortraitNeedsRefresh`; no hace IO ni prefetch. **Guardar** conserva Frente
+  y Cuerpo byte por byte; **Reimaginar** usa nonce aleatorio y es la ÚNICA acción
+  que puede reemplazar el par. El commit ocurre solo cuando ambas imágenes ya
+  cargaron y quedaron cacheadas; error/cuota conserva el par anterior.
+  `portraitIdentity` incluye exactamente los campos
   que alimentan el prompt. La curación de templates al arrancar se salta si la
   firma no coincide, porque eso representa una edición pendiente, no una URL
   legacy rota.
+- La ficha guardada (incluidas `faceUrl`/`fullBodyUrl`) persiste en localStorage
+  además de sessionStorage. Cerrar la pestaña ya no gasta otro par; `Reimaginar`
+  sigue siendo la invalidación visual explícita y los blobs viven en IndexedDB.
 - `forgeHeroPortraitPair` genera Cuerpo como identidad canónica con Schnell y
   deriva Frente mediante `linkPortraitReference` + Flux.2 Klein 4B. Cuerpo V19 es
   el master completo y Frente V19 su acercamiento 3/4; el Worker copia literalmente
@@ -91,7 +96,16 @@ section** — an outdated map costs more than no map.
   el master Cuerpo ya listo en vez de mantener el spinner.
 - Frente usa únicamente el master Cuerpo como referencia: no se agregan láminas
   de estilo que puedan contaminar ropa/anatomía. Un fallo de edición con referencia
-  nunca cae a text-to-image independiente: reintenta o conserva Cuerpo.
+  nunca cae a text-to-image independiente: reintenta o conserva Cuerpo. El mismo
+  contrato aplica al Cuerpo: ningún asset `TINYQUEST HERO ...` cae a Sana si falla
+  Cloudflare. Producción y Vite rechazan Frente sin referencia canónica ANTES de
+  invocar IA (HTTP 409, cero cuota).
+- Permanencia estricta: tabs Raza/Oficio/Compañero, rasgos, stats, Guardar y el
+  toggle Frente/Cuerpo no generan ni derivan URLs. El toggle navega solo
+  `look.faceUrl`/`look.fullBodyUrl`. Reimaginar prepara un candidato y hace commit
+  atómico únicamente cuando las dos tomas quedaron en caché; si una falla conserva
+  el par aprobado. El siguiente intento reusa el mismo seed para aprovechar el
+  Cuerpo ya cacheado y no duplicar cuota.
 - NPC `portraitUrl` se estampa en `forgeStory` desde `appearance + description`.
   Son medallones 448×448 y Schnell usa 6 pasos (héroe/escenas conservan 8): menos
   píxeles y ~25% menos pasos sin perder detalle al tamaño máximo del lightbox.
@@ -118,7 +132,10 @@ section** — an outdated map costs more than no map.
   summary{objective,risk,firstMystery,timeLimit}, keywordsUsed[{idea,how}],
   heroBond, evidence[]; NPCs carry bond + whyMightLie (public, no spoilers).
   Forge input now includes `hero` and forbids NPCs reusing the hero's name
-  unless bond explains it. maxTokens 3400.
+  unless bond explains it. maxTokens 4400. `ImprovisedStoryContent.opening`
+  trae la apertura en la MISMA llamada y la salida validada se persiste con clave
+  `story-v2-opening`; recargar reutiliza la forja. La revisión editorial repite
+  llamada solo ante fallos funcionales, no por cosmética de título/prosa.
 - Hidden NPC relations (SECRET layer, never rendered by any UI panel): forge asks
   for `npcRelations[{from,to,nature}]` (names) → `buildImprovisedCampaign` resolves
   them onto `CampaignNPC.relationshipToOtherNPCs` (ids); luna-roja has 3 authored
@@ -288,3 +305,17 @@ acción y adoptan el estado.
   agrega ", no text, no signature, no watermark" server-side (la clave de caché
   del cliente no cambia). Proxy /api/pollinations (dev server) + espera paciente
   de 429 quedan como último recurso. Imágenes cacheadas: intactas.
+
+## Performance/cuota/deploy 2026-07-16
+
+- `runTurn`: RAG + llamada del narrador corren en paralelo con los 1250 ms de
+  animación de dados. No volver a poner el `await wait` antes de la red.
+- Cloudflare y Pollinations comparten la cola prioritaria de `portraits.ts`.
+  Héroe visible > escena actual > primer NPC presente > resto en idle.
+- La caché edge de imagen se versiona por familia extraída del prompt
+  (`hero-body-v22`, `npc-portrait-v17`, `scene-v1`), no con una versión global.
+- Ajustes muestra telemetría local de imágenes y los headers de cuota LLM. El
+  Worker coalescea POST idénticos, usa timeout 20s, TTL LLM 6h y expone
+  `X-Tiny-Quest-Cache`.
+- `npm run deploy` ejecuta el check completo. `deploy:check` agrega dry-run y
+  `smoke:edge` verifica assets, tres proxies, Pollinations y `/ws` sin gastar IA.

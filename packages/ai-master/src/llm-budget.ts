@@ -1,4 +1,4 @@
-import type { NarrationRequest, NarrativeIngredientBundle, ResolutionPlan } from "@tiny-quest/game-engine";
+import type { GameRoom, NarrationRequest, NarrativeIngredientBundle, ResolutionPlan } from "@tiny-quest/game-engine";
 
 export interface LlmBudgetPolicy {
   enabled: boolean;
@@ -28,7 +28,7 @@ export const DEFAULT_CHEAP_LLM_POLICY: LlmBudgetPolicy = {
   enabled: true,
   maxCallsPerRun: 18,
   maxCallsPerScene: 6,
-  maxPromptChars: 2800,
+  maxPromptChars: 4200,
   maxOutputChars: 2400,
   useGroqForPlayerTurns: true,
   useGroqForBotTurns: false,
@@ -86,6 +86,45 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     .map((e) => e.narration ?? "")
     .filter((n) => n.length > 20)
     .map((n) => short(n, 300) ?? n);
+
+  // "La novela hasta ahora": memoria ACUMULADA de toda la sesión (llega en el request
+  // pero antes se ignoraba). storyLast son las 2 últimas escenas al detalle; esto es el
+  // hilo largo — hechos ya establecidos, hilos abiertos y stakes — para que el narrador
+  // recuerde capítulos anteriores y no reinvente ni contradiga lo ya jugado.
+  const mem = input?.memorySummary;
+  const established = mem ? [...(mem.confirmedFacts ?? []), ...(mem.facts ?? [])] : [];
+  const openThreads = mem ? [...(mem.unresolvedThreads ?? []), ...(mem.openQuestions ?? [])] : [];
+  const storySoFar = mem
+    ? {
+      ...(mem.lastBeat ? { lastBeat: short(mem.lastBeat, 200) } : {}),
+      ...(established.length ? { established: [...new Set(established)].slice(0, 6).map((f) => short(f, 120) ?? f) } : {}),
+      ...(openThreads.length ? { openThreads: [...new Set(openThreads)].slice(0, 4).map((t) => short(t, 110) ?? t) } : {}),
+      ...(mem.stakes?.length ? { stakes: mem.stakes.slice(0, 2).map((s) => short(s, 110) ?? s) } : {}),
+      ...(mem.currentTwist ? { twist: short(mem.currentTwist, 140) } : {})
+    }
+    : undefined;
+  const hasStorySoFar = Boolean(storySoFar && Object.keys(storySoFar).length > 0);
+
+  // RAG semántico: recuerdos recuperados por SIMILITUD con la acción/objetivo de ESTE
+  // turno. Llegan en narrativeContext (App.tsx los computa con el índice de embeddings)
+  // pero hasta ahora se descartaban antes del prompt que realmente viaja. A diferencia de
+  // storySoFar (resumen lineal de la sesión), esto trae detalles relevantes de CUALQUIER
+  // turno pasado — el punto de los embeddings: recuerdo no-lineal que reaparece a tiempo.
+  // truthStatus se marca para que el narrador no venda un rumor/error como hecho.
+  const retrievedMemories = input?.narrativeContext?.retrievedMemories ?? [];
+  const recall = retrievedMemories
+    .slice(0, 4)
+    .map((r) => {
+      const line = short(r.memory.summaryLine, 130);
+      if (!line) return undefined;
+      const status = r.memory.truthStatus;
+      return status && status !== "confirmed" ? `${line} [${status}]` : line;
+    })
+    .filter((l): l is string => Boolean(l));
+  const hasRecall = recall.length > 0;
+  // Perfil moral acumulado del héroe (también llega en narrativeContext y se ignoraba):
+  // tiñe el tono y cómo el mundo reacciona a él, sin declararse explícito.
+  const moralProfile = short(input?.narrativeContext?.moralProfileSummary, 200);
 
   // Hard facts for this turn (what happened, must appear in narration)
   const facts = bundle?.hardFacts.map((f) => short(f, 130) ?? f)
@@ -148,6 +187,10 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     if (enemy) return { name: enemy.name };
     return undefined;
   };
+  // stakeHint = possibleOutcomeHint de la opción (lo que está EN JUEGO al elegirla,
+  // autorado por la campaña). No es un spoiler del misterio: es el tipo de consecuencia
+  // que la etiqueta debe insinuar para que el jugador elija con criterio, sin declarar
+  // el resultado como hecho ni nombrar el final concreto.
   const optionsToLabel = (input?.visibleOptions ?? []).slice(0, 5).map((o) => {
     const target = resolveOptionTarget(o);
     return {
@@ -156,9 +199,11 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       ...(target ? { target: target.name } : {}),
       ...(target?.state ? { targetState: target.state } : {}),
       ...(o.intent ? { intent: o.intent } : {}),
-      ...(o.riskLevel ? { risk: o.riskLevel } : {})
+      ...(o.riskLevel ? { risk: o.riskLevel } : {}),
+      ...(o.possibleOutcomeHint ? { stakeHint: short(o.possibleOutcomeHint, 120) } : {})
     };
   });
+  const hasStakeHints = optionsToLabel.some((o) => "stakeHint" in o);
 
   // Bots
   const bots = plan.botDirectives.slice(0, 2).map((b) => ({
@@ -174,13 +219,23 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
   // narrador debe saber CON QUÉ actúa el personaje, no narrar manos genéricas.
   const actorSkill = plan.actorKind === "player" ? short(input?.character?.specialAbility, 150) : undefined;
 
+  // Talento del héroe: el narrador debe saber su don (para colorear el tono) y, si
+  // este turno se activó la habilidad 1/escena, tejer ese momento como un golpe de gracia.
+  const talentName = plan.actorKind === "player" ? input?.talent?.name : undefined;
+  const talentMoment = plan.actorKind === "player" ? short(input?.talent?.activeMoment, 160) : undefined;
+
   const payload = {
     story: storyLast,
+    ...(hasStorySoFar ? { storySoFar } : {}),
+    ...(hasRecall ? { recall } : {}),
+    ...(moralProfile ? { moralProfile } : {}),
     turn: {
       actor: plan.actorName,
       kind: plan.actorKind,
       ...(actorSkill ? { actorSkill } : {}),
       action: plan.actionText,
+      ...(talentName ? { talent: talentName } : {}),
+      ...(talentMoment ? { talentMoment } : {}),
       roll: { total: plan.roll.total, dc: plan.roll.dc, result: plan.roll.result, ...(plan.roll.critical ? { critical: true } : {}), ...(plan.roll.fumble ? { fumble: true } : {}) },
       facts,
       consequence: plan.consequence.summary,
@@ -201,7 +256,16 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     noRepeat: noRepeat.length ? noRepeat : undefined,
     optionsToLabel: optionsToLabel.length ? optionsToLabel : undefined,
     rules: [
-      "narration: 2-3 párrafos concretos, entre 110 y 180 palabras. Cada párrafo debe avanzar un hecho: acción, reacción y consecuencia. Incluí un detalle sensorial y un hilo abierto; no repitas el resumen, la acción ni imágenes de turnos anteriores. Nunca cierres la historia ni la escena en un solo turno.",
+      "narration: 3-4 párrafos, entre 160 y 240 palabras, prosa literaria de novela (nunca resumen de partida). Cada párrafo avanza un hecho: acción, reacción y consecuencia. Incluí un detalle sensorial NUEVO y dejá al menos un hilo abierto; no repitas el resumen, la acción ni imágenes de turnos anteriores. Nunca cierres la historia ni la escena en un solo turno.",
+      ...(hasStorySoFar
+        ? ["storySoFar = la novela hasta ahora: lastBeat es dónde quedó la escena; established son hechos YA confirmados (jamás los contradigas ni los redescubras como nuevos); openThreads son hilos sin cerrar que la historia debe seguir tejiendo; stakes es lo que está en juego; twist el giro vigente. Escribí este turno como el PRÓXIMO CAPÍTULO que continúa ese hilo: mantené tono, nombres, vínculos y consecuencias previas, y hacé avanzar al menos un openThread."]
+        : []),
+      ...(hasRecall
+        ? ["recall = recuerdos que la historia YA estableció y que, por similitud con lo que hacés este turno, vuelven a pesar ahora. Tejelos como continuidad viva: un personaje que recuerda una promesa, un objeto que reaparece, una deuda que vuelve — no los repitas textualmente ni los redescubras como nuevos. Los marcados [suspected] son sospechas SIN confirmar; [contradicted] y [forbidden] NO son verdad: tratalos como rumor o error, nunca como hecho narrado."]
+        : []),
+      ...(moralProfile
+        ? ["moralProfile = quién viene siendo el héroe según sus decisiones acumuladas: dejá que tiña el tono y cómo los NPCs y el mundo reaccionan ante él (confianza, miedo, respeto, recelo), sin declararlo nunca de forma explícita."]
+        : []),
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
       ...(npcs.some((n) => "hiddenTies" in n && n.hiddenTies)
@@ -213,7 +277,15 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       ...(actorSkill
         ? ["turn.actorSkill = las armas y herramientas propias del héroe: cuando la acción encaje (combate, cerraduras, puntería, sigilo), que la narración las nombre — pelea con SUS dagas, dispara SU arco, fuerza la cerradura con SUS ganzúas; nunca manos genéricas."]
         : []),
+      ...(talentMoment
+        ? ["turn.talentMoment = el héroe ACTIVÓ su talento este turno (habilidad 1/escena): narralo como un golpe de gracia visible y decisivo, coherente con el resultado del tiro — no un poder genérico, sino ESE don manifestándose. Es un momento memorable, dale peso."]
+        : (talentName
+          ? ["turn.talent = el don del héroe: dejá que tiña el tono y su forma de encarar la escena, sin declararlo explícito ni convertirlo en poder mágico si no lo es."]
+          : [])),
       "enrichedOptions: una etiqueta breve y concreta por cada optionsToLabel.id. Anclá la etiqueta a optionsToLabel.target (la entidad real de esa opción) y reflejá su targetState e intent/risk actuales. No inventes entidades fuera de scene ni cambies la mecánica de la opción.",
+      ...(hasStakeHints
+        ? ["optionsToLabel[].stakeHint = lo que está EN JUEGO al elegir esa opción. Dejá que la etiqueta INSINÚE esa tensión o consecuencia (qué se arriesga, qué se gana, qué se debe) con una palabra o imagen cargada — pero JAMÁS declares el resultado como hecho consumado, no spoilees qué final se abre ni nombres el desenlace. El jugador debe intuir el peso de la elección, no leer su spoiler."]
+        : []),
       "VARIÁ LA APERTURA: está PROHIBIDO empezar con las mismas palabras, el mismo sujeto o la misma imagen que cualquier entrada de noRepeat. Abrí cada turno distinto: a veces con una acción, a veces con un diálogo, a veces con un detalle sensorial NUEVO.",
       "story[] es continuidad de TRAMA y tensión, NO un molde de prosa: no copies su arranque ni sus frases. No repitas motivos ya usados en turnos previos (un objeto que cae, las voces que se cortan, el sudor frío, etc.); avanzá con material nuevo.",
       ...(plan.roll.critical ? ["turn.roll.critical: fue un golpe de suerte extraordinario (20 natural). Narralo como un momento sobresaliente, casi imposible, sin inventar hechos fuera de facts."] : []),
@@ -225,9 +297,20 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
   const text = JSON.stringify(payload);
   if (text.length <= maxChars) return text;
 
-  // Slim fallback: drop less critical fields
+  // Slim fallback: drop less critical fields. storySoFar se conserva RECORTADO —
+  // la memoria de continuidad es lo último que se sacrifica (es el punto del cambio).
+  const slimStorySoFar = storySoFar && hasStorySoFar
+    ? {
+      ...(storySoFar.lastBeat ? { lastBeat: storySoFar.lastBeat } : {}),
+      ...(storySoFar.established ? { established: storySoFar.established.slice(0, 3) } : {}),
+      ...(storySoFar.openThreads ? { openThreads: storySoFar.openThreads.slice(0, 2) } : {})
+    }
+    : undefined;
   const slim = {
     story: storyLast.slice(0, 2).map((s) => short(s, 200) ?? s),
+    ...(slimStorySoFar ? { storySoFar: slimStorySoFar } : {}),
+    ...(hasRecall ? { recall: recall.slice(0, 2) } : {}),
+    ...(moralProfile ? { moralProfile } : {}),
     turn: { ...payload.turn, facts: facts.slice(0, 3), forbidden: forbidden.slice(0, 2) },
     scene: { ...payload.scene, objects: objects.slice(0, 2), motifs: motifs.slice(0, 2) },
     noRepeat: noRepeat.slice(0, 2),
@@ -236,6 +319,58 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
   };
   return JSON.stringify(slim).slice(0, maxChars);
 }
+
+// Contexto compacto para el recap final. El cierre debe sentirse GANADO por las
+// decisiones acumuladas, no genérico: por eso viaja el endingScore (eje moral con su
+// dimensión dominante), el final ya resuelto por el motor, el precio pagado (muertes,
+// pérdidas) y la verdad probada. El motor decide el HECHO del final; el LLM solo lo
+// narra con el peso de lo que la mesa eligió durante toda la partida.
+export function buildFinalRecapContext(room: GameRoom) {
+  const score = (room.livingState?.endingScore ?? {}) as Record<string, number>;
+  const ranked = Object.entries(score)
+    .filter(([, value]) => typeof value === "number" && value > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const moralAxis = ranked.slice(0, 3).map(([key, value]) => `${key}:${value}`);
+  const dominant = ranked[0]?.[0];
+
+  const resolved = room.endingResolution;
+  const ending = room.finalEnding;
+  const price = [
+    ...(resolved?.losses ?? []),
+    ...room.players
+      .filter((player) => player.status === "dead")
+      .map((player) => `${player.name} cayó: ${player.deathCause ?? "pagó el precio de la escena"}`)
+  ].slice(0, 4);
+  const provenTruth = [...new Set([...room.mysteryClues, ...(room.memorySummary?.confirmedFacts ?? [])])]
+    .slice(-4)
+    .map((fact) => short(fact, 120) ?? fact);
+  const log = room.sessionLog
+    .slice(0, 6)
+    .map((event) => (event.narration ? short(event.narration, 180) : undefined))
+    .filter((line): line is string => Boolean(line));
+
+  return {
+    campaign: room.campaign.title,
+    players: room.players.map((player) => player.name),
+    ...(resolved?.title || ending?.title ? { ending: resolved?.title ?? ending?.title } : {}),
+    ...(resolved?.plan?.tierLabel ? { endingTone: resolved.plan.tierLabel } : {}),
+    ...(moralAxis.length ? { moralAxis } : {}),
+    ...(dominant ? { dominant } : {}),
+    ...(price.length ? { price } : {}),
+    ...(provenTruth.length ? { provenTruth } : {}),
+    ...(room.memorySummary?.currentTwist ? { twist: short(room.memorySummary.currentTwist, 160) } : {}),
+    log
+  };
+}
+
+// Reglas de estilo para que el recap refleje el eje moral acumulado sin listar números.
+export const FINAL_RECAP_RULES = [
+  "Cierra la partida como epílogo de saga oscura: 2-3 párrafos, prosa literaria, en español.",
+  "El final YA está decidido por el motor (campo `ending`): narralo como consumado, no lo elijas ni lo cambies.",
+  "moralAxis/dominant = el peso moral que la mesa acumuló con sus decisiones (verdad, misericordia, sacrificio, corrupción, caos). Que el TONO del cierre encarne ese eje dominante — NUNCA menciones los números ni las etiquetas crudas.",
+  "price = lo que costó: nómbralo con dignidad, sin regodeo. provenTruth = lo que quedó probado: es la base del veredicto, no lo contradigas.",
+  "No inventes NPCs, pistas ni hechos fuera del contexto. No cierres con moraleja explícita: dejá una última imagen concreta."
+];
 
 export function getNarrationCacheKey(plan: ResolutionPlan): string {
   return JSON.stringify({ turnId: plan.turnId, actorId: plan.actorId, actionText: plan.actionText, rollTotal: plan.roll.total, rollResult: plan.roll.result, consequence: plan.consequence.summary, sceneId: plan.scene.id });
