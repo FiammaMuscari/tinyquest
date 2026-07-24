@@ -42,13 +42,16 @@ export function composeHeroAppearance(spec: HeroVisualSpec): string {
     `ABSOLUTE USER-CHOSEN IDENTITY — HIGHEST PRIORITY, GROUND TRUTH, NEVER OVERRIDE, REINTERPRET OR SWAP: ${compact(spec.gender, 190)}`,
     `EXACT USER COLORS (non-negotiable, do not shift): ${compact(spec.skin, 80)}; ${compact(spec.eyes, 90)}; ${compact(spec.hair, 90)}`,
     `HAIR LENGTH: ${compact(spec.hairLength, 90)}`,
+    // La cicatriz va TEMPRANO (antes del corte de 900/980 chars de los wrappers):
+    // si el usuario no eligió cicatriz, "piel limpia" debe llegar al modelo o el
+    // Frente inventa heridas; si eligió una, debe sobrevivir para renderizarse.
+    `SCAR: ${compact(spec.scar, 90)}`,
     "PRIORITY: user-chosen gender & colors are absolute ground truth > mutation anatomy override > species anatomy > role; the chosen gender and colors survive every other rule",
     mutationPrompt(spec.mutation),
     `SPECIES ANATOMY LOCK (must keep the user-chosen gender and colors above): ${compact(resolvedSpecies, 190)}`,
     `GENDER REAFFIRM (same as the absolute identity, never contradicted): ${compact(spec.gender, 190)}`,
     `BANGS: ${spec.bangs === "con flequillo" ? "mandatory visible forehead bangs/fringe, identical in every view" : "no bangs or fringe covering the forehead"}`,
     "CLOTHING: fully dressed adult in opaque medieval clothes covering chest, torso, hips, groin and thighs; no nudity, bare chest, lingerie, loincloth, transparent or fetish armor",
-    `SCAR: ${compact(spec.scar, 90)}`,
     `ROLE/BUILD: ${compact(spec.role, 70)}, ${compact(spec.physique, 70)}`,
     compact(spec.concept, 100)
   ].filter(Boolean).join(". ");

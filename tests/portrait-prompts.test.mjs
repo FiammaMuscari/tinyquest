@@ -28,23 +28,26 @@ test("expone referencias de estilo separadas de la identidad", () => {
 const appearance = "EXACT SKIN COLOR: light warm beige skin. EXACT IRIS COLOR: strongly saturated VIOLET PURPLE irises, NOT blue. EXACT HAIR COLOR: metallic golden hair. female veil elf, black and gold medieval gown, scar on left eyebrow";
 const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""));
 
-test("Frente V25 es una pintura cercana y más detallada referenciada por Cuerpo", () => {
+test("Frente V26 es una pintura cercana y más detallada referenciada por Cuerpo", () => {
   const face = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const body = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(face);
   assert.notEqual(face, body);
-  assert.match(prompt, /HERO FACE DETAIL V25.*intimate close three-quarter portrait.*Head is large and near camera/is);
+  assert.match(prompt, /HERO FACE DETAIL V26.*intimate close three-quarter portrait.*Head is large and near camera/is);
   assert.match(prompt, /Waist, hips, legs and feet remain outside frame.*Never full body/is);
   assert.match(prompt, /STYLE FIDELITY LOCK: preserve the canonical body's exact medieval dark-fantasy hand-painted language/is);
-  assert.match(prompt, /QUALITY FLOOR: face, eyes, hair\/fringe, scars.*at least as defined as the body master/is);
-  assert.ok(prompt.length <= 2300, `prompt de frente truncable: ${prompt.length}`);
+  assert.match(prompt, /QUALITY FLOOR: face, eyes, hair\/fringe, anatomy.*at least as defined as the body master/is);
+  // El Frente no debe inventar cicatrices cuando el spec dice piel limpia.
+  assert.match(prompt, /SCAR FIDELITY: if the SCAR line says unmarked\/clean skin.*never invent facial injuries/is);
+  assert.doesNotMatch(prompt, /QUALITY FLOOR: face, eyes, hair\/fringe, scars/);
+  assert.ok(prompt.length <= 2400, `prompt de frente truncable: ${prompt.length}`);
 });
 
-test("Cuerpo V29 comparte el estilo pictórico de la cara, recorta pies y marca la raza", () => {
+test("Cuerpo V30 comparte el estilo pictórico de la cara, recorta pies y marca la raza", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
   // Candados front-loaded: identidad, sujeto único (bug de dos personas), encuadre sin pies.
-  assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V29.*CANONICAL IDENTITY SPEC — READ FIRST.*SINGLE SUBJECT LOCK: exactly ONE character.*never two figures, twin, turnaround, profile companion or model sheet.*FRAMING.*through both knees.*feet and lower legs OUTSIDE the frame/is);
+  assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V30.*CANONICAL IDENTITY SPEC — READ FIRST.*SINGLE SUBJECT LOCK: exactly ONE character.*never two figures, twin, turnaround, profile companion or model sheet.*FRAMING.*through both knees.*feet and lower legs OUTSIDE the frame/is);
   assert.match(prompt, /STYLE LIKE THE FACE.*mature semi-realism.*never 3D, CGI, Pixar/is);
   assert.match(prompt, /Adult, never a child/i);
   assert.match(prompt, /same medieval outfit\/armor as the face.*never modern clothing or sneakers/is);
