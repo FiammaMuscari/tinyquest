@@ -4426,3 +4426,33 @@ img.npcPortrait[src^="/assets/companions/"] {
 @media (prefers-reduced-motion: reduce) {
   .journeyClock .clockPips i { transition: none; }
 }
+
+/* ─── Foco de teclado visible (2026-07-24) ───
+   La hoja no definía NINGUNA regla :focus-visible, así que el anillo era el
+   default del navegador: 1px casi negro (rgb(16,16,16)) sobre un fondo casi
+   negro. Tabular por el lobby era literalmente a ciegas.
+
+   Turquesa y no dorado a propósito: el anillo tiene que leerse igual sobre el
+   fondo oscuro del juego y sobre los botones crema (.startHint, #EADFC6), y el
+   dorado se pierde contra la crema. #75eadb ya es acento de la paleta.
+
+   :focus-visible (no :focus) => el anillo solo aparece navegando con teclado;
+   hacer click en un botón no lo ensucia. El !important sigue la convención de
+   esta hoja: hay reglas de componente con más especificidad (p. ej.
+   `.lobbyThemeCard.selected { outline: … }`) que si no se lo comerían. */
+button:focus-visible,
+a[href]:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 3px solid #75eadb !important;
+  outline-offset: 2px !important;
+}
+/* Los paneles con overflow:hidden (.heroSpecial) recortan el anillo de sus hijos
+   contra el borde. Pegado al borde alcanza con menos offset para que se vea entero. */
+.heroSpecial button:focus-visible,
+.panel button:focus-visible {
+  outline-offset: 1px !important;
+}

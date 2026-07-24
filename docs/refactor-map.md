@@ -113,6 +113,31 @@ for f in $(find apps/web/public/assets -type f | sed 's|apps/web/public||'); do 
   || echo "HUERFANO: $f"; done
 ```
 
+### Pase de UI (2026-07-24) — qué se tocó y qué NO
+
+Auditado a 1360×700 con Playwright (`scratchpad/ui-*.mjs`, todo sin gastar cuota de
+LLM porque el lobby no llama al modelo). Arreglado:
+
+- **Foco de teclado invisible.** No había NINGUNA regla `:focus-visible` en toda la
+  hoja: el anillo era el default del navegador, 1px casi negro sobre fondo casi
+  negro. Anillo turquesa `#75eadb` al final de `app.css` (turquesa y no dorado
+  porque tiene que leerse también sobre los botones crema `.startHint`).
+- **404 en cada carga + `lang="en"`.** `apps/web/index.html` no declaraba favicon,
+  así que Chrome pedía `/favicon.ico` y comía un 404 siempre. Se generó
+  `favicon.png` (64px) y `apple-touch-icon.png` (180px) a partir del d20, más
+  `theme-color`, `description`, y `lang="es"` (el juego es en español).
+
+**NO se tocó, a propósito:**
+- La altura del lobby (1479px contra un viewport de 700 = ~2 pantallas de scroll).
+  Es una decisión de diseño de Fiamy: el retrato grande es el protagonista y el
+  flujo de 3 pasos es explícito. Achicarlo es cuestión de gusto, no un defecto.
+- Contraste: la auditoría marcó `.forgeButton` en 1.14, pero es **falso positivo** —
+  el fondo es un `linear-gradient` (o sea `backgroundColor: transparent`) y el
+  script sube al ancestro oscuro. En pantalla es marrón oscuro sobre dorado.
+  Si escribís otro auditor de contraste, resolvé `background-image` antes de creerle.
+- El `stepDiamond` desborda 10px del panel a la izquierda: es el número del paso
+  colgando en el margen, es intencional.
+
 ## Hard rules (violating these wastes a whole session)
 
 1. `App.tsx` is ~2500 lines. **Never read it whole.** Grep the anchor, then read ±40 lines.

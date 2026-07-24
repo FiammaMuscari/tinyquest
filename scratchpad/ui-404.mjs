@@ -1,0 +1,10 @@
+import { chromium } from "playwright-core";
+const b = await chromium.launch({ executablePath: "/usr/bin/google-chrome" });
+const p = await b.newPage({ viewport: { width: 1360, height: 700 } });
+const bad = [];
+p.on("requestfailed", r => bad.push(`FAIL ${r.url()} ${r.failure()?.errorText}`));
+p.on("response", r => r.status() >= 400 && bad.push(`${r.status()} ${r.url()}`));
+await p.goto("http://127.0.0.1:5173/", { waitUntil: "networkidle" });
+await p.waitForTimeout(3000);
+console.log(bad.length ? bad.join("\n") : "sin fallos");
+await b.close();
