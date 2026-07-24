@@ -87,10 +87,11 @@ type BroadcastGameMsg struct {
 
 // SubmitActionMsg — un invitado manda su acción; el server la relaya al host.
 type SubmitActionMsg struct {
-	RoomCode string `json:"roomCode"`
-	Action   string `json:"action"`
-	Stat     string `json:"stat"`
-	UsePet   bool   `json:"usePet"`
+	RoomCode  string `json:"roomCode"`
+	Action    string `json:"action"`
+	Stat      string `json:"stat"`
+	UsePet    bool   `json:"usePet"`
+	UseTalent bool   `json:"useTalent"`
 }
 type SendChatMsg struct {
 	RoomCode string `json:"roomCode"`
@@ -225,11 +226,12 @@ type RoomOptionsMsg struct {
 // GuestActionMsg — el server le entrega al HOST la acción pedida por un invitado,
 // con QUIÉN la pidió, para que el host la resuelva contra el motor.
 type GuestActionMsg struct {
-	Type     string `json:"type"`
-	PlayerID string `json:"playerId"`
-	Action   string `json:"action"`
-	Stat     string `json:"stat"`
-	UsePet   bool   `json:"usePet"`
+	Type      string `json:"type"`
+	PlayerID  string `json:"playerId"`
+	Action    string `json:"action"`
+	Stat      string `json:"stat"`
+	UsePet    bool   `json:"usePet"`
+	UseTalent bool   `json:"useTalent"`
 }
 
 type ErrorMsg struct {

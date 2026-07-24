@@ -224,9 +224,9 @@ export class MultiplayerClient {
 
   // ─── Acciones (invitado) ─────────────────────────────────────────────────────
 
-  submitAction(action: string, stat: StatKey, usePet: boolean): void {
+  submitAction(action: string, stat: StatKey, usePet: boolean, useTalent = false): void {
     if (!this._state.roomCode) return;
-    this.send({ type: "submit_action", roomCode: this._state.roomCode, action, stat, usePet });
+    this.send({ type: "submit_action", roomCode: this._state.roomCode, action, stat, usePet, useTalent });
   }
 
   // ─── Ruteo de mensajes del servidor ──────────────────────────────────────────

@@ -143,10 +143,15 @@ func TestStartStoryAndTurnRelay(t *testing.T) {
 	}
 
 	// Ahora sí, el invitado manda su acción y le llega al host como guest_action.
-	send(t, guest, map[string]any{"type": "submit_action", "roomCode": code, "action": "forzar la puerta", "stat": "body", "usePet": true})
+	// usePet y useTalent son decisiones DEL INVITADO sobre SU personaje: si no
+	// viajan, el host resuelve el turno con sus propios toggles (bug 2026-07-24).
+	send(t, guest, map[string]any{"type": "submit_action", "roomCode": code, "action": "forzar la puerta", "stat": "body", "usePet": true, "useTalent": true})
 	ga := waitFor(t, host, "guest_action")
 	if ga["playerId"] != guestID || ga["action"] != "forzar la puerta" || ga["stat"] != "body" || ga["usePet"] != true {
 		t.Fatalf("guest_action mal relayado: %+v", ga)
+	}
+	if ga["useTalent"] != true {
+		t.Fatalf("useTalent del invitado no llegó al host: %+v", ga)
 	}
 }
 

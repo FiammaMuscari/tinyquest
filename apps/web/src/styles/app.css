@@ -4368,3 +4368,61 @@ img.npcPortrait[src^="/assets/companions/"] {
   font-size: 11px;
   line-height: 1.35;
 }
+
+/* ─── Relojes de historia (2026-07-24) ───────────────────────────────────────
+   Presión con nombre en el panel del Recorrido. El motor (game-engine/clocks.ts)
+   decide los segmentos; acá solo se pintan. Amenaza roja, oportunidad dorada,
+   misterio teal — el color dice si lo que corre juega a favor o en contra. */
+.journeyClocks {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(212, 175, 55, .18);
+}
+.journeyClocks h4 {
+  margin: 0 0 7px;
+  font-family: Cinzel, serif;
+  font-size: 11px;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: rgba(242, 210, 124, .82);
+}
+.journeyClock {
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.journeyClock .clockName {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: rgba(234, 223, 198, .88);
+}
+.journeyClock .clockPips {
+  display: flex;
+  gap: 3px;
+}
+.journeyClock .clockPips i {
+  width: 100%;
+  max-width: 18px;
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(234, 223, 198, .13);
+  box-shadow: inset 0 0 0 1px rgba(234, 223, 198, .08);
+  transition: background .45s ease, box-shadow .45s ease;
+}
+.clock-threat .clockPips i.on { background: #c2504a; box-shadow: 0 0 6px rgba(194, 80, 74, .5); }
+.clock-opportunity .clockPips i.on { background: #d4af37; box-shadow: 0 0 6px rgba(212, 175, 55, .45); }
+.clock-mystery .clockPips i.on { background: #4f9b93; box-shadow: 0 0 6px rgba(79, 155, 147, .45); }
+/* Un reloj cumplido queda como cicatriz: apagado, con su pago escrito. */
+.journeyClock.clockFired .clockName { color: rgba(234, 223, 198, .58); }
+.journeyClock.clockFired .clockPips i { opacity: .55; }
+.journeyClock .clockPayoff {
+  font-family: Alegreya, serif;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.35;
+  color: rgba(234, 223, 198, .66);
+}
+@media (prefers-reduced-motion: reduce) {
+  .journeyClock .clockPips i { transition: none; }
+}

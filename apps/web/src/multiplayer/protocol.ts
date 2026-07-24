@@ -84,6 +84,7 @@ export type SubmitActionMsg = {
   action: string;
   stat: StatKey;
   usePet: boolean;
+  useTalent: boolean;
 };
 
 export type C2SMessage =
@@ -156,6 +157,7 @@ export type GuestActionMsg = {
   action: string;
   stat: StatKey;
   usePet: boolean;
+  useTalent: boolean;
 };
 
 export type ErrorMsg = {

@@ -4,6 +4,7 @@ import { applyStatePatch } from "./game/memory/game-state.reducer";
 import { clueIdsForChoice, createLivingStateForRoom, emptyStatePatch, filterUndiscoveredClueIds, isValidRevealClueId } from "./living-state-adapter";
 import { createCharacter } from "./character";
 import { capDangerGainForRound, dangerCapForParty, getDangerBand } from "./danger";
+import { advanceClocks, clockPressureLines, createClocksForCampaign } from "./clocks";
 import { rollConsequence } from "./consequences";
 import { resolveCheck } from "./checks";
 import { getTalent, isTalentAvailable, talentPassiveBonus } from "./talents";
@@ -76,6 +77,7 @@ export function createGameRoom(input: CreateRoomInput = {}): GameRoom {
     roundInScene: 0,
     turn: 0,
     dangerClock: 0,
+    clocks: createClocksForCampaign(campaign),
     mysteryClues: [],
     sceneProgress: 0,
     sessionStartedAt: Date.now(),
@@ -555,16 +557,26 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
   if (talentActive && talent!.activeEffect.negateDanger) {
     statePatch.dangerDelta = Math.min(0, statePatch.dangerDelta);
   }
-  const patchedDangerClock = Math.max(0, Math.min(10, room.dangerClock + statePatch.dangerDelta));
+  // Relojes de historia: avanzan ACÁ, con el resto de los hechos que decide el motor,
+  // para que el narrador de ESTE turno ya vea el reloj que se acaba de cumplir.
+  // (Si avanzaran en applyNarration, el pago se narraría siempre un turno tarde.)
+  const clockAdvance = advanceClocks(room.clocks, {
+    outcome: check.outcome,
+    dangerDelta: statePatch.dangerDelta,
+    revealedClueCount: revealedClueIds.length,
+    turn: room.turn
+  });
+  const patchedDangerClock = Math.max(0, Math.min(10, room.dangerClock + statePatch.dangerDelta + clockAdvance.dangerDelta));
   const livingState = applyStatePatch(room.livingState, statePatch);
 
   const nextRoom: GameRoom = {
     ...room,
     players,
     dangerClock: patchedDangerClock,
+    clocks: clockAdvance.clocks,
     mysteryClues: [...mysteryClues],
     sceneProgress,
-    storyFlags: Array.from(new Set([...room.storyFlags, ...unlockedFlags])),
+    storyFlags: Array.from(new Set([...room.storyFlags, ...unlockedFlags, ...clockAdvance.flags])),
     phase: deriveScenePhase({ ...room, dangerClock: patchedDangerClock, sceneProgress }, currentScene),
     livingState
   };
@@ -644,6 +656,12 @@ export function resolvePlayerAction(room: GameRoom, action: string, selectedStat
       combatNote,
       resolvedOutcome: check.outcome,
       dangerClock,
+      ...(clockAdvance.clocks.length ? {
+        clocks: {
+          pressure: clockPressureLines(clockAdvance.clocks),
+          firedNow: clockAdvance.ticks.filter((tick) => tick.fired && tick.payoff).map((tick) => tick.payoff!)
+        }
+      } : {}),
       mysteryCluesFound: [...mysteryClues],
       memorySummary: room.memorySummary,
       storyFlags: room.storyFlags,
@@ -756,6 +774,14 @@ export function applyNarration(room: GameRoom, resolution: ActionResolution, nar
       : player)
     : nextRoom.players;
 
+  // Los relojes ya avanzaron en resolvePlayerAction (llegan en resolution.room). Acá
+  // solo cobramos su efecto narrativo: el pago de un reloj cumplido en ESTE turno es un
+  // hecho consumado y entra a stakes, para que el narrador lo trate como pasado y no
+  // como amenaza futura.
+  const firedPayoffs = (nextRoom.clocks ?? [])
+    .filter((clock) => clock.firedAtTurn === room.turn && clock.payoff)
+    .map((clock) => clock.payoff);
+
   nextRoom = {
     ...nextRoom,
     players,
@@ -763,10 +789,17 @@ export function applyNarration(room: GameRoom, resolution: ActionResolution, nar
     dangerClock,
     phase: deriveScenePhase({ ...nextRoom, dangerClock, sceneProgress }, scene),
     mysteryClues: [...clues],
-    storyFlags: tragicCompanionDeath ? Array.from(new Set([...nextRoom.storyFlags, `companion_dead:${activePlayer.id}`])) : nextRoom.storyFlags,
-    memorySummary: tragicCompanionDeath
-      ? { ...stableMemory, stakes: Array.from(new Set([...stableMemory.stakes, deathCause!])).slice(-6), currentTwist: deathCause! }
-      : stableMemory,
+    storyFlags: tragicCompanionDeath
+      ? Array.from(new Set([...nextRoom.storyFlags, `companion_dead:${activePlayer.id}`]))
+      : nextRoom.storyFlags,
+    memorySummary: (() => {
+      const withClocks = firedPayoffs.length
+        ? { ...stableMemory, stakes: Array.from(new Set([...stableMemory.stakes, ...firedPayoffs])).slice(-6) }
+        : stableMemory;
+      return tragicCompanionDeath
+        ? { ...withClocks, stakes: Array.from(new Set([...withClocks.stakes, deathCause!])).slice(-6), currentTwist: deathCause! }
+        : withClocks;
+    })(),
     narrativeMemory: (() => {
       const base = indexTurnResult({ ...nextRoom, players, memorySummary: stableMemory, mysteryClues: [...clues] }, event);
       const threads = updateStoryThreadsAfterResolution(room.narrativeMemory.storyThreads ?? [], { ...nextRoom, dangerClock }, resolution);

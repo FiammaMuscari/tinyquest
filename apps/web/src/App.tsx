@@ -57,6 +57,7 @@ import {
   talents as talentCatalog,
   getTalent,
   isTalentAvailable,
+  visibleClocks,
   getCurrentScene,
   DEFAULT_TALENT_ID,
   resolvePlayerAction,
@@ -857,7 +858,7 @@ export function App() {
   // refs ejecutarían la clausura del PRIMER render —con room=null y estado viejo— y
   // descartarían la acción/estado que llega de la red. Se reasignan en cada render
   // (las funciones están hoisteadas) para apuntar siempre a la instancia vigente.
-  const runTurnRef = useRef<(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean) => Promise<void>>(() => Promise.resolve());
+  const runTurnRef = useRef<(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean, overrideUseTalent?: boolean) => Promise<void>>(() => Promise.resolve());
   const launchMultiplayerRoomRef = useRef<(mpRoom: GameRoom) => void>(() => {});
   const adoptRemoteRoomRef = useRef<(mpRoom: GameRoom) => void>(() => {});
   runTurnRef.current = runTurn;
@@ -921,8 +922,11 @@ export function App() {
   // Host: un invitado pidió su acción; la resolvemos contra el motor. El motor ya
   // tiene activePlayerIndex apuntando a ese invitado (lo dejamos ahí al difundir).
   useEffect(() => {
-    const onGuestAction = ({ action, stat, usePet: guestUsePet }: { action: string; stat: StatKey; usePet: boolean }) => {
-      void runTurnRef.current(action, stat, guestUsePet);
+    // OJO: usePet/useTalent viajan en el mensaje porque son decisiones DEL INVITADO
+    // sobre SU personaje. Antes se resolvían con el toggle local del host — el
+    // invitado no podía gastar su talento y el host se lo gastaba sin querer.
+    const onGuestAction = ({ action, stat, usePet: guestUsePet, useTalent: guestUseTalent }: { action: string; stat: StatKey; usePet: boolean; useTalent?: boolean }) => {
+      void runTurnRef.current(action, stat, guestUsePet, Boolean(guestUseTalent));
     };
     multiplayerClient.on("guest_action", onGuestAction);
     return () => multiplayerClient.off("guest_action", onGuestAction);
@@ -1541,10 +1545,11 @@ export function App() {
     if (!mpState.yourTurn || mpState.phase !== "active") return;
     const action = usingCustomAction ? encodeCustomAction(customAction) : selectedActionDraft?.action;
     if (!action) return;
-    multiplayerClient.submitAction(action, selectedStat, usePet);
+    multiplayerClient.submitAction(action, selectedStat, usePet, useTalent);
+    if (useTalent) setUseTalent(false);
   }
 
-  async function runTurn(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean) {
+  async function runTurn(botAction?: string, botStat?: StatKey, overrideUsePet?: boolean, overrideUseTalent?: boolean) {
     if (!room || room.sessionComplete || busy || turnInFlightRef.current) return;
     turnInFlightRef.current = true;
     openingTokenRef.current += 1;
@@ -1564,7 +1569,7 @@ export function App() {
       const displayAction = chosenChoice?.label ?? decodeCustomAction(turnAction) ?? cleanActionText(turnAction);
       const petActive = (overrideUsePet ?? usePet) && active.type === "human" && hasPet(active.character);
       // Activar el talento 1/escena: solo humano, con talento y aún disponible esta escena.
-      const talentActive = useTalent && active.type === "human" && Boolean(active.character.talent) && isTalentAvailable(room, active.id, scene.id);
+      const talentActive = (overrideUseTalent ?? useTalent) && active.type === "human" && Boolean(active.character.talent) && isTalentAvailable(room, active.id, scene.id);
       const turnStat = botStat ?? selectedStat;
       const actionCountInScene = room.sessionLog.filter((event) =>
         event.sceneId === scene.id && (event.actionLabel === displayAction || cleanActionText(event.action) === displayAction)
@@ -1773,7 +1778,9 @@ export function App() {
   const mpBlockActions = isMultiplayer && (mpState.phase !== "active" || !mpState.yourTurn);
   // Talento activo 1/escena: solo solo-play por ahora (MP no lo transporta aún).
   const talentDef = getTalent(currentCharacter.talent);
-  const talentReady = Boolean(talentDef) && !isMultiplayer && activePlayer?.type === "human" && Boolean(room) && isTalentAvailable(room as GameRoom, activePlayer.id, scene.id);
+  // En party el talento es del jugador ACTIVO (host o invitado): el toggle aparece
+  // solo cuando de verdad te toca, y viaja en guest_action hasta el motor del host.
+  const talentReady = Boolean(talentDef) && !mpBlockActions && activePlayer?.type === "human" && Boolean(room) && isTalentAvailable(room as GameRoom, activePlayer.id, scene.id);
   // Host resuelve su propio turno contra el motor local y difunde; el invitado
   // solo manda su acción y espera el estado autoritativo.
   const handleHumanTurn = !isMultiplayer ? () => runTurn() : mpState.isHost ? () => runTurn() : runMultiplayerTurn;
@@ -2106,6 +2113,27 @@ function TurnQueue({ room, draft, multiplayerPlayers, localPlayerId, audioRef, a
               </li>
             ))}
           </ol>
+          {/* Relojes de historia: presión con NOMBRE. Solo los revelados — el motor
+              mantiene ocultas las amenazas hasta que llegan a la mitad (ver clocks.ts). */}
+          {visibleClocks(room?.clocks).length > 0 && (
+            <div className="journeyClocks">
+              <h4>Lo que corre</h4>
+              {visibleClocks(room?.clocks).map((clock) => {
+                const done = clock.firedAtTurn !== undefined;
+                return (
+                  <div key={clock.id} className={`journeyClock clock-${clock.kind}${done ? " clockFired" : ""}`}>
+                    <span className="clockName">{clock.name}</span>
+                    <span className="clockPips" role="img" aria-label={`${clock.filled} de ${clock.segments}`}>
+                      {Array.from({ length: clock.segments }, (_, index) => (
+                        <i key={index} className={index < clock.filled ? "on" : "off"} aria-hidden="true" />
+                      ))}
+                    </span>
+                    {done && <em className="clockPayoff">{clock.payoff}</em>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="journeyLaws">
             <h4>Leyes de {journey.worldName}</h4>
             {journey.laws.length === 0 && <p className="journeyLocked">Todavía no conocés ninguna. Se graban al avanzar de capítulo.</p>}

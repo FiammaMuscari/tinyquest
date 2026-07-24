@@ -2,6 +2,7 @@ export * from "./types";
 export * from "./stats";
 export * from "./dice";
 export * from "./danger";
+export * from "./clocks";
 export * from "./action-costs";
 export * from "./custom-actions";
 export * from "./action-outcomes";

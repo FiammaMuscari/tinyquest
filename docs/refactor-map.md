@@ -4,6 +4,115 @@ Purpose: save exploration cost (tokens/time) on every session. Grep these anchor
 instead of reading whole files. **Update this map whenever you move or rename a
 section** — an outdated map costs more than no map.
 
+## Estado del proyecto (revisado 2026-07-24)
+
+Health check corrido en esta fecha — no re-verificar sin motivo:
+
+| Señal | Estado |
+|---|---|
+| Árbol / remote | limpio, `main` == `origin/main` (`fb0ec4e`) |
+| `npm test` | **354/354** verde (~30s) |
+| `npm run typecheck` | limpio |
+| Dev server | vive en 127.0.0.1:5173 (no matarlo si Fiamy juega) |
+| Tamaño | App.tsx 4113 líneas · app.css 4370 · assets 15M · media 1.4M |
+
+Roadmap de narración (`memory/project_tinyquest_roadmap.md`) — qué está REALMENTE
+cableado, verificado por traza estática en esta fecha:
+
+- **1 Calidad de narración**: hecho (contrato unificado 160-240 palabras, `storySoFar`,
+  `max_tokens` 1400). Falta solo el juicio subjetivo de Fiamy jugando.
+- **2 Opciones dinámicas**: hecho (`optionsToLabel` con target/intent/risk).
+- **3 RAG con embeddings**: hecho y consumido por `buildCompactGroqPrompt` (campos
+  `recall` + `moralProfile`). Falta ver recuerdos no-vacíos en partida larga real.
+- **4 Talentos**: hecho en solo y **ya también en grupal (arreglado 2026-07-24)**.
+  `useTalent` viaja en `submit_action`/`guest_action` (TS `protocol.ts` + Go
+  `protocol.go`/`hub.go:372`); el host resuelve el turno del invitado con la
+  decisión DEL INVITADO (`onGuestAction` → `runTurn(..., overrideUseTalent)`), no
+  con su propio toggle. Antes el host gastaba su talento sin querer.
+  Gating de UI: `talentReady` usa `!mpBlockActions` (cada quien dueño del suyo).
+  Regresión cubierta en `server-go/internal/hub/hub_test.go` y
+  `tests/multiplayer-e2e.test.mjs`.
+- **5 Finales dinámicos**: MÁS hecho de lo que dice el roadmap — `generateFinalRecap`
+  del provider está cableado end-to-end (`App.tsx:1629`, `groq-dungeon-master.ts:303`,
+  `buildFinalRecapContext` + `FINAL_RECAP_RULES` en `llm-budget.ts:328`);
+  `buildFinalRecap` (App.tsx:2958) es el fallback local sin LLM.
+- **6 Multi-campaña**: sigue siendo solo luna-roja + forja improvisada.
+
+Del spec viejo de Fiamy: acción libre escrita por el jugador **ya existe**
+(`customAction`/`encodeCustomAction`, App.tsx:808/1542, cuesta energía);
+pistas falsas/verdaderas **ya existen** (`CampaignClue.isFalse`);
+**relojes múltiples ya existen** desde 2026-07-24 (ver abajo).
+
+### Relojes de historia (`packages/game-engine/src/clocks.ts`, nuevo 2026-07-24)
+
+Pistas de presión al estilo Blades in the Dark, además del `dangerClock` global.
+Tres tipos: `threat` (nace OCULTO, se alimenta de fallos y de subidas de peligro),
+`opportunity` (la llena el éxito, nunca retrocede) y `mystery` (solo avanza con
+pistas reales reveladas). Tope de **2 segmentos por turno** para proteger el pacing;
+un reloj oculto se destapa al llegar a la mitad; al llenarse dispara `payoff`, un flag
+`clock_fired:<id>` y un delta de peligro (+2 amenaza / −1 oportunidad / 0 misterio),
+y después **queda congelado** (no se cobra dos veces).
+
+Puntos de contacto — si tocás uno, revisá los otros:
+- `engine.ts` `resolvePlayerAction`: `advanceClocks` corre **acá**, con el resto de
+  los hechos. NO moverlo a `applyNarration`: la narración se genera antes, y el pago
+  se narraría siempre un turno tarde. `applyNarration` solo *deriva* los pagos con
+  `clock.firedAtTurn === room.turn` y los mete en `memorySummary.stakes`.
+- `createClocksForCampaign(campaign)`: usa `campaign.clocks` si están escritos; si no,
+  los DERIVA de `threats[0]` / `clues.length` / `forgeNotes.summary.objective` — así
+  una historia forjada por LLM tiene presión sin tocar el prompt.
+- `llm-budget.ts` (`buildCompactGroqPrompt`): campos `clocks` (máx 4 líneas) y
+  `clocksFired`. Regla dura: la presión **se narra, no se reporta** — prohibido decir
+  números, segmentos o la palabra "reloj"; los ocultos solo se insinúan.
+- UI: `visibleClocks(room?.clocks)` en el `journeyPanel` (App.tsx ~2115, bloque
+  `.journeyClocks` antes de `.journeyLaws`). CSS al final de `app.css`.
+- Tests: `tests/clocks.test.mjs` (11 casos, transpila `clocks.ts` inline).
+
+### Assets huérfanos (medido 2026-07-24, script abajo)
+
+⚠️ **TRAMPA: grepear el nombre CON extensión da falsos positivos masivos.** Casi
+todos los assets se referencian por *stem* y la ruta se arma en runtime:
+`uiIcon(name)` → `` `/assets/ui/${name}.webp` `` (App.tsx:2387) y `DiceBadge` →
+`` `/assets/dice/${kind}.webp` `` (App.tsx:3545). Buscar `d20.webp` no encuentra nada
+y parece huérfano cuando en realidad se dibuja en cada tirada.
+
+Huérfanos REALES: eran **6 archivos, ~88K**, todos en `assets/ui/` (`compass-rose`,
+`logo`, `step-connector`, `sparkle`, `companeros`, `dice_d20` — este último un
+duplicado viejo del d20 que sí se usa en `assets/dice/`). **Ya borrados 2026-07-24.**
+Los otros 14 iconos de `assets/ui/` sí se usan vía `uiIcon()`.
+
+**Recomprimido 2026-07-24 (~1.7M ahorrados, sin cambiar código):** los assets venían
+del pack a 500-1100px para renders de 25-50px. Se bajaron a ~4x del display real,
+que es el techo de cualquier pantalla:
+
+| Asset | Display real (app.css) | Antes | Ahora |
+|---|---|---|---|
+| `assets/dice/*.webp` | 46px (`.diceBadgeWrap`), 34px (`.miniDiceImageWrap`) | ~1100px, 692K | 184px, 24K |
+| `assets/character/talents/*.webp` | 46-52px (`.talentPicker img`) | 500px, 858K | 192px, 53K |
+| `assets/character/stats/*.webp` | 25-30px (`.statBarRow img`) | 500px, 230K | 128px, 36K |
+
+**NO tocar** (medido, ya están bien dimensionados):
+- `assets/ui/ornamento-{circulo,espada}.webp` (640px): son fondos de `.heroSpecial`
+  a `auto 96%` de la altura del panel, que a 1360×700 no pasa de ~670px. Bajarlos se ve.
+- `assets/campaigns/*.webp` (1916×821 por ~60K): banners, ya comprimidos finos.
+- `assets/audio/song-of-the-north.mp3` (**11M de los 13M**): es la única música del
+  juego y **no está en el camino crítico** — los tres reproductores usan
+  `preload="none"` (`ui-sound.ts:81`, `App.tsx:2094`, `App.tsx:2942`), así que solo
+  baja si Fiamy la enciende. Recomprimir degrada el único track a cambio de nada.
+
+Regla para el futuro: antes de recomprimir, buscá el `width/height` en `app.css` y
+multiplicá por 4. Verificá con un render estático a `deviceScaleFactor: 3` contra el
+dev server (patrón en `scratchpad/dice-render.mjs` / `scratchpad/icons-render.mjs`) —
+no hace falta jugar una partida ni gastar cuota de LLM.
+
+Receta para re-medir huérfanos (match por stem, no por nombre de archivo):
+```bash
+for f in $(find apps/web/public/assets -type f | sed 's|apps/web/public||'); do \
+  s=$(basename "$f" | sed 's/\.[^.]*$//'); \
+  grep -rqE "\"$s\"|'$s'|\($s\)|$(basename "$f")" apps/web/src packages scripts apps/web/index.html \
+  || echo "HUERFANO: $f"; done
+```
+
 ## Hard rules (violating these wastes a whole session)
 
 1. `App.tsx` is ~2500 lines. **Never read it whole.** Grep the anchor, then read ±40 lines.

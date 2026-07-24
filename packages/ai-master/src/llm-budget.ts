@@ -224,6 +224,13 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
   const talentName = plan.actorKind === "player" ? input?.talent?.name : undefined;
   const talentMoment = plan.actorKind === "player" ? short(input?.talent?.activeMoment, 160) : undefined;
 
+  // Relojes de historia (engine `clocks.ts`): presión CON NOMBRE. A diferencia de
+  // dangerClock (un número plano), acá el narrador sabe QUÉ se acerca y a qué distancia,
+  // así puede dosificar la tensión. Los ocultos vienen marcados: se insinúan, no se nombran.
+  const clockPressure = (input?.clocks?.pressure ?? []).slice(0, 4);
+  const clocksFired = (input?.clocks?.firedNow ?? []).map((line) => short(line, 140)).filter((l): l is string => Boolean(l));
+  const hasClocks = clockPressure.length > 0;
+
   const payload = {
     story: storyLast,
     ...(hasStorySoFar ? { storySoFar } : {}),
@@ -252,6 +259,8 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
       objects,
       motifs
     },
+    ...(hasClocks ? { clocks: clockPressure } : {}),
+    ...(clocksFired.length ? { clocksFired } : {}),
     bots: bots.length ? bots : undefined,
     noRepeat: noRepeat.length ? noRepeat : undefined,
     optionsToLabel: optionsToLabel.length ? optionsToLabel : undefined,
@@ -265,6 +274,12 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
         : []),
       ...(moralProfile
         ? ["moralProfile = quién viene siendo el héroe según sus decisiones acumuladas: dejá que tiña el tono y cómo los NPCs y el mundo reaccionan ante él (confianza, miedo, respeto, recelo), sin declararlo nunca de forma explícita."]
+        : []),
+      ...(hasClocks
+        ? ["clocks = relojes de presión que YA movió el motor (formato 'nombre (tipo) llenos/total'). Cuanto más lleno, más cerca está eso de ocurrir: dosificá la tensión con esa distancia — a 1/8 es un rumor de fondo, a 6/8 se siente en la nuca. Los marcados [oculto] JAMÁS se nombran ni se explican: solo se insinúan (un ruido que no encaja, una puerta que antes estaba abierta). PROHIBIDO mencionar números, segmentos o la palabra 'reloj': la presión se narra, no se reporta."]
+        : []),
+      ...(clocksFired.length
+        ? ["clocksFired = pagos que se CUMPLIERON en este turno: son hechos consumados, no amenazas. Narralos como algo que YA pasó y que cambia el tablero, integrado en la consecuencia del turno — no los anuncies como aviso ni los pospongas."]
         : []),
       "consequence.summary DEBE ser exactamente: " + plan.consequence.summary,
       "dangerChange: before=" + plan.scene.dangerBefore + " after=" + plan.scene.dangerAfter,
@@ -311,6 +326,10 @@ export function buildCompactGroqPrompt(plan: ResolutionPlan, maxChars = DEFAULT_
     ...(slimStorySoFar ? { storySoFar: slimStorySoFar } : {}),
     ...(hasRecall ? { recall: recall.slice(0, 2) } : {}),
     ...(moralProfile ? { moralProfile } : {}),
+    // Un reloj CUMPLIDO no se recorta nunca: es un hecho consumado del turno. La
+    // presión en curso sí se achica a los 2 relojes más cargados.
+    ...(hasClocks ? { clocks: clockPressure.slice(0, 2) } : {}),
+    ...(clocksFired.length ? { clocksFired } : {}),
     turn: { ...payload.turn, facts: facts.slice(0, 3), forbidden: forbidden.slice(0, 2) },
     scene: { ...payload.scene, objects: objects.slice(0, 2), motifs: motifs.slice(0, 2) },
     noRepeat: noRepeat.slice(0, 2),

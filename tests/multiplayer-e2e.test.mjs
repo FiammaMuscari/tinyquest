@@ -111,12 +111,14 @@ test("party completa: crear → unirse → arrancar → turnos → relay", async
 
   // 5) El invitado manda su acción → al host le llega como guest_action.
   const relay = waitEvent(host, "guest_action");
-  guest.submitAction("forzar la puerta", "body", true);
+  guest.submitAction("forzar la puerta", "body", true, true);
   const ga = await relay;
   assert.equal(ga.playerId, guestId);
   assert.equal(ga.action, "forzar la puerta");
   assert.equal(ga.stat, "body");
   assert.equal(ga.usePet, true);
+  // El talento es del invitado: si no viaja, el host resuelve con SU toggle.
+  assert.equal(ga.useTalent, true, "useTalent del invitado debe llegar al host");
 
   // 6) Chat compartido, color personal y expulsión del host.
   guest.setChatColor("#ff66aa");

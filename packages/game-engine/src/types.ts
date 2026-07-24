@@ -588,6 +588,15 @@ export type Campaign = {
   clues: CampaignClue[];
   possibleEndings: CampaignEnding[];
   threats?: Array<{ id: string; name: string; pressure: string; escalatesWhen?: string }>;
+  /** Relojes de historia escritos a mano. Si falta, `createClocksForCampaign` los deriva. */
+  clocks?: Array<{
+    id: string;
+    name: string;
+    kind: import("./clocks").StoryClockKind;
+    segments?: number;
+    payoff: string;
+    revealed?: boolean;
+  }>;
   twists?: Array<{ id: string; title: string; trigger: string; reveal: string }>;
   graveConsequences?: string[];
   energyMax?: number;
@@ -904,6 +913,8 @@ export type GameRoom = {
   roundInScene: number;
   turn: number;
   dangerClock: number;
+  /** Relojes de historia con nombre y pago. Ver `clocks.ts` (el motor los mueve, el LLM los narra). */
+  clocks?: import("./clocks").StoryClock[];
   mysteryClues: string[];
   sceneProgress: number;
   sessionStartedAt: number;
@@ -971,6 +982,12 @@ export type NarrationRequest = {
   skillUsed?: string;
   petUsed?: string;
   talent?: { name: string; activeMoment?: string };
+  /**
+   * Relojes de historia para teñir la tensión. `pressure` los lista TODOS (los ocultos
+   * marcados, para insinuar sin nombrar); `firedNow` son los que se cumplieron en ESTE
+   * turno — pagos que el narrador debe cobrar como hecho consumado.
+   */
+  clocks?: { pressure: string[]; firedNow: string[] };
   visualPrompt: string;
   ambientSoundPrompt: string;
   atmosphereTags: string[];

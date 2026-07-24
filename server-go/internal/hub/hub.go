@@ -369,7 +369,7 @@ func (h *Hub) submitAction(c *Client, data []byte) {
 	}
 	room.touch()
 	host.client.enqueue(mustJSON(GuestActionMsg{
-		Type: SActionRelay, PlayerID: p.id, Action: msg.Action, Stat: msg.Stat, UsePet: msg.UsePet,
+		Type: SActionRelay, PlayerID: p.id, Action: msg.Action, Stat: msg.Stat, UsePet: msg.UsePet, UseTalent: msg.UseTalent,
 	}))
 }
 
