@@ -1,7 +1,7 @@
 import type { Character, StatKey } from "./types";
 
 const portraitStatOrder: StatKey[] = ["body", "mind", "charm", "creativity", "courage", "focus", "luck"];
-export const HERO_PORTRAIT_IDENTITY_VERSION = "hero-v23";
+export const HERO_PORTRAIT_IDENTITY_VERSION = "hero-v24-canonical-anatomy";
 
 function dominantStat(character: Character): StatKey {
   return portraitStatOrder.reduce((best, stat) => character.stats[stat] > character.stats[best] ? stat : best, portraitStatOrder[0]);
@@ -22,6 +22,8 @@ export function heroPortraitIdentityKey(character: Character): string {
     character.look?.eyeColor,
     character.look?.hairColor,
     character.look?.hairLength,
+    character.look?.bangs ?? "sin flequillo",
+    character.look?.mutation ?? "ninguna",
     character.look?.scar ?? "sin cicatrices"
   ].map((value) => value?.trim().toLocaleLowerCase() ?? "").join("|");
 }

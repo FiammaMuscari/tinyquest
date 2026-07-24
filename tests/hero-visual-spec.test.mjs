@@ -38,3 +38,19 @@ test("campos libres se acotan para no truncar las reglas críticas", () => {
   assert.ok(prompt.length < 900, `spec demasiado largo: ${prompt.length}`);
   assert.match(prompt, /…$/);
 });
+
+test("mutaciones explícitas vencen a la raza sin perder rasgos del usuario", () => {
+  const prompt = composeHeroAppearance({ ...spec, bangs: "con flequillo", mutation: "licantropía parcial" });
+  assert.match(prompt, /PRIORITY: mutation > species anatomy > user traits > role/i);
+  assert.match(prompt, /MID LYCANTHROPE STAGE.*identity and chosen gender remain recognizable/is);
+  assert.match(prompt, /partially elongated wolf muzzle.*fur patches.*clawed hands/is);
+  assert.match(prompt, /mandatory visible forehead bangs/i);
+  assert.match(prompt, /SPECIES ANATOMY LOCK: veil elf/i);
+});
+
+test("ojo extra elimina la contradicción de dos ojos de la raza", () => {
+  const prompt = composeHeroAppearance({ ...spec, species: "adult elf; exactly two eyes, two arms and two legs", mutation: "ojo extra" });
+  assert.match(prompt, /exactly THREE open eyes total/i);
+  assert.doesNotMatch(prompt, /exactly two eyes/i);
+  assert.match(prompt, /two arms and two legs/i);
+});

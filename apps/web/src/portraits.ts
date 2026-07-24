@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { anatomyFidelityRules, classifyBeingVisual, creaturePortraitPrompt, facialExpressionPrompt, humanoidPortraitPrompt, inferFacialExpression, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_FACE_QUALITY_RULES, TINY_QUEST_NEGATIVE_RULES, TINY_QUEST_PAINT_MEDIUM, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
+import { classifyBeingVisual, creaturePortraitPrompt, humanoidPortraitPrompt, phenomenonPortraitPrompt, sceneStylePrompt, shouldRenderAsCreature, TINY_QUEST_FACE_QUALITY_RULES, TINY_QUEST_NEGATIVE_RULES, TINY_QUEST_PAINT_MEDIUM, TINY_QUEST_VISUAL_STYLE, worldImageConstraints } from "./visual-identity";
 
 // ─── Retratos generados por IA, con caché persistente ────────────────────────
 // Pollinations (gratis, sin key) genera la imagen a partir de un prompt en la URL.
@@ -60,33 +60,19 @@ export function portraitSessionSeedOffset(): number {
 // El LLM imagina el aspecto (appearance) y este prompt lo pinta. Seed determinística
 // por nombre → mismo personaje, mismo retrato durante toda la partida. `seedNonce`
 // permite "reimaginar": nueva cara para la misma identidad.
-// MISMO TRAZO en las dos tomas: la raíz del prompt es idéntica palabra por palabra
-// y solo cambia el ENCUADRE — frente = primer plano 3/4; cuerpo = de cabeza a
-// rodillas. Frente se deriva desde Cuerpo por img2img: alejar una imagen cercana
-// inventaba piernas y hasta recortaba la cabeza; acercar un master es estable.
+// Pipeline visual V22 aprobado: Cuerpo fija la identidad y Frente se deriva de
+// ese máster con referencia, sin inventar otra persona.
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
-const heroPromptTail = (name: string, styleHint: string) =>
-  ` Character: ${name}. ${styleHint}. ${facialExpressionPrompt("neutral-alert")}`;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // MISMAS dimensiones y seed que el cuerpo: mismo tensor de ruido inicial → la
-  // mayor consistencia de personaje posible sin img2img (kontext es de pago).
-  // El marco 4:5 de la UI recorta el sobrante con cover anclado arriba.
-  // Mantener EXACTO el prompt aprobado del avatar: recupera las imágenes previas
-  // desde IndexedDB y evita convertir al protagonista al estilo de los NPC.
-  // IDENTIDAD PRIMERO: Flux Schnell pondera con más fuerza el inicio. Poner el
-  // estilo antes hacía que obedeciera "pintado" pero ignorara pelo/ojos/piel.
-  const prompt = `TINYQUEST HERO FACE VARIANT V22. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. CAMERA: close 3/4 head-and-shoulders at 30 degrees, both eyes/full head visible; not frontal/full-body. ${heroPromptTail(name, styleHint)} SAME BODY MASTER: exact person, gender anatomy, hair length, face and upper clothes; camera only. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE DETAIL V24. OUTPUT CAMERA LOCK: newly painted intimate close three-quarter portrait at exactly 30 degrees; entire head, both eyes, shoulders, collar and upper torso dominate the square frame. Head is large and near camera. Waist, hips, legs and feet remain outside frame. Never full body, knee-up, distant or weak composition. STYLE FIDELITY LOCK: preserve the canonical body's exact medieval dark-fantasy hand-painted language, pigment density, mature semi-realism, brush scale, canvas grain, lighting, contrast and finish; never simplify, genericize, smooth or abstract it. QUALITY FLOOR: face, eyes, hair/fringe, scars, anatomy, clothing and materials must be at least as defined as the body master, with a richer portrait detail pass. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Character: ${name}. ${styleHint}. SAME BODY MASTER: exact recognizable person, species, visual gender, eye count, facial geometry, hairstyle, colors, permanent marks and upper clothing; only camera distance/composition changes. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
-// Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen, nunca al revés.
+// Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  // Diffusion suele ignorar "sin pies" y recortar a mitad de muslo. V22 fuerza
-  // una fuente completa (para que EXISTAN rodillas) y loadPortrait descarta de
-  // forma determinista el 18% inferior ANTES de cachear/mostrar/descargar.
-  const prompt = `TINYQUEST HERO BODY MASTER V22. ${TINY_QUEST_PAINT_MEDIUM}. CAMERA FIRST: distant single standing figure, whole head through feet visible with margins, BOTH KNEES mandatory; client crops below knees. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Face at 30 degrees, both eyes visible. ${heroPromptTail(name, styleHint)} MASTER PERSON/WARDROBE. Natural hands/anatomy. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO BODY MASTER V26. CAMERA FIRST — NON-NEGOTIABLE: one single standing character shown from complete head through both feet with margins; full torso, hips, both arms, both hands, both thighs, BOTH KNEES and both lower legs visible. The standing body fills the vertical frame. This is a character-sheet body view, not a portrait, bust, headshot or close-up; client crops only below knees after generation. Face at 30 degrees with both eyes visible. ${TINY_QUEST_PAINT_MEDIUM}. MATURE ADULT QUALITY FLOOR: clearly adult facial proportions and coherent anatomy, lived-in believable face, refined eyes/hair/scars, rich textile/leather/metal rendering, confident visible brushwork and finished lighting. STYLE FIDELITY LOCK: ${heroPromptRoot}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. Character: ${name}. ${styleHint}. MASTER PERSON/WARDROBE. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -155,20 +141,15 @@ export function storySceneImageUrl(storyTitle: string, worldName: string, era: s
 // Imagen de escena VIVA durante la partida: se genera con la historia real y se
 // renueva al cambiar de escena. El jugador elige el encuadre: lugar, héroe o ambiente.
 export type SceneImageMode = "place" | "hero" | "mood";
-export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, heroLine: string, ambience = "", worldRules: string[] = [], beat?: string): string {
-  const expression = facialExpressionPrompt(inferFacialExpression(beat ?? objective));
+export function liveSceneImageUrl(mode: SceneImageMode, campaignTitle: string, sceneTitle: string, objective: string, worldName: string, era: string, _heroLine: string, ambience = "", worldRules: string[] = [], beat?: string): string {
   const base = mode === "hero"
-    ? `Fantasy story illustration: the hero (${heroLine}) inside the scene "${sceneTitle}", taking action. ${expression} ${objective}.`
+    ? `Environmental traces of the confirmed hero action in "${sceneTitle}", with the hero outside frame. ${objective}.`
     : mode === "mood"
       ? `Atmospheric fantasy ambience illustration, abstract cinematic mood for "${sceneTitle}". ${objective}.`
       : `Fantasy environment concept art, atmospheric wide view of "${sceneTitle}". ${objective}.`;
-  const identity = mode === "hero" ? ` ${anatomyFidelityRules(heroLine)}` : "";
   const laws = worldImageConstraints(worldName, ambience, worldRules);
-  const storyBeat = beat?.trim() ? `CURRENT CONFIRMED STORY BEAT: ${beat.trim()} ` : "";
-  const subjectPolicy = mode === "hero"
-    ? "SINGLE-SUBJECT FILM COMPOSITE: one canonical hero alone dominates the subject layer."
-    : "CLEAN ENVIRONMENT MATTE-PAINTING BACKGROUND PLATE: abandoned, evacuated and empty before inhabitants arrive; architecture and terrain exclusively.";
-  const prompt = `${storyBeat}ABSOLUTE WORLD CONSTRAINTS: ${laws}. ${subjectPolicy} ${sceneStylePrompt()}. ${base}${identity} World: ${worldName} (${era}). Tale: ${campaignTitle}. Show the confirmed beat without inventing people, objects or facts. World laws override clichés. In hero mode preserve identity, gender, colors and anatomy; only natural expression responds to the confirmed beat. Match character/environment light.`;
+  const storyBeat = beat?.trim() ? `CONFIRMED BEAT: ${beat.trim()} ` : "";
+  const prompt = `TINYQUEST ENVIRONMENT SCENE V2. WIDE ENVIRONMENT PLATE. ${storyBeat}ABSOLUTE WORLD CONSTRAINTS: ${laws}. ZERO people, heroes, NPCs, creatures or silhouettes. Show only the confirmed environment and explicitly confirmed objects; do not visualize unconfirmed narrative nouns. ${sceneStylePrompt()}. ${base} World: ${worldName} (${era}). Tale: ${campaignTitle}. No text, letters, UI, logo, signature or watermark.`;
   const seed = nameHash(campaignTitle + sceneTitle + mode + (beat ?? "")) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=576&nologo=true&model=flux&seed=${seed}`;
 }
@@ -328,6 +309,7 @@ function nextUtcMidnight(): number {
 /** Declara que una variante debe editarse desde otra imagen canónica. Se llama
  * antes de montar el <img>, evitando que una carrera dispare text-to-image. */
 export function linkPortraitReference(targetUrl: string, referenceUrl: string): void {
+  if (targetUrl === referenceUrl) return;
   portraitReferences.set(targetUrl, referenceUrl);
 }
 
@@ -358,7 +340,7 @@ function styleReferencePayload(styleUrl: string): Promise<{ data: string; type: 
   return pending;
 }
 
-async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls: string[] = []): Promise<Blob | null> {
+async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls: string[] = [], priority = false): Promise<Blob | null> {
   if (!url.startsWith("https://image.pollinations.ai/")) return null;
   if (!cfImageAvailable) {
     if (referenceUrl) throw new ReferenceVariantError();
@@ -371,6 +353,7 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
     const parsed = new URL(url);
     const prompt = decodeURIComponent(parsed.pathname.replace(/^\/prompt\//, ""));
     if (!prompt) return null;
+    const canonicalFaceDetail = /^TINYQUEST HERO FACE DETAIL V24\b/.test(prompt);
     const width = Number(parsed.searchParams.get("width") ?? "512");
     const height = Number(parsed.searchParams.get("height") ?? "512");
     // CAMBIO DE PROVEEDOR (2026-07-11): Pollinations RETIRÓ flux — su único
@@ -394,12 +377,29 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
         referencePayload,
         Promise.all(styleUrls.map(styleReferencePayload))
       ]);
-      const response = await fetch("/api/cf-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, width, height, seed, referenceImage: reference.image, referenceType: reference.type, styleImages }),
-        signal: controller.signal
-      });
+      // Cloudflare y Pollinations comparten la MISMA cola. Antes, el límite de
+      // concurrencia solo cubría el fallback y el inicio de partida podía lanzar
+      // escena + elenco + héroe simultáneamente, quemando cuota y prioridad.
+      await acquireSlot(priority);
+      const startedAt = performance.now();
+      let response: Response;
+      try {
+        response = await fetch("/api/cf-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, width, height, seed, referenceImage: reference.image, referenceType: reference.type, styleImages }),
+          signal: controller.signal
+        });
+        try {
+          const day = new Date().toISOString().slice(0, 10);
+          const storageKey = `tiny-quest:image-usage:${day}`;
+          const previous = JSON.parse(localStorage.getItem(storageKey) ?? '{"count":0,"totalMs":0}') as { count?: number; totalMs?: number };
+          const generated = response.ok && response.headers.get("x-tiny-quest-cache") !== "hit";
+          localStorage.setItem(storageKey, JSON.stringify({ count: (previous.count ?? 0) + (generated ? 1 : 0), totalMs: (previous.totalMs ?? 0) + (generated ? Math.round(performance.now() - startedAt) : 0), provider: "cloudflare" }));
+        } catch { /* telemetría local opcional */ }
+      } finally {
+        releaseSlot();
+      }
       if (response.status === 501 || response.status === 404 || response.status === 405) {
         cfImageAvailable = false;
         if (referenceUrl) throw new ReferenceVariantError();
@@ -413,6 +413,12 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
         if (referenceUrl) throw new ReferenceVariantError();
         return null;
       }
+      // Frente V24 solo es válido si el Worker confirma que usó el Cuerpo como
+      // fuente de identidad y aplicó el contrato de primer plano.
+      if (canonicalFaceDetail && (
+        response.headers.get("x-tiny-quest-identity-source") !== "canonical-body"
+        || response.headers.get("x-tiny-quest-composition") !== "close-portrait-v24"
+      )) throw new ReferenceVariantError();
       const blob = await response.blob();
       if (!blob.type.startsWith("image/")) return null;
       return blob;
@@ -439,9 +445,22 @@ function portraitFetchTarget(url: string): string {
   return url;
 }
 
+function isCanonicalHeroPortraitUrl(url: string): boolean {
+  try { return /^TINYQUEST HERO (?:BODY MASTER|FACE (?:VARIANT|DETAIL)) V\d+\b/.test(decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""))); }
+  catch { return false; }
+}
+
+function isVersionedTinyQuestImageUrl(url: string): boolean {
+  try { return /^TINYQUEST .+ V\d+\b/.test(decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""))); }
+  catch { return false; }
+}
+
 async function fetchPortraitBlob(url: string, priority: boolean): Promise<Blob> {
-  const fast = await fetchViaCloudflare(url, portraitReferences.get(url), portraitStyleReferences.get(url));
+  const fast = await fetchViaCloudflare(url, portraitReferences.get(url), portraitStyleReferences.get(url), priority);
   if (fast) return fast;
+  // Una familia visual versionada falla cerrada: conserva caché/placeholder y
+  // reintenta luego, sin pagar otro proveedor ni cambiar modelo/seed.
+  if (isVersionedTinyQuestImageUrl(url) || isCanonicalHeroPortraitUrl(url)) throw new ReferenceVariantError();
   let lastError: unknown = new Error("portrait fetch failed");
   // Pollinations 2026-07: cola por IP de UN solo pedido — cualquier extra rebota
   // con 429 al instante (otra pestaña, la portada, un reintento cruzado). Un 429
@@ -497,15 +516,41 @@ export function kneeUpCropGeometry(width: number, height: number): { sx: number;
   return { sx: Math.max(0, Math.round((width - sw) / 2)), sy: 0, sw, sh, width: targetWidth, height: targetHeight };
 }
 
-function needsKneeUpCrop(url: string): boolean {
+export function ankleCropGeometry(width: number, height: number): { sx: number; sy: number; sw: number; sh: number; width: number; height: number } {
+  const sh = Math.max(1, Math.round(height * 0.94));
+  const targetWidth = 448;
+  const targetHeight = 512;
+  const sw = Math.min(width, Math.round(sh * (targetWidth / targetHeight)));
+  return { sx: Math.max(0, Math.round((width - sw) / 2)), sy: 0, sw, sh, width: targetWidth, height: targetHeight };
+}
+
+async function validateImageBlob(blob: Blob, expectedWidth: number, expectedHeight: number): Promise<void> {
+  if (!blob.type.startsWith("image/") || blob.size === 0) throw new Error("invalid image payload");
+  if (typeof createImageBitmap === "undefined") return;
+  const bitmap = await createImageBitmap(blob);
   try {
-    return /TINYQUEST HERO BODY MASTER V(?:19|20|21|22)/.test(decodeURIComponent(new URL(url).pathname));
-  } catch {
-    return false;
+    const actualRatio = bitmap.width / bitmap.height;
+    const expectedRatio = expectedWidth / expectedHeight;
+    if (!bitmap.width || !bitmap.height || Math.abs(actualRatio - expectedRatio) > 0.08) {
+      throw new Error("invalid image dimensions");
+    }
+  } finally {
+    bitmap.close();
   }
 }
 
-async function cropKneeUpPortrait(blob: Blob): Promise<Blob> {
+function heroCropVersion(url: string): "knee" | "ankle" | null {
+  try {
+    const prompt = decodeURIComponent(new URL(url).pathname);
+    if (/TINYQUEST HERO BODY MASTER V(?:23|24)/.test(prompt)) return "ankle";
+    if (/TINYQUEST HERO BODY MASTER V(?:19|20|21|22|25|26)/.test(prompt)) return "knee";
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function cropHeroPortrait(blob: Blob, version: "knee" | "ankle"): Promise<Blob> {
   if (typeof document === "undefined") return blob;
   let source: CanvasImageSource;
   let sourceWidth: number;
@@ -528,7 +573,7 @@ async function cropKneeUpPortrait(blob: Blob): Promise<Blob> {
     release = () => URL.revokeObjectURL(objectUrl);
   }
   try {
-    const crop = kneeUpCropGeometry(sourceWidth, sourceHeight);
+    const crop = version === "ankle" ? ankleCropGeometry(sourceWidth, sourceHeight) : kneeUpCropGeometry(sourceWidth, sourceHeight);
     const canvas = document.createElement("canvas");
     canvas.width = crop.width;
     canvas.height = crop.height;
@@ -551,8 +596,11 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
   const promise = (async () => {
     let blob = await idbGet(url).catch(() => undefined);
     if (!blob) {
+      const parsed = new URL(url);
       blob = await fetchPortraitBlob(url, options.priority ?? false);
-      if (needsKneeUpCrop(url)) blob = await cropKneeUpPortrait(blob);
+      await validateImageBlob(blob, Number(parsed.searchParams.get("width") ?? 512), Number(parsed.searchParams.get("height") ?? 512));
+      const cropVersion = heroCropVersion(url);
+      if (cropVersion) blob = await cropHeroPortrait(blob, cropVersion);
       await idbPut(url, blob).catch(() => undefined); // sin persistencia sigue funcionando en memoria
     }
     const objectUrl = URL.createObjectURL(blob);
