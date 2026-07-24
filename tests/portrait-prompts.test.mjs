@@ -10,6 +10,7 @@ const transpile = (source) => ts.transpileModule(source, { compilerOptions: { mo
 const visualSource = await readFile(new URL("../apps/web/src/visual-identity.ts", import.meta.url), "utf8");
 const workerSource = await readFile(new URL("../apps/edge-worker/src/worker.js", import.meta.url), "utf8");
 const viteSource = await readFile(new URL("../apps/web/vite.config.ts", import.meta.url), "utf8");
+const imagePlanSource = await readFile(new URL("../apps/edge-worker/src/image-plan.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../apps/web/src/App.tsx", import.meta.url), "utf8");
 let portraitSource = await readFile(new URL("../apps/web/src/portraits.ts", import.meta.url), "utf8");
 portraitSource = portraitSource
@@ -27,30 +28,38 @@ test("expone referencias de estilo separadas de la identidad", () => {
 const appearance = "EXACT SKIN COLOR: light warm beige skin. EXACT IRIS COLOR: strongly saturated VIOLET PURPLE irises, NOT blue. EXACT HAIR COLOR: metallic golden hair. female veil elf, black and gold medieval gown, scar on left eyebrow";
 const promptFrom = (url) => decodeURIComponent(new URL(url).pathname.replace(/^\/prompt\//, ""));
 
-test("Frente V24 es una pintura cercana y más detallada referenciada por Cuerpo", () => {
+test("Frente V25 es una pintura cercana y más detallada referenciada por Cuerpo", () => {
   const face = portraits.characterPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const body = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(face);
   assert.notEqual(face, body);
-  assert.match(prompt, /HERO FACE DETAIL V24.*intimate close three-quarter portrait.*Head is large and near camera/is);
+  assert.match(prompt, /HERO FACE DETAIL V25.*intimate close three-quarter portrait.*Head is large and near camera/is);
   assert.match(prompt, /Waist, hips, legs and feet remain outside frame.*Never full body/is);
   assert.match(prompt, /STYLE FIDELITY LOCK: preserve the canonical body's exact medieval dark-fantasy hand-painted language/is);
   assert.match(prompt, /QUALITY FLOOR: face, eyes, hair\/fringe, scars.*at least as defined as the body master/is);
-  assert.ok(prompt.length <= 1960, `prompt de frente truncable: ${prompt.length}`);
+  assert.ok(prompt.length <= 2300, `prompt de frente truncable: ${prompt.length}`);
 });
 
-test("Cuerpo V26 prioriza encuadre corporal y mantiene calidad adulta", () => {
+test("Cuerpo V29 comparte el estilo pictórico de la cara, recorta pies y marca la raza", () => {
   const url = portraits.fullBodyPortraitUrl("Fiamy", appearance, "fantasy", 2);
   const prompt = promptFrom(url);
-  assert.match(prompt.slice(0, 1500), /HERO BODY MASTER V26.*CAMERA FIRST — NON-NEGOTIABLE.*complete head through both feet.*full torso, hips, both arms.*BOTH KNEES.*lower legs visible.*body fills the vertical frame.*not a portrait, bust, headshot or close-up.*visibly hand-painted matte oil.*MATURE ADULT QUALITY FLOOR.*STYLE FIDELITY LOCK:.*mature semi-realism.*CANONICAL SPEC:/is);
-  assert.match(prompt, /FULLY CLOTHED opaque medieval layers/i);
-  assert.match(prompt, /CANONICAL SPEC:.*VIOLET PURPLE.*scar on left eyebrow/is);
-  assert.match(prompt, /NO blur, deformity, extra digits\/limbs.*nudity\/bare chest.*mixed gender anatomy/is);
+  // Candados front-loaded: identidad, sujeto único (bug de dos personas), encuadre sin pies.
+  assert.match(prompt.slice(0, 1200), /HERO BODY MASTER V29.*CANONICAL IDENTITY SPEC — READ FIRST.*SINGLE SUBJECT LOCK: exactly ONE character.*never two figures, twin, turnaround, profile companion or model sheet.*FRAMING.*through both knees.*feet and lower legs OUTSIDE the frame/is);
+  assert.match(prompt, /STYLE LIKE THE FACE.*mature semi-realism.*never 3D, CGI, Pixar/is);
+  assert.match(prompt, /Adult, never a child/i);
+  assert.match(prompt, /same medieval outfit\/armor as the face.*never modern clothing or sneakers/is);
+  assert.match(prompt, /RACE VISIBLE: if an elf, long pointed ears clearly visible/is);
+  assert.match(prompt, /Keep the exact gender, skin, iris and hair colors and anatomy from the spec.*never swap gender, race or colors/is);
+  assert.match(prompt, /CANONICAL IDENTITY SPEC.*VIOLET PURPLE.*scar on left eyebrow/is);
+  assert.match(prompt, /No blur, extra limbs, nudity, mixed gender anatomy or wrong colors/i);
   assert.equal(new URL(url).searchParams.get("width"), "384");
   assert.equal(new URL(url).searchParams.get("height"), "512");
   assert.deepEqual(portraits.kneeUpCropGeometry(384, 512), { sx: 8, sy: 0, sw: 368, sh: 420, width: 448, height: 512 });
   assert.match(portraitSource, /if \(cropVersion\) blob = await cropHeroPortrait\(blob, cropVersion\)/);
-  assert.ok(prompt.length <= 1960, `prompt de cuerpo truncable: ${prompt.length}`);
+  // Con un appearance realista (~1.2k) el prompt debe entrar entero en el corte
+  // de 1960 chars del worker: candados siempre presentes en prod.
+  const realistic = portraits.fullBodyPortraitUrl("Fiamy", "x".repeat(1400), "fantasy", 2);
+  assert.ok(promptFrom(realistic).length <= 1960, `prompt de cuerpo se trunca en prod: ${promptFrom(realistic).length}`);
 });
 
 test("durante Reimaginar se oculta la imagen anterior y se muestra el spinner", () => {
@@ -104,8 +113,8 @@ test("la forja literaria usa Gemini por defecto y reserva Groq para los turnos",
 
 test("Frente usa edición referenciada y el caché sigue versionado", () => {
   assert.match(appSource, /linkPortraitStyleReferences\(urls\.face/);
-  assert.match(workerSource, /OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING/);
-  assert.match(workerSource, /never return, crop, zoom or preserve the full-body composition/);
+  assert.match(imagePlanSource, /OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING/);
+  assert.match(imagePlanSource, /never return, crop, zoom or preserve the full-body composition/);
   assert.match(workerSource, /x-tiny-quest-composition.*close-portrait-v24/s);
   assert.match(portraitSource, /x-tiny-quest-identity-source"\) !== "canonical-body"/);
   assert.match(portraitSource, /x-tiny-quest-composition"\) !== "close-portrait-v24"/);
@@ -115,16 +124,24 @@ test("Frente usa edición referenciada y el caché sigue versionado", () => {
 });
 
 test("el servidor local 5173 cumple el mismo contrato de Frente que producción", () => {
-  assert.match(viteSource, /HERO FACE \(\?:VARIANT\|DETAIL\) V\\d\+/);
-  assert.match(viteSource, /flux-1-schnell/);
-  assert.match(viteSource, /OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING/);
+  // Local y prod comparten la MISMA función de decisión (image-plan.js): no puede
+  // haber divergencia de modelo/prompt/pasos entre lo que se testea y lo que sale.
+  assert.match(viteSource, /import \{ planImage \} from "\.\.\/edge-worker\/src\/image-plan\.js"/);
+  assert.match(workerSource, /import \{ planImage \} from "\.\/image-plan\.js"/);
+  assert.match(viteSource, /const plan = planImage\(/);
+  assert.match(workerSource, /const plan = planImage\(/);
+  // El contrato de composición del Frente vive en la fuente única.
+  assert.match(imagePlanSource, /HERO FACE \(\?:VARIANT\|DETAIL\) V\\d\+/);
+  assert.match(imagePlanSource, /flux-1-schnell/);
+  assert.match(imagePlanSource, /OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING/);
+  // Los headers de identidad se emiten en cada transporte.
   assert.match(viteSource, /x-tiny-quest-identity-source", "canonical-body"/);
   assert.match(viteSource, /x-tiny-quest-composition", faceDetail \? "close-portrait-v24"/);
 });
 
 test("medallones NPC usan perfil rápido de seis pasos", () => {
-  assert.match(workerSource, /fastMedallion/);
-  assert.match(workerSource, /steps: fastMedallion \? 6 : 8/);
+  assert.match(imagePlanSource, /isFastMedallion/);
+  assert.match(imagePlanSource, /isFastMedallion\(prompt\) \? 6 : 8/);
 });
 
 test("Portada prioriza leyes del mundo y fondo sin figuras", () => {

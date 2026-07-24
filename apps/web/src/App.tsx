@@ -667,6 +667,11 @@ export function App() {
   function prepareHeroPortraitPair(urls: { face: string; fullbody: string }) {
     linkPortraitReference(urls.face, urls.fullbody);
     linkPortraitStyleReferences(urls.face, ["/assets/style/face-style-oil.jpg"]);
+    // El cuerpo TAMBIÉN necesita style references: sin ellas cae a flux-1-schnell
+    // (plastilina) en vez de flux-2-klein-4b (el óleo pictórico de la cara). Con
+    // refs, el worker (línea `styleImages.length → runKlein`) lo rinde en el mismo
+    // modelo/estilo bueno. Ver docs/refactor-map.md → Portraits.
+    linkPortraitStyleReferences(urls.fullbody, ["/assets/style/body-style-painterly.jpg", "/assets/style/body-style-delicate.jpg"]);
   }
   function loadHeroPortraitPair(urls: { face: string; fullbody: string }, shot: "face" | "fullbody"): Promise<boolean> {
     const loadId = ++heroPairLoadIdRef.current;

@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import crypto from "node:crypto";
+// FUENTE ÚNICA compartida con el Worker de prod: mismo modelo/prompt/pasos en
+// local que en remoto para poder testear-verificar-pushear sin sorpresas.
+import { planImage } from "../edge-worker/src/image-plan.js";
 
 function llmProxyPlugin(): Plugin {
   const responseCache = new Map<string, string>();
@@ -140,34 +143,44 @@ function llmProxyPlugin(): Plugin {
               response.end(JSON.stringify({ error: { message: "canonical body reference required", stage: "identity-validation" } }));
               return;
             }
-            const model = body.referenceImage ? "@cf/black-forest-labs/flux-2-klein-4b" : (env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell");
+            // MODELO, prompt, recortes y pasos vienen de image-plan.js: la MISMA
+            // función que usa el Worker de prod (worker.js). Si local y prod
+            // divergen se testea algo que en remoto sale distinto. Antes el dev
+            // usaba otro styleInstruction ("beautiful/delicate"), no distinguía
+            // faceVariant y forzaba steps 8: por eso el cuerpo salía aniñado.
+            const styles = (body.styleImages ?? []).filter((item) => item?.data).slice(0, 2);
+            const hasReference = Boolean(body.referenceImage);
+            const plan = planImage({
+              prompt: body.prompt,
+              width: body.width,
+              height: body.height,
+              seed: body.seed,
+              hasReference,
+              styleCount: styles.length,
+              envModel: env.CF_IMAGE_MODEL
+            });
             let upstreamBody: BodyInit;
             let upstreamContentType = "application/json";
-            if (body.referenceImage || model.includes("flux-2-klein")) {
+            if (plan.multipart) {
               const form = new FormData();
-              const styles = (body.styleImages ?? []).filter((item) => item?.data).slice(0, 2);
-              const styleStart = body.referenceImage ? 1 : 0;
-              const styleInstruction = styles.length ? `Images ${styleStart}-${styleStart + styles.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful full-body silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.` : "";
-              form.append("prompt", body.referenceImage
-                ? `Image 0 is the IMMUTABLE canonical full character, wardrobe AND painting-style master. OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING: repaint a NEW intimate square close three-quarter portrait, never return, crop, zoom or preserve the full-body composition. Entire head, both eyes, shoulders, collar and upper torso dominate the frame; head is large and near camera; waist, hips, legs and feet are outside frame. Copy the EXACT same recognizable person, facial geometry, adult visual gender, species, eye count, anatomy, skin, iris and hair colors/LENGTH, fringe, scars, collar, upper garments, armor and jewelry. Copy Image 0's exact pigment density, brush scale, canvas grain, lighting, contrast and finish; never simplify, genericize, smooth, abstract or lower detail. Keep upper torso fully clothed in the exact opaque medieval layers. Change camera/composition only; never redesign identity or outfit. Paint substantially MORE facial, eye, hair, scar and textile detail than Image 0. ${styleInstruction} Matte medieval oil; simple dark gradient; one character. ${body.prompt.slice(0, 900)}`
-                : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${body.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
-              form.append("width", String(Math.min(1920, Math.max(256, body.width ?? 512))));
-              form.append("height", String(Math.min(1920, Math.max(256, body.height ?? 768))));
-              form.append("seed", String(body.seed ?? 0));
-              if (body.referenceImage) form.append("input_image_0", new Blob([Buffer.from(body.referenceImage, "base64")], { type: body.referenceType || "image/jpeg" }), "hero-reference.jpg");
-              styles.forEach((style, index) => form.append(`input_image_${styleStart + index}`, new Blob([Buffer.from(style.data, "base64")], { type: style.type || "image/png" }), `style-${index}.png`));
+              form.append("prompt", plan.promptText);
+              form.append("width", String(plan.width));
+              form.append("height", String(plan.height));
+              form.append("seed", String(plan.seed));
+              if (hasReference) form.append("input_image_0", new Blob([Buffer.from(body.referenceImage as string, "base64")], { type: body.referenceType || "image/jpeg" }), "hero-reference.jpg");
+              styles.forEach((style, index) => form.append(`input_image_${plan.styleStart + index}`, new Blob([Buffer.from(style.data, "base64")], { type: style.type || "image/png" }), `style-${index}.png`));
               upstreamBody = form;
               upstreamContentType = ""; // fetch agrega boundary multipart
             } else {
               upstreamBody = JSON.stringify({
-                prompt: `${body.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
-                width: Math.min(2048, Math.max(256, body.width ?? 512)),
-                height: Math.min(2048, Math.max(256, body.height ?? 512)),
-                seed: body.seed,
-                ...(model.includes("flux") ? { steps: 8 } : {})
+                prompt: plan.promptText,
+                width: plan.width,
+                height: plan.height,
+                seed: plan.seed,
+                steps: plan.steps
               });
             }
-            const upstream = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/ai/run/${model}`, {
+            const upstream = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/ai/run/${plan.model}`, {
               method: "POST",
               headers: { "Authorization": `Bearer ${env.CF_AI_TOKEN}`, ...(upstreamContentType ? { "Content-Type": upstreamContentType } : {}) },
               body: upstreamBody,

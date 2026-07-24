@@ -65,14 +65,21 @@ export function portraitSessionSeedOffset(): number {
 const heroPromptRoot = TINY_QUEST_VISUAL_STYLE;
 
 export function characterPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  const prompt = `TINYQUEST HERO FACE DETAIL V24. OUTPUT CAMERA LOCK: newly painted intimate close three-quarter portrait at exactly 30 degrees; entire head, both eyes, shoulders, collar and upper torso dominate the square frame. Head is large and near camera. Waist, hips, legs and feet remain outside frame. Never full body, knee-up, distant or weak composition. STYLE FIDELITY LOCK: preserve the canonical body's exact medieval dark-fantasy hand-painted language, pigment density, mature semi-realism, brush scale, canvas grain, lighting, contrast and finish; never simplify, genericize, smooth or abstract it. QUALITY FLOOR: face, eyes, hair/fringe, scars, anatomy, clothing and materials must be at least as defined as the body master, with a richer portrait detail pass. ${TINY_QUEST_PAINT_MEDIUM}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Character: ${name}. ${styleHint}. SAME BODY MASTER: exact recognizable person, species, visual gender, eye count, facial geometry, hairstyle, colors, permanent marks and upper clothing; only camera distance/composition changes. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  const prompt = `TINYQUEST HERO FACE DETAIL V25. CANONICAL IDENTITY SPEC — READ FIRST, ABSOLUTE GROUND TRUTH, everything below must obey it exactly: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. Character: ${name}. OUTPUT CAMERA LOCK: newly painted intimate close three-quarter portrait at exactly 30 degrees; entire head, both eyes, shoulders, collar and upper torso dominate the square frame. Head is large and near camera. Waist, hips, legs and feet remain outside frame. Never full body, knee-up, distant or weak composition. STYLE FIDELITY LOCK: preserve the canonical body's exact medieval dark-fantasy hand-painted language, pigment density, mature semi-realism, brush scale, canvas grain, lighting, contrast and finish; never simplify, genericize, smooth or abstract it. QUALITY FLOOR: face, eyes, hair/fringe, scars, anatomy, clothing and materials must be at least as defined as the body master, with a richer portrait detail pass. ${TINY_QUEST_PAINT_MEDIUM}. IDENTITY REAFFIRM: obey the canonical identity spec above exactly — same visual gender, skin, eyes and hair colors, hairstyle and anatomy; never swap gender or shift colors. ${styleHint}. SAME BODY MASTER: exact recognizable person, species, visual gender, eye count, facial geometry, hairstyle, colors, permanent marks and upper clothing; only camera distance/composition changes. ${TINY_QUEST_FACE_QUALITY_RULES}. ${heroPromptRoot}. ${TINY_QUEST_NEGATIVE_RULES}.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=512&height=512&nologo=true&model=flux&seed=${seed}`;
 }
 
 // Cuerpo es el MASTER canónico. Frente se acerca desde esta imagen.
 export function fullBodyPortraitUrl(name: string, appearance: string | undefined, styleHint: string, seedNonce = 0): string {
-  const prompt = `TINYQUEST HERO BODY MASTER V26. CAMERA FIRST — NON-NEGOTIABLE: one single standing character shown from complete head through both feet with margins; full torso, hips, both arms, both hands, both thighs, BOTH KNEES and both lower legs visible. The standing body fills the vertical frame. This is a character-sheet body view, not a portrait, bust, headshot or close-up; client crops only below knees after generation. Face at 30 degrees with both eyes visible. ${TINY_QUEST_PAINT_MEDIUM}. MATURE ADULT QUALITY FLOOR: clearly adult facial proportions and coherent anatomy, lived-in believable face, refined eyes/hair/scars, rich textile/leather/metal rendering, confident visible brushwork and finished lighting. STYLE FIDELITY LOCK: ${heroPromptRoot}. CANONICAL SPEC: ${appearance?.trim() || "mysterious fully clothed fantasy hero"}. FULLY CLOTHED opaque medieval layers shoulders-to-thighs. Character: ${name}. ${styleHint}. MASTER PERSON/WARDROBE. ${TINY_QUEST_NEGATIVE_RULES}.`;
+  // Prod (worker flux-1-schnell) recorta el prompt a 1960 chars y el modelo T5
+  // ignora lo que pase de ~512 tokens. El appearance ya ronda 1.2k, así que el
+  // spec se acota y los candados del cuerpo se mantienen CORTOS y front-loaded
+  // para que TODOS (sujeto único, encuadre, estilo, ropa, raza) lleguen al modelo.
+  // El path bueno (klein-4b con style refs) recorta el prompt a 1700 chars; el
+  // spec se acota a 980 para que hasta RACE VISIBLE (orejas de elfo) sobreviva.
+  const spec = (appearance?.trim() || "mysterious fully clothed fantasy hero").slice(0, 980);
+  const prompt = `TINYQUEST HERO BODY MASTER V29. CANONICAL IDENTITY SPEC — READ FIRST, ABSOLUTE GROUND TRUTH, obey every trait exactly: ${spec}. Character: ${name}. SINGLE SUBJECT LOCK: exactly ONE character, one body, one front three-quarter view; never two figures, twin, turnaround, profile companion or model sheet. FRAMING: three-quarter-length, crown of head through both knees; feet and lower legs OUTSIDE the frame. STYLE LIKE THE FACE: hand-painted matte medieval oil, mature semi-realism, broken brushwork; never 3D, CGI, Pixar, anime, chibi, plastic or doll. Adult, never a child; same medieval outfit/armor as the face, fully clothed; never modern clothing or sneakers. RACE VISIBLE: if an elf, long pointed ears clearly visible; species traits unmistakable. Keep the exact gender, skin, iris and hair colors and anatomy from the spec; never swap gender, race or colors. No blur, extra limbs, nudity, mixed gender anatomy or wrong colors.`;
   const seed = (nameHash(name) + seedNonce * 7919 + portraitSessionSeedOffset()) % 100000;
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=384&height=512&nologo=true&model=flux&seed=${seed}`;
 }
@@ -353,7 +360,7 @@ async function fetchViaCloudflare(url: string, referenceUrl?: string, styleUrls:
     const parsed = new URL(url);
     const prompt = decodeURIComponent(parsed.pathname.replace(/^\/prompt\//, ""));
     if (!prompt) return null;
-    const canonicalFaceDetail = /^TINYQUEST HERO FACE DETAIL V24\b/.test(prompt);
+    const canonicalFaceDetail = /^TINYQUEST HERO FACE (?:VARIANT|DETAIL) V\d+\b/.test(prompt);
     const width = Number(parsed.searchParams.get("width") ?? "512");
     const height = Number(parsed.searchParams.get("height") ?? "512");
     // CAMBIO DE PROVEEDOR (2026-07-11): Pollinations RETIRÓ flux — su único
@@ -543,7 +550,7 @@ function heroCropVersion(url: string): "knee" | "ankle" | null {
   try {
     const prompt = decodeURIComponent(new URL(url).pathname);
     if (/TINYQUEST HERO BODY MASTER V(?:23|24)/.test(prompt)) return "ankle";
-    if (/TINYQUEST HERO BODY MASTER V(?:19|20|21|22|25|26)/.test(prompt)) return "knee";
+    if (/TINYQUEST HERO BODY MASTER V(?:19|20|21|22|25|26|27|28|29)/.test(prompt)) return "knee";
     return null;
   } catch {
     return null;

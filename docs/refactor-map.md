@@ -48,6 +48,31 @@ section** — an outdated map costs more than no map.
   IndexedDB `tiny-quest-portraits` blob cache + fetch queue. `useGeneratedPortrait(url)`
   React hook (keeps prev image while a new one loads, background-retries every 30s
   up to 8 rounds while mounted). `medallionDataUri(name)` fallback placeholder.
+- **MODELO POR STYLE REFERENCES = calidad (2026-07-24, causa raíz del "cuerpo plastilina"):**
+  el worker rutea por modelo (`worker.js:182-184`): con `referenceImage` O con
+  `styleImages.length` → **flux-2-klein-4b** (óleo pictórico, bueno); sin nada →
+  **flux-1-schnell** (plastilina). La cara siempre tuvo style ref
+  (`face-style-oil.jpg`) → klein. El cuerpo NO las tenía → schnell → plastilina.
+  Fix: `prepareHeroPortraitPair` (App.tsx) ahora hace
+  `linkPortraitStyleReferences(urls.fullbody, ["/assets/style/body-style-painterly.jpg","/assets/style/body-style-delicate.jpg"])`.
+  Los assets ya estaban en `apps/web/public/assets/style/`. Cualquier retrato que
+  deba verse pictórico DEBE tener style refs o cae a schnell. El path klein recorta
+  el prompt a **1700 chars** (más agresivo que los 1960 de schnell), por eso el
+  cuerpo acota el `appearance` a 980. Las `styleImages` NO van en la URL (van por
+  `portraitStyleReferences`), así que la caché IndexedDB del cliente no las ve →
+  cambiar el ruteo EXIGE bump de versión (por eso V28→V29) para forzar regeneración.
+- **LÍMITE DURO DE PROMPT (2026-07-24):** el Worker (`worker.js` runSchnell) y el
+  proxy dev (`vite.config.ts`) cortan el prompt del cuerpo a **1960 chars**, y flux
+  (T5) ignora todo lo que pase de ~512 tokens. Como `composeHeroAppearance` ya mide
+  ~1.2k chars, los prompts de héroe DEBEN ser magros y front-loaded. Cara = FACE
+  DETAIL **V25**; cuerpo = BODY MASTER **V28** (candados en orden: sujeto único →
+  encuadre sin pies → estilo óleo anti-3D → adulto+ropa → raza/orejas → identidad →
+  negativos). `fullBodyPortraitUrl` recorta el `appearance` a 1020 chars para
+  garantizar que TODOS los candados entren en 1960. El género/colores del usuario
+  van primeros en `composeHeroAppearance` (verdad absoluta) y se reafirman en el
+  candado del cuerpo. `heroCropVersion` mapea V28→"knee" (recorta pies); si subís de
+  versión, agregala al regex o se pierde el crop. El test `portrait-prompts` valida
+  el fit <=1960 con appearance realista (no "optimizar" sin re-medir).
 - Cloudflare Schnell es la vía primaria; el Worker cachea globalmente cada imagen
   por SHA-256 del payload completo (prompt+seed+referencias), y el navegador la
   cachea además en IndexedDB. Pollinations es solo fallback: ahí la concurrencia

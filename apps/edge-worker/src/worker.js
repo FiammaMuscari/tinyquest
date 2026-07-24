@@ -1,4 +1,5 @@
 export { RoomHub } from "./room-hub.js";
+import { planImage } from "./image-plan.js";
 
 const pendingLlmRequests = new Map();
 const LLM_CACHE_SECONDS = 6 * 60 * 60;
@@ -105,21 +106,31 @@ async function cfImage(request, env, ctx) {
     headers.set("x-tiny-quest-cache", "miss");
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   };
-  const model = env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell";
   const quotaError = (error) => /4006|daily free allocation|neurons/i.test(error instanceof Error ? error.message : String(error));
-  const fastMedallion = /^TINYQUEST (?:NPC PORTRAIT|CREATURE PORTRAIT) V(?:17|18)\b/.test(input.prompt)
-    || /^TINYQUEST PHENOMENON V17\b/.test(input.prompt);
+  const styleImages = Array.isArray(input.styleImages) ? input.styleImages.filter((item) => typeof item?.data === "string").slice(0, 2) : [];
+  const hasReference = typeof input.referenceImage === "string" && Boolean(input.referenceImage);
+  // MODELO, prompt, recortes y pasos vienen de la fuente única compartida con el
+  // middleware dev de Vite (image-plan.js) para que local y prod rindan igual.
+  const plan = planImage({
+    prompt: input.prompt,
+    width: input.width,
+    height: input.height,
+    seed: input.seed,
+    hasReference,
+    styleCount: styleImages.length,
+    envModel: env.CF_IMAGE_MODEL
+  });
   const runSchnell = async () => {
     try {
-      const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
-        prompt: `${input.prompt.slice(0, 1960)}, no text, no signature, no watermark`,
-        width: Math.min(2048, Math.max(256, Number(input.width) || 512)),
-        height: Math.min(2048, Math.max(256, Number(input.height) || 512)),
-        seed: Number(input.seed) || 0,
+      const result = await env.AI.run(plan.model, {
+        prompt: plan.promptText,
+        width: plan.width,
+        height: plan.height,
+        seed: plan.seed,
         // Los medallones son 448² y se ven como máximo a ~420px: 6 pasos
         // conservan el estilo/rasgos y reducen 25% la latencia frente a 8.
         // El héroe y escenas mantienen 8 pasos porque se inspeccionan en grande.
-        steps: fastMedallion ? 6 : 8
+        steps: plan.steps
       });
       if (result instanceof ReadableStream || result instanceof ArrayBuffer || ArrayBuffer.isView(result)) {
         return new Response(result, { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable" } });
@@ -132,34 +143,24 @@ async function cfImage(request, env, ctx) {
       return json({ error: { message: error instanceof Error ? error.message : String(error), stage: "flux-1-schnell" } }, quotaError(error) ? 429 : 502);
     }
   };
-  const styleImages = Array.isArray(input.styleImages) ? input.styleImages.filter((item) => typeof item?.data === "string").slice(0, 2) : [];
-  const runKlein = async (referenceImage) => {
+  const runKlein = async () => {
     const form = new FormData();
-    const styleStart = referenceImage ? 1 : 0;
-    const styleInstruction = styleImages.length
-      ? `Images ${styleStart}-${styleStart + styleImages.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their mature medieval oil technique: dry matte pigment, visible canvas tooth, rough broken brush strokes, believable asymmetry, normal-sized eyes, natural proportions, hand-painted costume and restrained tonal background. Reject anime, doll-face, beauty-render and glossy digital smoothness. NEVER copy their person, elf anatomy, gender, face, skin, eye/hair colors, clothes, weapons or pose; canonical identity overrides every reference.`
-      : "";
-    const faceVariant = heroFaceVariant;
-    form.append("prompt", referenceImage
-      ? faceVariant
-        ? `Image 0 is the IMMUTABLE canonical full character, wardrobe AND painting-style master. OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING: repaint a NEW intimate square close three-quarter portrait, never return, crop, zoom or preserve the full-body composition. Entire head, both eyes, shoulders, collar and upper torso dominate the frame; head is large and near camera; waist, hips, legs and feet are outside frame. Copy the EXACT same recognizable person, facial geometry, adult visual gender, species, eye count, anatomy, skin, iris and hair colors/LENGTH, fringe, scars, collar, upper garments, armor and jewelry. Copy Image 0's exact pigment density, brush scale, canvas grain, lighting, contrast and finish; never simplify, genericize, smooth, abstract or lower detail. Keep upper torso fully clothed in the exact opaque medieval layers. Change camera/composition only; never redesign identity or outfit. Paint substantially MORE facial, eye, hair, scar and textile detail than Image 0. ${styleInstruction} Matte medieval oil; simple dark gradient; one character. ${input.prompt.slice(0, 900)}`
-        : `Image 0 is the IMMUTABLE canonical character and wardrobe master. Copy the exact person and outfit. ${styleInstruction} ${input.prompt.slice(0, 1400)}`
-      : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${input.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
-    form.append("width", String(Math.min(1920, Math.max(256, Number(input.width) || 512))));
-    form.append("height", String(Math.min(1920, Math.max(256, Number(input.height) || 768))));
-    form.append("seed", String(Number(input.seed) || 0));
-    if (referenceImage) {
-      const bytes = Uint8Array.from(atob(referenceImage), (char) => char.charCodeAt(0));
+    form.append("prompt", plan.promptText);
+    form.append("width", String(plan.width));
+    form.append("height", String(plan.height));
+    form.append("seed", String(plan.seed));
+    if (hasReference) {
+      const bytes = Uint8Array.from(atob(input.referenceImage), (char) => char.charCodeAt(0));
       form.append("input_image_0", new Blob([bytes], { type: input.referenceType || "image/jpeg" }), "hero-reference.jpg");
     }
     styleImages.forEach((style, index) => {
       const bytes = Uint8Array.from(atob(style.data), (char) => char.charCodeAt(0));
-      form.append(`input_image_${styleStart + index}`, new Blob([bytes], { type: style.type || "image/png" }), `style-${index}.png`);
+      form.append(`input_image_${plan.styleStart + index}`, new Blob([bytes], { type: style.type || "image/png" }), `style-${index}.png`);
     });
     const serialized = new Response(form);
     let edited;
     try {
-      edited = await env.AI.run("@cf/black-forest-labs/flux-2-klein-4b", {
+      edited = await env.AI.run(plan.model, {
         multipart: { body: serialized.body, contentType: serialized.headers.get("content-type") }
       });
     } catch (error) {
@@ -174,14 +175,11 @@ async function cfImage(request, env, ctx) {
     return new Response(output, { headers: {
       "content-type": "image/jpeg",
       "cache-control": "public, max-age=31536000, immutable",
-      "x-tiny-quest-identity-source": referenceImage ? "canonical-body" : "text",
-      "x-tiny-quest-composition": faceVariant ? "close-portrait-v24" : "reference-edit"
+      "x-tiny-quest-identity-source": hasReference ? "canonical-body" : "text",
+      "x-tiny-quest-composition": plan.isFace ? "close-portrait-v24" : "reference-edit"
     } });
   };
-  let response;
-  if (typeof input.referenceImage === "string" && input.referenceImage) response = await runKlein(input.referenceImage);
-  else if (model.includes("flux-2-klein") || styleImages.length) response = await runKlein();
-  else response = await runSchnell();
+  const response = plan.multipart ? await runKlein() : await runSchnell();
   return cacheGenerated(response);
 }
 

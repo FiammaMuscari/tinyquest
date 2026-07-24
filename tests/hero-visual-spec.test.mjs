@@ -26,26 +26,30 @@ const spec = {
 
 test("character spec único fija género, ropa, colores y largo", () => {
   const prompt = composeHeroAppearance(spec);
-  assert.match(prompt, /GENDER\/BODY:.*ADULT FEMALE.*never male torso/is);
+  // La identidad elegida por el usuario es VERDAD ABSOLUTA y va PRIMERO (primacía
+  // de tokens en difusión) y se reafirma después del lock de especie.
+  assert.ok(prompt.startsWith("ABSOLUTE USER-CHOSEN IDENTITY"), "la identidad elegida debe ir primera");
+  assert.match(prompt, /ABSOLUTE USER-CHOSEN IDENTITY.*ADULT FEMALE.*never male torso/is);
+  assert.match(prompt, /GENDER REAFFIRM.*ADULT FEMALE/is);
   assert.match(prompt, /CLOTHING: fully dressed adult.*covering chest, torso, hips, groin and thighs/is);
   assert.match(prompt, /no nudity, bare chest, lingerie, loincloth, transparent or fetish armor/i);
-  assert.match(prompt, /COLORS:.*warm olive.*violet.*golden/is);
+  assert.match(prompt, /EXACT USER COLORS.*warm olive.*violet.*golden/is);
   assert.match(prompt, /HAIR LENGTH: long below shoulders, never short/i);
 });
 
 test("campos libres se acotan para no truncar las reglas críticas", () => {
   const prompt = composeHeroAppearance({ ...spec, concept: "x".repeat(5000) });
-  assert.ok(prompt.length < 900, `spec demasiado largo: ${prompt.length}`);
+  assert.ok(prompt.length < 1300, `spec demasiado largo: ${prompt.length}`);
   assert.match(prompt, /…$/);
 });
 
 test("mutaciones explícitas vencen a la raza sin perder rasgos del usuario", () => {
   const prompt = composeHeroAppearance({ ...spec, bangs: "con flequillo", mutation: "licantropía parcial" });
-  assert.match(prompt, /PRIORITY: mutation > species anatomy > user traits > role/i);
+  assert.match(prompt, /PRIORITY: user-chosen gender & colors are absolute ground truth > mutation anatomy override > species anatomy > role/i);
   assert.match(prompt, /MID LYCANTHROPE STAGE.*identity and chosen gender remain recognizable/is);
   assert.match(prompt, /partially elongated wolf muzzle.*fur patches.*clawed hands/is);
   assert.match(prompt, /mandatory visible forehead bangs/i);
-  assert.match(prompt, /SPECIES ANATOMY LOCK: veil elf/i);
+  assert.match(prompt, /SPECIES ANATOMY LOCK.*veil elf/i);
 });
 
 test("ojo extra elimina la contradicción de dos ojos de la raza", () => {
