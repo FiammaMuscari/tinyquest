@@ -114,6 +114,15 @@ export type CharacterLook = {
   previousFaceUrl?: string;
   previousFullBodyUrl?: string;
   previousPortraitNonce?: number;
+  /** Miniatura data-URI de la toma ELEGIDA, generada por el dueño del personaje.
+   * Viaja con el Character por el relay: los demás navegadores no tienen la imagen
+   * en su caché y regenerarla cuesta cuota y segundos, así que mientras tanto
+   * mostraban la otra toma y el avatar "cambiaba solo". Con la miniatura todos ven
+   * el mismo encuadre desde el primer frame. Tope duro: 24 KB (ver AVATAR_THUMB_MAX_BYTES). */
+  avatarThumb?: string;
+  /** Clave de la URL con la que se generó `avatarThumb`. Si no coincide con la toma
+   * actual, la miniatura está vieja y se regenera. */
+  avatarThumbKey?: string;
 };
 
 export type Character = {

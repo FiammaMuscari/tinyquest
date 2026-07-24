@@ -1,0 +1,40 @@
+{
+  "title": "La Deuda del Sello Menor",
+  "genre": "intriga mágica",
+  "premise": "Kael Morvane entró al Salón de Registros con el sello de un muerto cosido al guante y salió con tu nombre escrito en un libro que nadie debería poder abrir. La tinta todavía estaba húmeda cuando el archivista te la mostró: tu deuda, con fecha de ayer, firmada por una mano que perdiste hace tres inviernos. Si el consejo la cobra antes del cierre de las doce lunas, tu sello vuelve a junior y tu maestra pierde la cátedra que apostó por vos.",
+  "storyHook": "Alguien firmó una deuda con tu mano muerta.",
+  "hiddenTruth": "La deuda es real, pero el deudor original es la propia maestra Ysolde.",
+  "themeSkill": "deducción",
+  "twist": "El guante del muerto todavía responde a su dueño.",
+  "stakes": ["Tu sello", "La cátedra de Ysolde", "El silencio de Bren"],
+  "threat": { "name": "El Cobrador Dunwyn", "description": "Hunter de cobros que nunca alza la voz ni la mano.", "specialMove": "Congela el chi de un sello menor con solo nombrarlo en voz alta.", "appearance": "hombre, humano de unos cincuenta años, alto y enjuto, cabeza rapada con doce marcas lunares tatuadas en el cráneo, abrigo gris de cobrador hasta los tobillos, guantes de cuero negro sin dedos" },
+  "scenes": [
+    { "title": "El Salón de Registros", "objective": "Ver el libro antes de que lo sellen", "keyObject": "el libro de deudas", "escapeRoute": "la escalera de servicio" },
+    { "title": "El Taller del Guantero", "objective": "Rastrear quién remendó el guante", "keyObject": "el guante remendado", "escapeRoute": "el patio de tinturas" },
+    { "title": "La Cátedra de Ysolde", "objective": "Hacer hablar a tu maestra", "keyObject": "el anillo de cátedra", "escapeRoute": "el balcón de piedra" },
+    { "title": "El Consejo de las Doce Lunas", "objective": "Impugnar la deuda ante los sellos", "keyObject": "la copia firmada", "escapeRoute": "el portal lunar" }
+  ],
+  "npcs": [
+    { "name": "Ysolde Ashcombe", "role": "maestra de sellos", "description": "Tu maestra, la única que apostó su cátedra por vos.", "motive": "Proteger a alguien que no sos vos", "secret": "La deuda original es suya y la traspasó", "desire": "Morir con la cátedra intacta", "fear": "Que Bren hable", "appearance": "mujer, humana de sesenta y pocos, menuda y erguida, pelo blanco recogido con aguja de plata, túnica azul de cátedra con puños quemados, ciega del ojo izquierdo", "bond": "tu maestra desde los once años", "whyMightLie": "Porque protegerte y protegerse ya no son lo mismo" },
+    { "name": "Bren Dunwyn", "role": "archivista junior", "description": "El que te mostró la tinta húmeda.", "motive": "Salir del archivo antes de que lo culpen", "secret": "Vio quién firmó y calló por miedo", "desire": "Un sello medio", "fear": "Su tío el Cobrador", "appearance": "hombre, humano de unos veinte, bajo y fornido, cara redonda con pecas, uniforme de archivo con manchas de tinta en las mangas, dedos permanentemente azules", "bond": "compartieron aula de junior", "whyMightLie": "Porque su apellido lo ata al que te cobra" },
+    { "name": "Marga Vayne", "role": "guantera del barrio bajo", "description": "Remienda lo que los sellos rompen y no pregunta.", "motive": "Cobrar sin quedar en medio", "secret": "Remendó el guante del muerto la semana pasada", "desire": "Que la dejen trabajar", "fear": "Perder la mano derecha", "appearance": "mujer, humana de cuarenta y tantos, ancha de hombros, trenza roja hasta la cintura, delantal de cuero con doce bolsillos, quemadura vieja en el antebrazo izquierdo", "bond": "le debés un favor de tu primer sello", "whyMightLie": "Porque el cliente pagó por su silencio" }
+  ],
+  "clues": [
+    { "title": "La tinta húmeda", "text": "La firma está fresca pero la fecha dice ayer: alguien escribió después del cierre.", "sceneIndex": 1, "isFalse": false },
+    { "title": "El guante remendado", "text": "La costura del guante es nueva y el hilo es de tintura de cátedra, no de archivo.", "sceneIndex": 2, "isFalse": false },
+    { "title": "El testigo del patio", "text": "Un aprendiz jura haber visto a Bren salir con el libro bajo el brazo a las tres.", "sceneIndex": 1, "isFalse": true }
+  ],
+  "summary": { "objective": "Impugná la deuda falsa antes de que el consejo la cobre", "risk": "Perdés tu sello y Ysolde su cátedra", "firstMystery": "¿Quién firmó con una mano que ya no existe?", "timeLimit": "antes de que cierren las doce lunas" },
+  "keywordsUsed": [],
+  "heroBond": "Tu sello lo avaló Ysolde: si la deuda se cobra, caen los dos.",
+  "evidence": ["La tinta de tu firma seguía húmeda", "El guante apareció remendado con hilo de cátedra", "El libro no registra quién lo abrió"],
+  "hiddenTwists": ["El testigo del patio fue pagado por Dunwyn", "El guante responde al chi de Ysolde, no del muerto", "Bren es sobrino del Cobrador y lo ocultó"],
+  "npcRelations": [
+    { "from": "Bren Dunwyn", "to": "El Cobrador Dunwyn", "nature": "sobrino que le debe el puesto" },
+    { "from": "Ysolde Ashcombe", "to": "Marga Vayne", "nature": "le paga el silencio desde hace años" }
+  ],
+  "opening": {
+    "narration": "El archivista te encuentra antes de que encuentres la puerta. Bren tiene los dedos azules hasta el segundo nudillo y el libro abierto contra el pecho como si pesara más de lo que pesa. Lo apoya en la mesa larga, gira las páginas con el dorso de la mano para no manchar, y se detiene en un renglón que lleva tu nombre completo y una fecha de ayer.\n\nLa tinta todavía brilla. Lo suficiente para que un dedo la corra si alguien fuera lo bastante idiota como para tocarla. Bren no la toca; te mira a vos y después mira la escalera de servicio, y en ese orden. Afuera, en el patio, alguien empieza a contar lunas en voz alta.",
+    "dialogue": "Bren Dunwyn: Yo no la escribí, pero si te vas ahora, tampoco voy a poder jurarlo."
+  }
+}

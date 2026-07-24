@@ -4399,20 +4399,42 @@ img.npcPortrait[src^="/assets/companions/"] {
 }
 .journeyClock .clockPips {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
+/* El segmento VACÍO tiene que verse tanto como el lleno: un reloj se lee por lo que
+   le falta. La primera versión los dejaba en .13 de opacidad y a 0/6 el track era
+   invisible — parecía una lista de frases, no una barra de presión. Ahora el hueco
+   lleva borde propio y el relleno se tiñe según el tipo. */
 .journeyClock .clockPips i {
   width: 100%;
-  max-width: 18px;
-  height: 5px;
+  max-width: 20px;
+  height: 7px;
   border-radius: 2px;
-  background: rgba(234, 223, 198, .13);
-  box-shadow: inset 0 0 0 1px rgba(234, 223, 198, .08);
+  background: rgba(234, 223, 198, .07);
+  box-shadow: inset 0 0 0 1px rgba(234, 223, 198, .26);
   transition: background .45s ease, box-shadow .45s ease;
 }
-.clock-threat .clockPips i.on { background: #c2504a; box-shadow: 0 0 6px rgba(194, 80, 74, .5); }
-.clock-opportunity .clockPips i.on { background: #d4af37; box-shadow: 0 0 6px rgba(212, 175, 55, .45); }
-.clock-mystery .clockPips i.on { background: #4f9b93; box-shadow: 0 0 6px rgba(79, 155, 147, .45); }
+.clock-threat .clockPips i.on { background: #c2504a; box-shadow: inset 0 0 0 1px #d9736d, 0 0 7px rgba(194, 80, 74, .55); }
+.clock-opportunity .clockPips i.on { background: #d4af37; box-shadow: inset 0 0 0 1px #f1c970, 0 0 7px rgba(212, 175, 55, .5); }
+.clock-mystery .clockPips i.on { background: #4f9b93; box-shadow: inset 0 0 0 1px #75c3ba, 0 0 7px rgba(79, 155, 147, .5); }
+/* El hueco vacío también se tiñe: así el reloj dice si juega a favor o en contra
+   incluso a 0 segmentos, que es como el jugador lo ve al empezar la partida. */
+.clock-threat .clockPips i { box-shadow: inset 0 0 0 1px rgba(194, 80, 74, .42); }
+.clock-opportunity .clockPips i { box-shadow: inset 0 0 0 1px rgba(212, 175, 55, .42); }
+.clock-mystery .clockPips i { box-shadow: inset 0 0 0 1px rgba(79, 155, 147, .42); }
+/* Punto del tipo delante del nombre: refuerza el color sin depender de los pips. */
+.journeyClock .clockName::before {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: currentColor;
+}
+.clock-threat .clockName::before { background: #c2504a; }
+.clock-opportunity .clockName::before { background: #d4af37; }
+.clock-mystery .clockName::before { background: #4f9b93; }
 /* Un reloj cumplido queda como cicatriz: apagado, con su pago escrito. */
 .journeyClock.clockFired .clockName { color: rgba(234, 223, 198, .58); }
 .journeyClock.clockFired .clockPips i { opacity: .55; }
@@ -4456,3 +4478,56 @@ textarea:focus-visible,
 .panel button:focus-visible {
   outline-offset: 1px !important;
 }
+
+/* ─── Casillas: no son campos de texto (2026-07-24) ──────────────────────────
+   La regla base `textarea, select, input { width: 100% }` (app.css:103) también
+   pisaba a los checkbox, así que la casilla de "Escribir mi propia acción" medía
+   253px y empujaba su propio texto al otro extremo de la fila: parecía un defecto
+   de maquetado. `.petToggle input` ya lo parcheaba a mano; esto lo arregla en la
+   raíz para toda casilla presente y futura. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  flex: none;
+  min-width: 0;
+  padding: 0;
+  accent-color: #d4af37;
+  cursor: pointer;
+}
+
+/* ─── Ficha del jugador: el nombre del compañero cabe (2026-07-24) ───────────
+   `.miniMeters` repartía 239px en tres columnas iguales, así que "Alma Dracónica"
+   tenía 78px para 87px de texto. Y como el chip es flex, `text-overflow: ellipsis`
+   no se aplicaba: el nombre quedaba cortado a cuchillo, sin puntos suspensivos.
+   Vida y energía son dos dígitos; que ocupen lo suyo y el compañero se quede con
+   el resto. Ojo: `.queueCard .miniMeters` (app.css:2806) fija las 3 columnas con
+   !important, así que hay que ganarle con su misma especificidad. */
+.miniMeters,
+.queueCard .miniMeters { grid-template-columns: auto auto minmax(0, 1fr) !important; }
+.miniMeterName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Chapita del avatar en la cola de turnos (2026-07-24) ───────────────────
+   `.queueCard span` (app.css:58-59) le mete `display:block` y `overflow-wrap:
+   anywhere` a TODOS los span de la ficha, incluida la chapita absoluta del
+   avatar: "PARTY" partía en dos líneas encima del retrato. La chapita es una
+   etiqueta, nunca se parte. (En solo la chapita decía "PARTY" porque
+   `mpState.playerId` está vacío fuera de multijugador — arreglado en App.tsx.) */
+.avatar span {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  line-height: 1.2;
+}
+
+/* ─── El recorrido: el futuro pesa menos que el presente (2026-07-24) ────────
+   Las escenas sin descubrir ("· · ·") ocupaban la misma altura que la escena
+   actual: tres filas de puntos empujaban las Leyes fuera del carril (594px de
+   contenido en 576px). Comprimirlas devuelve el espacio Y ordena la jerarquía:
+   lo que ya pasó y lo que está pasando se leen primero. */
+.journeyPath li.future { padding-bottom: 6px; }
+.journeyPath li.future i { width: 11px; height: 11px; margin-top: 3px; border-width: 1.5px; opacity: .75; }
+.journeyPath li.future::before { top: 12px; }

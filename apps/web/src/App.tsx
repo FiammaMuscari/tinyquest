@@ -5,7 +5,7 @@ import { canonicalMultiplayerCharacter, multiplayerAvatarSignature, validateChat
 import { createDungeonMasterProvider } from "@tiny-quest/ai-master";
 import { createImageProvider, createSoundProvider, readAtmosphereEnv } from "@tiny-quest/atmosphere";
 import { characterStatAssets, characterTalentAssets } from "./character-assets";
-import { archetypeImageUrl, beingPortraitUrlWithContext, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
+import { archetypeImageUrl, beingPortraitUrlWithContext, buildPortraitThumb, cacheImage, characterPortraitUrl, fullBodyPortraitUrl, getCachedImage, isGeneratedPortraitUrl, linkPortraitReference, linkPortraitStyleReferences, liveSceneImageUrl, loadPortrait, loadingSpinnerDataUri, medallionDataUri, nameHash, petPortraitUrl, portraitThumbKey, storySceneImageUrl, useGeneratedPortrait, worldCardImageUrl, type SceneImageMode } from "./portraits";
 import { ambientPlaying, installUiClickSound, setUiSoundEnabled, stopAmbient, toggleAmbient, uiSoundEnabled } from "./ui-sound";
 import { deriveMusicState, MUSIC_PRESETS } from "./adaptive-music";
 import { composeHeroAppearance } from "./hero-visual-spec";
@@ -873,6 +873,29 @@ export function App() {
     return () => multiplayerClient.off("state_change", handler);
   }, []);
 
+  // Miniatura de la toma elegida: se calcula UNA vez por retrato y viaja dentro
+  // del Character. Sin esto, el resto de la party no tiene la imagen en su caché,
+  // tiene que pedirla de nuevo al generador (cuota + segundos, a veces falla) y
+  // mientras tanto veía la otra toma: el avatar "cambiaba solo" en la sala.
+  useEffect(() => {
+    const url = draft.avatarUrl;
+    const key = portraitThumbKey(url);
+    if (!isGeneratedPortraitUrl(url) || !key || draft.look?.avatarThumbKey === key) return;
+    let alive = true;
+    // loadPortrait está deduplicado: si la UI ya está mostrando este retrato, esto
+    // no dispara ninguna descarga extra, solo espera a que el blob esté en caché.
+    loadPortrait(url)
+      .then(() => buildPortraitThumb(url))
+      .then((thumb) => {
+        if (!alive || !thumb) return;
+        setDraft((current) => (portraitThumbKey(current.avatarUrl) === key
+          ? { ...current, look: { ...current.look, avatarThumb: thumb, avatarThumbKey: key } }
+          : current));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [draft.avatarUrl, draft.look?.avatarThumbKey]);
+
   // El asiento del relay es la única fuente de verdad visual. Si el héroe local
   // cambia su toma guardada, se publica una vez y todos reciben player_updated.
   useEffect(() => {
@@ -880,7 +903,7 @@ export function App() {
     const seat = mpState.players.find((player) => player.id === mpState.playerId);
     if (!seat || multiplayerAvatarSignature(seat.character) === multiplayerAvatarSignature(draft)) return;
     multiplayerClient.setPlayerAvatar(canonicalMultiplayerCharacter(draft));
-  }, [draft.avatarUrl, draft.look?.avatarShot, draft.look?.faceUrl, draft.look?.fullBodyUrl, draft.look?.portraitIdentity, draft.look?.portraitNonce, mpState.roomCode, mpState.playerId, mpState.players]);
+  }, [draft.avatarUrl, draft.look?.avatarShot, draft.look?.faceUrl, draft.look?.fullBodyUrl, draft.look?.portraitIdentity, draft.look?.portraitNonce, draft.look?.avatarThumbKey, mpState.roomCode, mpState.playerId, mpState.players]);
 
   // El GameRoom del host también adopta la foto canónica para que el próximo
   // broadcast no reintroduzca una variante vieja. Solo cambia campos visuales.
@@ -2084,9 +2107,9 @@ function TurnQueue({ room, draft, multiplayerPlayers, localPlayerId, audioRef, a
         const syncedCharacter = player.type === "human" ? multiplayerPlayers?.find((seat) => seat.id === player.id)?.character ?? player.character : player.character;
         return (
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
-            <div className="avatar">{player.type === "bot" ? <HeroAvatarImg url={characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía")} name={player.name} /> : <MultiplayerAvatarImg character={syncedCharacter} name={player.name} priority />}<span>{player.type === "bot" ? "BOT" : player.id === localPlayerId ? "TÚ" : "PARTY"}</span></div>
+            <div className="avatar">{player.type === "bot" ? <HeroAvatarImg url={characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía")} name={player.name} /> : <MultiplayerAvatarImg character={syncedCharacter} name={player.name} priority />}<span>{player.type === "bot" ? "BOT" : !localPlayerId || player.id === localPlayerId ? "TÚ" : "PARTY"}</span></div>
             <div><strong>{player.name}</strong><span>{syncedCharacter.species} · {syncedCharacter.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
-            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span>{syncedCharacter.pet.id !== "none" && <span><NpcPortrait name={syncedCharacter.pet.name} portraitUrl={petImage(syncedCharacter.pet)} size={14} /> {syncedCharacter.pet.name}</span>}</div>
+            <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span>{syncedCharacter.pet.id !== "none" && <span><NpcPortrait name={syncedCharacter.pet.name} portraitUrl={petImage(syncedCharacter.pet)} size={14} /> <span className="miniMeterName" title={syncedCharacter.pet.name}>{syncedCharacter.pet.name}</span></span>}</div>
           </article>
         );
       })}
@@ -2135,8 +2158,13 @@ function TurnQueue({ room, draft, multiplayerPlayers, localPlayerId, audioRef, a
             </div>
           )}
           <div className="journeyLaws">
-            <h4>Leyes de {journey.worldName}</h4>
-            {journey.laws.length === 0 && <p className="journeyLocked">Todavía no conocés ninguna. Se graban al avanzar de capítulo.</p>}
+            {/* Solo el nombre propio: "Veldaran, la Ciudad de los Sellos" parte el
+                título en dos líneas en un carril de 279px. El epíteto vive en la
+                portada del mundo, acá alcanza con el nombre. */}
+            <h4 title={journey.worldName}>Leyes de {journey.worldName.split(",")[0].trim()}</h4>
+            {/* "Todavía no conocés ninguna" sobra: la lista vacía ya lo dice, y en el
+                carril esa frase costaba una segunda línea. */}
+            {journey.laws.length === 0 && <p className="journeyLocked">Se graban al avanzar de capítulo.</p>}
             {journey.laws.map((law) => <p key={law} className="journeyLaw">⚖ {law}</p>)}
             {journey.laws.length < journey.totalLaws && journey.laws.length > 0 && (
               <p className="journeyLocked">{journey.totalLaws - journey.laws.length} {journey.totalLaws - journey.laws.length === 1 ? "ley sellada" : "leyes selladas"} por descubrir…</p>
@@ -2737,7 +2765,11 @@ function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false }: 
   const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority });
   // Frente depende del master Cuerpo. Mostramos el master mientras termina el
   // acercamiento 3/4, en vez de dejar un spinner.
-  const fallback = useGeneratedPortrait(isGeneratedPortraitUrl(fallbackUrl) ? fallbackUrl : undefined, { priority });
+  // El respaldo puede ser una miniatura data-URI que ya viajó por el relay: esa se
+  // pinta directo, no pasa por la caché de generación (no hay nada que generar).
+  const inlineFallback = fallbackUrl?.startsWith("data:") ? fallbackUrl : undefined;
+  const remoteFallback = useGeneratedPortrait(isGeneratedPortraitUrl(fallbackUrl) ? fallbackUrl : undefined, { priority });
+  const fallback = inlineFallback ? { src: inlineFallback } : remoteFallback;
   // Los avatares clásicos (gato con damero blanco horneado) quedaron retirados:
   // hasta que el look esté completo se muestra el busto dorado de "héroe por forjar".
   if (!generated) {
@@ -2745,7 +2777,7 @@ function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false }: 
     return <img className={className} src={staticUrl.startsWith("/assets/avatars/") ? heroPlaceholderDataUri : staticUrl} alt={name} />;
   }
   if (src) return <img className={`${className ?? ""} ${status === "loading" ? "portraitForging" : "portraitFade"}`} src={src} alt={name} />;
-  if (fallback.src) return <img className={`${className ?? ""} portraitForging`} src={fallback.src} alt={`${name}, preparando variante de cuerpo`} />;
+  if (fallback.src) return <img className={`${className ?? ""} portraitForging`} src={fallback.src} alt={inlineFallback ? name : `${name}, preparando variante de cuerpo`} />;
   // Cargando: spinner sobre fondo gris; si falló del todo, medallón procedural.
   if (status === "failed") return <img className={className} src={medallionDataUri(name)} alt={name} />;
   return <img className={`${className ?? ""} imgLoadingBg`} src={loadingSpinnerDataUri} alt={`Generando retrato de ${name}`} />;
@@ -2755,7 +2787,13 @@ function MultiplayerAvatarImg({ character, name, className, priority = false }: 
   // No se sortea una toma: avatarUrl es exactamente la elección sincronizada.
   // La referencia solo permite reconstruir esa misma Frente desde su Cuerpo master.
   if (character.look?.faceUrl && character.look.fullBodyUrl) linkPortraitReference(character.look.faceUrl, character.look.fullBodyUrl);
-  const fallbackUrl = character.avatarUrl === character.look?.faceUrl ? character.look?.fullBodyUrl : undefined;
+  // Mientras el retrato grande no esté en ESTA caché, se muestra la miniatura que
+  // mandó el dueño: mismo encuadre, misma foto, solo más chica. Nunca la otra toma
+  // —eso es lo que hacía que el avatar de la sala pareciera cambiar solo.
+  const thumb = character.look?.avatarThumbKey === portraitThumbKey(character.avatarUrl) ? character.look?.avatarThumb : undefined;
+  // Sin miniatura (personaje viejo, guardado antes de esta versión) se conserva el
+  // comportamiento anterior: algo se ve, aunque sea el master de cuerpo entero.
+  const fallbackUrl = thumb ?? (character.avatarUrl === character.look?.faceUrl ? character.look?.fullBodyUrl : undefined);
   return <HeroAvatarImg url={character.avatarUrl} fallbackUrl={fallbackUrl} name={name} className={className} priority={priority} />;
 }
 

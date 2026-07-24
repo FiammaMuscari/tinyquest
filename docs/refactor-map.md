@@ -66,7 +66,23 @@ Puntos de contacto — si tocás uno, revisá los otros:
   números, segmentos o la palabra "reloj"; los ocultos solo se insinúan.
 - UI: `visibleClocks(room?.clocks)` en el `journeyPanel` (App.tsx ~2115, bloque
   `.journeyClocks` antes de `.journeyLaws`). CSS al final de `app.css`.
-- Tests: `tests/clocks.test.mjs` (11 casos, transpila `clocks.ts` inline).
+- Tests: `tests/clocks.test.mjs` (12 casos, transpila `clocks.ts` inline).
+
+**El nombre de un reloj es una ETIQUETA, no una oración** (`clockLabel()` en
+`clocks.ts`, aplicado en los 3 sitios donde se arma un `name`). El rail de la partida
+mide **279px**: un objetivo tal como lo escribe el LLM ("Impugná la deuda falsa antes
+de que el consejo la cobre") parte en dos líneas y el reloj deja de leerse como reloj.
+`clockLabel` corta en la primera subordinada (`antes de que`, `para que`, `hasta que`…)
+y, si igual pasa de 34 chars, recorta en borde de palabra con `…`. El `payoff` conserva
+la frase entera: el recorte es SOLO de UI. Si agregás un cuarto tipo de reloj, pasá su
+nombre por `clockLabel` o volverá el wrap.
+
+**Los pips vacíos se ven tanto como los llenos.** Primera versión: `rgba(…, .13)` sin
+borde propio → a 0/6 el track era invisible y el bloque parecía una lista de frases.
+Ahora el hueco lleva `inset 0 0 0 1px` teñido según el tipo (rojo/oro/verde al 42%) y
+el nombre arranca con un punto del color del reloj, para que a 0 segmentos ya se sepa
+si juega a favor o en contra. Verificación sin cuota: `node scratchpad/clock-render.mjs`
+(markup exacto de la UI + `app.css` real, con rellenos parciales y un reloj `clockFired`).
 
 ### Assets huérfanos (medido 2026-07-24, script abajo)
 
@@ -137,6 +153,61 @@ LLM porque el lobby no llama al modelo). Arreglado:
   Si escribís otro auditor de contraste, resolvé `background-image` antes de creerle.
 - El `stepDiamond` desborda 10px del panel a la izquierda: es el número del paso
   colgando en el margen, es intencional.
+
+### Pase de UI — pantalla de PARTIDA (2026-07-24, segunda tanda)
+
+Recién con `scratchpad/ingame.mjs` (entra a la partida con LLM mockeado, cuota cero)
+se pudo auditar la pantalla real. Cinco defectos, todos con la misma causa de fondo:
+**una regla base genérica pisando un caso particular.**
+
+- **Casilla de "Escribir mi propia acción" de 253px.** `textarea, select, input
+  { width: 100% }` (app.css:103) también aplicaba a los `input[type=checkbox]`, así
+  que la casilla empujaba su propio texto al otro extremo de la fila. `.petToggle
+  input` ya lo parcheaba a mano; ahora hay un reset global de checkbox/radio al final
+  de `app.css`. **Si agregás una casilla nueva, ya está cubierta.**
+- **"Alma Dracónica" cortada a cuchillo.** `.miniMeters` repartía el carril en 3
+  columnas iguales (78px) y el chip del compañero es flex → `text-overflow: ellipsis`
+  no se aplica en un contenedor flex. Ahora las columnas son `auto auto minmax(0,1fr)`
+  y el nombre va en `.miniMeterName`. Ojo: `.queueCard .miniMeters` (app.css:2806) fija
+  las columnas con `!important`, hay que ganarle con su misma especificidad.
+- **La chapita del avatar decía "PARTY" en solo.** `localPlayerId` viene de
+  `mpState.playerId`, que está vacío fuera de multijugador, así que el propio jugador
+  caía en la rama "otro". Además `.queueCard span` le metía `overflow-wrap: anywhere`
+  y "PARTY" partía en dos líneas encima del retrato.
+- **El carril izquierdo desbordaba 20px** (Leyes cortadas). Se comprimieron las
+  escenas futuras (`.journeyPath li.future`) — que ocupaban lo mismo que la escena
+  actual — y se acortó el texto vacío de Leyes. Ahora entra justo: 574/576px.
+- **Nombres de reloj de dos líneas** → ver la regla de `clockLabel` más arriba.
+
+Auditor reutilizable: `scratchpad/ui-clip2.mjs` compara `scrollWidth/clientWidth` de
+todo el DOM. Ignora lo que tenga scroll, `overflow: visible` o `text-overflow:
+ellipsis` declarado — sin esos filtros escupe decenas de falsos positivos.
+
+### Avatar de la sala de espera: miniatura por el relay (2026-07-24)
+
+Síntoma: en la sala el avatar de un jugador aparecía a veces de frente y a veces de
+cuerpo entero. **No era el servidor** — el hub guarda el `Character` como
+`json.RawMessage` opaco y lo retransmite entero, `avatarShot` incluido. El problema es
+que el retrato vive en la **IndexedDB de quien lo generó**: los demás navegadores solo
+reciben la URL de pollinations y tienen que volver a pedir la imagen (cuota + segundos,
+y si la cuota está agotada nunca llega). Mientras tanto `HeroAvatarImg` mostraba la
+OTRA toma como puente.
+
+Solución: `look.avatarThumb` — miniatura JPEG data-URI de ~2 KB de la toma elegida,
+generada por el dueño con `buildPortraitThumb()` (portraits.ts) desde el blob que ya
+tiene cacheado, y transportada dentro del `Character`. Contactos:
+
+- `buildPortraitThumb(url)` NUNCA dispara una generación: lee de IndexedDB o devuelve
+  null. Conserva la proporción (128px de lado mayor) — tiene que ser la MISMA foto.
+- `look.avatarThumbKey` es un hash de la URL: si no coincide con la toma actual, la
+  miniatura está vieja y se ignora/regenera.
+- `multiplayerAvatarSignature` incluye `avatarThumbKey` → cambiarla republica el asiento.
+- `canonicalMultiplayerCharacter` **descarta la miniatura** si el Character pasa de
+  56 KB. El hub rechaza a los 64 KB y un rechazo tira abajo la publicación entera: se
+  sacrifica la miniatura, nunca el avatar.
+- `MultiplayerAvatarImg` usa la miniatura como respaldo; solo cae a la otra toma si el
+  personaje es viejo y no tiene miniatura.
+- Verificación en navegador real, sin cuota: `node scratchpad/thumb-check.mjs`.
 
 ## Hard rules (violating these wastes a whole session)
 

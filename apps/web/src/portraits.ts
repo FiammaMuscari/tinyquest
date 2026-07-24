@@ -620,6 +620,81 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
   return promise;
 }
 
+// ─── Miniatura compartible por el relay ──────────────────────────────────────
+// El retrato vive en la IndexedDB de QUIEN lo generó. Los demás jugadores solo
+// reciben la URL y tienen que volver a pedirle la imagen al generador: cuesta
+// cuota, tarda segundos y a veces falla, y mientras tanto la sala mostraba la
+// otra toma. La miniatura resuelve eso: pesa poco, viaja dentro del Character y
+// muestra desde el primer frame EXACTAMENTE el encuadre que eligió el jugador.
+
+/** Tope duro: el relay rechaza Characters de más de 64 KB (hub.go setPlayerAvatar). */
+export const AVATAR_THUMB_MAX_BYTES = 24_000;
+const AVATAR_THUMB_SIZE = 128;
+
+/** Clave corta y estable de una URL de retrato: sirve para saber si la miniatura
+ * guardada corresponde a la toma actual sin duplicar una URL de 12 000 caracteres. */
+export function portraitThumbKey(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  let hash = 2166136261;
+  for (let index = 0; index < url.length; index += 1) {
+    hash ^= url.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+/** Miniatura JPEG data-URI de un retrato ya cacheado. Devuelve null si la imagen
+ * todavía no está local, si el navegador no puede dibujar, o si el resultado se
+ * pasa del tope que acepta el relay. Nunca dispara una generación nueva. */
+export async function buildPortraitThumb(url: string | undefined): Promise<string | null> {
+  if (!isGeneratedPortraitUrl(url) || typeof document === "undefined") return null;
+  const blob = await idbGet(url).catch(() => undefined);
+  if (!blob) return null;
+  let source: CanvasImageSource;
+  let width: number;
+  let height: number;
+  let release: () => void = () => {};
+  try {
+    if (typeof createImageBitmap !== "undefined") {
+      const bitmap = await createImageBitmap(blob);
+      source = bitmap;
+      width = bitmap.width;
+      height = bitmap.height;
+      release = () => bitmap.close();
+    } else {
+      const objectUrl = URL.createObjectURL(blob);
+      const image = new Image();
+      image.src = objectUrl;
+      await image.decode();
+      source = image;
+      width = image.naturalWidth;
+      height = image.naturalHeight;
+      release = () => URL.revokeObjectURL(objectUrl);
+    }
+  } catch {
+    return null;
+  }
+  try {
+    // Se conserva la proporción: la miniatura tiene que ser la MISMA foto, no un
+    // recorte distinto, o volvemos al problema de dos encuadres para un jugador.
+    const scale = AVATAR_THUMB_SIZE / Math.max(width, height);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    const dataUri = canvas.toDataURL("image/jpeg", 0.72);
+    return dataUri.length <= AVATAR_THUMB_MAX_BYTES ? dataUri : null;
+  } catch {
+    return null;
+  } finally {
+    release();
+  }
+}
+
 export type PortraitStatus = "idle" | "loading" | "ready" | "failed";
 
 // Hook para <img>: mantiene la imagen anterior mientras llega la nueva (sin parpadeo),

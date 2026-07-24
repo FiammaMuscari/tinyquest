@@ -35,13 +35,24 @@ export function validateChatColor(value: string, usedByOthers: string[]): string
   return null;
 }
 
+/** El relay rechaza un Character de más de 64 KB (hub.go, setPlayerAvatar). Dejamos
+ * margen: las URLs de retrato son larguísimas y un rechazo tira ABAJO la publicación
+ * entera, así que ante la duda se sacrifica la miniatura, no el avatar. */
+export const MULTIPLAYER_CHARACTER_MAX_BYTES = 56_000;
+
 /** El servidor conserva este Character como fuente única; jamás decide Frente/Cuerpo. */
 export function canonicalMultiplayerCharacter(character: Character): Character {
-  return {
+  const canonical: Character = {
     ...character,
     look: character.look ? { ...character.look } : character.look,
     avatarUrl: character.avatarUrl
   };
+  if (JSON.stringify(canonical).length <= MULTIPLAYER_CHARACTER_MAX_BYTES) return canonical;
+  // Sin miniatura la sala vuelve al comportamiento viejo (el retrato tarda), pero
+  // el asiento se publica igual. Es preferible a quedarse sin actualizar nada.
+  if (!canonical.look?.avatarThumb) return canonical;
+  const { avatarThumb: _dropped, avatarThumbKey: _droppedKey, ...look } = canonical.look;
+  return { ...canonical, look };
 }
 
 export function multiplayerAvatarSignature(character: Character): string {
@@ -51,6 +62,9 @@ export function multiplayerAvatarSignature(character: Character): string {
     faceUrl: character.look?.faceUrl,
     fullBodyUrl: character.look?.fullBodyUrl,
     portraitIdentity: character.look?.portraitIdentity,
-    portraitNonce: character.look?.portraitNonce
+    portraitNonce: character.look?.portraitNonce,
+    // La miniatura es lo que ve la party antes de que el retrato grande llegue a su
+    // caché: si cambia hay que republicar, o los demás se quedan con la anterior.
+    avatarThumbKey: character.look?.avatarThumbKey
   });
 }

@@ -52,3 +52,31 @@ test("los mensajes existentes adoptan inmediatamente el color sincronizado", () 
   assert.match(appSource, /messageColor = mpState\.players\.find/);
   assert.match(appSource, /validateChatColor\(colorDraft, usedColors\)/);
 });
+
+test("la miniatura del avatar viaja por el relay y nunca sustituye la toma elegida", () => {
+  // El dueño del personaje genera la miniatura; sin ella cada navegador tenía que
+  // volver a pedirle la imagen al generador y mientras tanto mostraba la otra toma.
+  const withThumb = {
+    avatarUrl: "https://image.pollinations.ai/prompt/x?width=512",
+    look: { avatarShot: "face", faceUrl: "https://image.pollinations.ai/prompt/x?width=512", fullBodyUrl: "/cuerpo.jpg", avatarThumb: "data:image/jpeg;base64,AAAA", avatarThumbKey: "abc123" }
+  };
+  assert.equal(style.canonicalMultiplayerCharacter(withThumb).look.avatarThumb, "data:image/jpeg;base64,AAAA");
+  assert.match(style.multiplayerAvatarSignature(withThumb), /avatarThumbKey/);
+
+  // Republica cuando cambia la miniatura, aunque la URL grande sea la misma.
+  const otherThumb = { ...withThumb, look: { ...withThumb.look, avatarThumbKey: "zzz999" } };
+  assert.notEqual(style.multiplayerAvatarSignature(withThumb), style.multiplayerAvatarSignature(otherThumb));
+
+  // Tope del relay: si el Character se pasa, cae la miniatura y NO el avatar.
+  const huge = { ...withThumb, look: { ...withThumb.look, avatarThumb: `data:image/jpeg;base64,${"A".repeat(60_000)}` } };
+  const trimmed = style.canonicalMultiplayerCharacter(huge);
+  assert.equal(trimmed.look.avatarThumb, undefined);
+  assert.equal(trimmed.look.avatarThumbKey, undefined);
+  assert.equal(trimmed.avatarUrl, huge.avatarUrl, "el asiento se publica igual");
+  assert.ok(JSON.stringify(trimmed).length < 64_000, "entra en el límite del hub");
+
+  // La sala usa la miniatura como respaldo, jamás la otra toma cuando existe.
+  assert.match(appSource, /const thumb = character\.look\?\.avatarThumbKey === portraitThumbKey\(character\.avatarUrl\)/);
+  assert.match(appSource, /buildPortraitThumb/);
+  assert.match(hubSource, /64\s*\*\s*1024/, "el hub sigue capando el Character");
+});
