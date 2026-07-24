@@ -133,7 +133,14 @@ function llmProxyPlugin(): Plugin {
               response.end("prompt requerido");
               return;
             }
-            const model = body.referenceImage ? "@cf/black-forest-labs/flux-2-klein-4b" : (env.CF_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning");
+            const faceDetail = /^TINYQUEST HERO FACE (?:VARIANT|DETAIL) V\d+\b/.test(body.prompt);
+            if (faceDetail && !body.referenceImage) {
+              response.statusCode = 409;
+              response.setHeader("Content-Type", "application/json");
+              response.end(JSON.stringify({ error: { message: "canonical body reference required", stage: "identity-validation" } }));
+              return;
+            }
+            const model = body.referenceImage ? "@cf/black-forest-labs/flux-2-klein-4b" : (env.CF_IMAGE_MODEL || "@cf/black-forest-labs/flux-1-schnell");
             let upstreamBody: BodyInit;
             let upstreamContentType = "application/json";
             if (body.referenceImage || model.includes("flux-2-klein")) {
@@ -142,7 +149,7 @@ function llmProxyPlugin(): Plugin {
               const styleStart = body.referenceImage ? 1 : 0;
               const styleInstruction = styles.length ? `Images ${styleStart}-${styleStart + styles.length - 1} are STYLE REFERENCES ONLY. Copy ONLY their beautiful classic oil technique, graceful full-body silhouette, elegant natural proportions, delicate medieval costume rendering, soft broken brush edges and restrained tonal background. NEVER copy their person, elf anatomy, gender, face, skin, eye or hair colors, clothing details, weapons or pose; canonical identity overrides every reference.` : "";
               form.append("prompt", body.referenceImage
-                ? `Image 0 is the canonical character identity. Preserve EXACT face, canonical species and non-human anatomy, skin color, iris color, hair color, scar, medieval clothing, jewelry and weapons. ${styleInstruction} Change ONLY the camera/framing to a close character-sheet standing composition: the head-to-feet figure fills 90% of the frame, with crisp face, hands, clothing and equipment detail and no empty scenic space. Use only a clean unobtrusive dark tonal gradient background; the character is the only subject. ${body.prompt.slice(0, 1300)}`
+                ? `Image 0 is the IMMUTABLE canonical full character, wardrobe AND painting-style master. OUTPUT COMPOSITION OVERRIDES THE REFERENCE FRAMING: repaint a NEW intimate square close three-quarter portrait, never return, crop, zoom or preserve the full-body composition. Entire head, both eyes, shoulders, collar and upper torso dominate the frame; head is large and near camera; waist, hips, legs and feet are outside frame. Copy the EXACT same recognizable person, facial geometry, adult visual gender, species, eye count, anatomy, skin, iris and hair colors/LENGTH, fringe, scars, collar, upper garments, armor and jewelry. Copy Image 0's exact pigment density, brush scale, canvas grain, lighting, contrast and finish; never simplify, genericize, smooth, abstract or lower detail. Keep upper torso fully clothed in the exact opaque medieval layers. Change camera/composition only; never redesign identity or outfit. Paint substantially MORE facial, eye, hair, scar and textile detail than Image 0. ${styleInstruction} Matte medieval oil; simple dark gradient; one character. ${body.prompt.slice(0, 900)}`
                 : `${styleInstruction} Create the NEW character described here without copying the reference subjects: ${body.prompt.slice(0, 1700)}, no text, no signature, no watermark`);
               form.append("width", String(Math.min(1920, Math.max(256, body.width ?? 512))));
               form.append("height", String(Math.min(1920, Math.max(256, body.height ?? 768))));
@@ -184,11 +191,19 @@ function llmProxyPlugin(): Plugin {
               }
               response.statusCode = 200;
               response.setHeader("Content-Type", "image/jpeg");
+              if (body.referenceImage) {
+                response.setHeader("x-tiny-quest-identity-source", "canonical-body");
+                response.setHeader("x-tiny-quest-composition", faceDetail ? "close-portrait-v24" : "reference-edit");
+              }
               response.end(Buffer.from(base64, "base64"));
               return;
             }
             response.statusCode = 200;
             response.setHeader("Content-Type", contentType || "image/png");
+            if (body.referenceImage) {
+              response.setHeader("x-tiny-quest-identity-source", "canonical-body");
+              response.setHeader("x-tiny-quest-composition", faceDetail ? "close-portrait-v24" : "reference-edit");
+            }
             response.end(Buffer.from(await upstream.arrayBuffer()));
           } catch (error) {
             response.statusCode = 502;

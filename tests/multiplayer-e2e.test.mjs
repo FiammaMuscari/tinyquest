@@ -5,13 +5,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { after, before } from "node:test";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import ts from "typescript";
 
-const GO = join(process.env.HOME, ".local/go/bin/go");
+const localGo = join(process.env.HOME, ".local/go/bin/go");
+const GO = existsSync(localGo) ? localGo : "go";
 const serverDir = new URL("../server-go", import.meta.url).pathname;
 const env = { ...process.env, PATH: `${join(process.env.HOME, ".local/go/bin")}:${process.env.PATH}`, GOPATH: join(process.env.HOME, "go"), GOCACHE: join(process.env.HOME, ".cache/go-build") };
 

@@ -12,11 +12,13 @@
     "groq:smoke": "node scripts/run-groq-narration-smoke.mjs",
     "server:dev": "tsx --tsconfig tsconfig.server.json server/src/index.ts",
     "server:install": "npm install --workspace @tiny-quest/server",
-    "server:go": "cd server-go && go run ./cmd/server",
-    "server:go:test": "cd server-go && go test ./...",
+    "server:go": "node scripts/run-go.mjs run ./cmd/server",
+    "server:go:test": "node scripts/run-go.mjs test ./...",
     "check": "npm run typecheck && npm test && npm run server:go:test && npm run build",
+    "deploy:check": "npm run check && wrangler deploy --dry-run --config apps/edge-worker/wrangler.jsonc",
+    "smoke:edge": "node scripts/smoke-edge.mjs",
     "dev:edge": "npm run build && wrangler dev --config apps/edge-worker/wrangler.jsonc",
-    "deploy": "npm run build && wrangler deploy --config apps/edge-worker/wrangler.jsonc"
+    "deploy": "npm run check && wrangler deploy --config apps/edge-worker/wrangler.jsonc"
   },
   "workspaces": [
     "apps/web",

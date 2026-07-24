@@ -63,3 +63,12 @@ test("el segundo payload idéntico sale de caché sin ejecutar IA", async () => 
   assert.equal(response.status, 200);
   assert.equal(second.calls.length, 0);
 });
+
+test("Frente sin Cuerpo canónico se rechaza antes de gastar IA", async () => {
+  stored.clear();
+  const setup = harness();
+  const response = await generate("TINYQUEST HERO FACE VARIANT V22. mujer elfa", 512, 512, setup);
+  assert.equal(response.status, 409);
+  assert.equal(setup.calls.length, 0);
+  assert.match(await response.text(), /canonical body reference required/);
+});
