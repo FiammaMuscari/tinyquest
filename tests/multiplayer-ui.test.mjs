@@ -14,6 +14,9 @@ const appSource = await readFile(new URL("../apps/web/src/App.tsx", import.meta.
 const cssSource = await readFile(new URL("../apps/web/src/styles/app.css", import.meta.url), "utf8");
 const protocolSource = await readFile(new URL("../apps/web/src/multiplayer/protocol.ts", import.meta.url), "utf8");
 const hubSource = await readFile(new URL("../server-go/internal/hub/hub.go", import.meta.url), "utf8");
+const doSource = await readFile(new URL("../apps/edge-worker/src/room-hub.js", import.meta.url), "utf8");
+const clientSource = await readFile(new URL("../apps/web/src/multiplayer/ws-client.ts", import.meta.url), "utf8");
+const portraitsSource = await readFile(new URL("../apps/web/src/portraits.ts", import.meta.url), "utf8");
 
 test("el color de chat debe ser único y legible", () => {
   assert.match(style.validateChatColor("#ff66aa", ["#FF66AA"]), /ya pertenece/);
@@ -79,4 +82,39 @@ test("la miniatura del avatar viaja por el relay y nunca sustituye la toma elegi
   assert.match(appSource, /const thumb = character\.look\?\.avatarThumbKey === portraitThumbKey\(character\.avatarUrl\)/);
   assert.match(appSource, /buildPortraitThumb/);
   assert.match(hubSource, /64\s*\*\s*1024/, "el hub sigue capando el Character");
+});
+
+test("el avatar de un compañero no se regenera: o está en caché o se queda la miniatura", () => {
+  // Regenerarlo daba OTRA cara: la identidad se arma con el master de cuerpo como
+  // referencia y el navegador del compañero no lo tiene. Además gastaba cuota de
+  // imágenes una vez por cada persona mirando la sala.
+  assert.match(portraitsSource, /export async function loadCachedPortrait/);
+  const cached = portraitsSource.slice(portraitsSource.indexOf("export async function loadCachedPortrait"));
+  const body = cached.slice(0, cached.indexOf("\n}"));
+  assert.doesNotMatch(body, /fetchPortraitBlob|fetch\(/, "loadCachedPortrait no puede pedir nada a la red");
+  assert.match(appSource, /cacheOnly=\{remote\}/, "el avatar ajeno se pinta en modo solo-caché");
+  assert.match(appSource, /remote=\{p\.id !== mpState\.playerId\}/, "en la sala de espera");
+  assert.match(appSource, /remote=\{Boolean\(localPlayerId\) && player\.id !== localPlayerId\}/, "en la cola de turnos");
+});
+
+test("un corte de socket no termina la partida: el asiento vuelve solo", () => {
+  // Lo que rompió la sala en producción, en tres puntos.
+  // 1) El anfitrión llega por room_created, no por room_joined: si no guarda el
+  //    asiento ahí, no tiene forma de volver a sentarse y el servidor le contesta
+  //    "not_host" a todo (la puerta no abre, la historia no arranca).
+  const created = clientSource.slice(clientSource.indexOf('case "room_created"'), clientSource.indexOf('case "room_joined"'));
+  assert.match(created, /saveSeat\(msg\.roomCode, msg\.playerId\)/);
+
+  // 2) La sala de espera del anfitrión contaba como partida viva: antes un corte
+  //    ahí no avisaba nada y sus clics se encolaban en un socket muerto.
+  assert.match(clientSource, /const alive = \["lobby_host", "waiting_room"/);
+  assert.match(clientSource, /if \(loadSeat\(\) && this\.retries < MAX_RETRIES\) this\.scheduleRetry\(\)/);
+  assert.match(clientSource, /rejoin_room", roomCode: seat\.roomCode, playerId: seat\.playerId/);
+
+  // 3) El Durable Object tiene que cerrar SU lado del socket. Con la API de
+  //    hibernación el saludo de cierre no se completa solo, y sin eso el
+  //    navegador nunca recibe `close`: no se entera de que se cayó.
+  const onClose = doSource.slice(doSource.indexOf("async webSocketClose"), doSource.indexOf("async webSocketError"));
+  assert.match(onClose, /ws\.close\(/, "el DO debe confirmar el cierre");
+  assert.match(onClose, /1005|1006/, "1005 y 1006 no se pueden devolver");
 });

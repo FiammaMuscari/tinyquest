@@ -53,6 +53,11 @@ function clearSeat(): void {
   try { localStorage.removeItem(SEAT_KEY); } catch { /* sin storage */ }
 }
 
+// El servidor guarda el asiento 5 minutos (RECONNECT_GRACE_MS en room-hub.js).
+// Con espera creciente hasta 15 s, 20 intentos cubren ~4,5 min: siempre menos que
+// la gracia, así que si el asiento sigue vivo lo alcanzamos.
+const MAX_RETRIES = 20;
+
 const emptyState: MultiplayerState = {
   phase: "idle",
   roomCode: null,
@@ -76,6 +81,11 @@ export class MultiplayerClient {
   private listeners = new Map<string, Set<Handler<unknown>>>();
   // Cola de mensajes a mandar apenas abra el socket.
   private pending: C2SMessage[] = [];
+  // Reconexión automática. Un corte de socket NO es el fin de la partida: el
+  // servidor guarda el asiento 5 minutos, así que insistimos hasta agotarlos.
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retries = 0;
+  private resuming = false;
 
   constructor(serverUrl = "ws://localhost:8787") {
     this.serverUrl = serverUrl;
@@ -116,6 +126,15 @@ export class MultiplayerClient {
 
     this.ws.onopen = () => {
       this.startPing();
+      this.retries = 0;
+      // Volvimos de un corte: lo primero es recuperar el asiento. Sin esto el
+      // socket nuevo no tiene dueño y el servidor rechaza todo lo del anfitrión
+      // con "not_host" —la puerta no abre y la historia no arranca.
+      if (this.resuming) {
+        this.resuming = false;
+        const seat = loadSeat();
+        if (seat) this.rawSend({ type: "rejoin_room", roomCode: seat.roomCode, playerId: seat.playerId });
+      }
       const queued = this.pending;
       this.pending = [];
       for (const msg of queued) this.rawSend(msg);
@@ -130,10 +149,14 @@ export class MultiplayerClient {
 
     this.ws.onclose = () => {
       this.stopPing();
-      const alive = ["waiting_room", "active", "watching", "narrating"];
-      if (alive.includes(this._state.phase)) {
-        this.setState({ phase: "host_gone", errorMessage: "Se perdió la conexión con la sala." });
-      }
+      this.ws = null;
+      const alive = ["lobby_host", "waiting_room", "active", "watching", "narrating"];
+      if (!alive.includes(this._state.phase)) return;
+      // Un despliegue del Worker, un wifi que parpadea o una tapa de notebook
+      // cierran el socket. Antes eso terminaba la partida para siempre; ahora
+      // reintentamos mientras el servidor siga guardando el asiento.
+      if (loadSeat() && this.retries < MAX_RETRIES) this.scheduleRetry();
+      else this.setState({ phase: "host_gone", errorMessage: "Se perdió la conexión con la sala." });
     };
 
     this.ws.onerror = () => {
@@ -143,6 +166,7 @@ export class MultiplayerClient {
 
   disconnect(): void {
     this.stopPing();
+    this.stopRetrying();
     clearSeat(); // salida intencional: no queremos reconectar a esta sala
     this.pending = [];
     if (this.ws) {
@@ -234,18 +258,26 @@ export class MultiplayerClient {
   private handleServerMessage(msg: S2CMessage): void {
     switch (msg.type) {
       case "room_created":
+        // El anfitrión nunca pasa por room_joined, así que su asiento se guarda
+        // acá. Sin esto, un corte lo dejaba sin forma de volver a sentarse.
+        saveSeat(msg.roomCode, msg.playerId);
         this.setState({ roomCode: msg.roomCode, playerId: msg.playerId, isHost: true, players: msg.players, phase: "lobby_host" });
         break;
 
       case "room_joined": {
         const rejoinedActive = this._state.gameRoom !== null; // llegó estado tras rejoin
         const isHostSeat = msg.players.find((p) => p.id === msg.playerId)?.isHost ?? this._state.isHost;
-        // Guardamos el asiento para poder reconectar tras una recarga (solo invitados).
-        if (!isHostSeat) saveSeat(msg.roomCode, msg.playerId);
+        // El asiento se guarda TAMBIÉN para el anfitrión. Sin él, un corte lo dejaba
+        // sin forma de volver a sentarse: el socket nuevo no era dueño de nada, el
+        // servidor le contestaba "not_host" a todo (la puerta no abría, la historia
+        // no arrancaba) y a los 5 minutos la sala se borraba sola.
+        saveSeat(msg.roomCode, msg.playerId);
         this.setState({
           roomCode: msg.roomCode, playerId: msg.playerId, players: msg.players, isHost: isHostSeat,
           errorMessage: null,
-          phase: this._state.phase === "lobby_host" ? "lobby_host" : rejoinedActive ? this._state.phase : "waiting_room"
+          // Al reconectar sin estado todavía, cada uno vuelve a SU sala de espera:
+          // el anfitrión a la suya, que es la única desde donde se arranca.
+          phase: rejoinedActive ? this._state.phase : isHostSeat ? "lobby_host" : "waiting_room"
         });
         break;
       }
@@ -268,6 +300,7 @@ export class MultiplayerClient {
       case "player_kicked":
         if (msg.playerId === this._state.playerId) {
           clearSeat();
+          this.stopRetrying(); // te echaron: volver a entrar sería insistir de más
           this.setState({ phase: "lobby_guest", roomCode: null, players: [], gameRoom: null, kickedMessage: msg.message, errorMessage: msg.message });
           if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
         } else this.setState({ players: msg.players });
@@ -311,7 +344,10 @@ export class MultiplayerClient {
         // El asiento guardado ya no sirve (sala/asiento inexistente o partida
         // terminada): lo borramos para no reintentar rejoin en loop y permitir un
         // join limpio. El resto de errores no tocan el asiento.
-        if (msg.code === "room_not_found" || msg.code === "game_ended") clearSeat();
+        if (msg.code === "room_not_found" || msg.code === "game_ended") {
+          clearSeat();
+          this.stopRetrying(); // sin asiento no hay a dónde volver: dejá de insistir
+        }
         this.setState({ errorMessage: msg.message });
         this.emit("error", msg.message);
         break;
@@ -342,6 +378,25 @@ export class MultiplayerClient {
 
   private stopPing(): void {
     if (this.pingTimer) { clearInterval(this.pingTimer); this.pingTimer = null; }
+  }
+
+  /** Espera cada vez más, pero nunca más de 15 s, y avisa en pantalla. */
+  private scheduleRetry(): void {
+    if (this.retryTimer) return;
+    const delay = Math.min(15_000, 1_000 * 2 ** this.retries);
+    this.retries += 1;
+    this.setState({ errorMessage: "Se cortó la conexión. Reconectando…" });
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.resuming = true;
+      this.connect();
+    }, delay);
+  }
+
+  private stopRetrying(): void {
+    if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
+    this.retries = 0;
+    this.resuming = false;
   }
 }
 

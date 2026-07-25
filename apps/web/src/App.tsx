@@ -2107,7 +2107,7 @@ function TurnQueue({ room, draft, multiplayerPlayers, localPlayerId, audioRef, a
         const syncedCharacter = player.type === "human" ? multiplayerPlayers?.find((seat) => seat.id === player.id)?.character ?? player.character : player.character;
         return (
           <article className={`queueCard ${active ? "current" : ""}`} key={player.id}>
-            <div className="avatar">{player.type === "bot" ? <HeroAvatarImg url={characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía")} name={player.name} /> : <MultiplayerAvatarImg character={syncedCharacter} name={player.name} priority />}<span>{player.type === "bot" ? "BOT" : !localPlayerId || player.id === localPlayerId ? "TÚ" : "PARTY"}</span></div>
+            <div className="avatar">{player.type === "bot" ? <HeroAvatarImg url={characterPortraitUrl(player.name, `${player.character.species} ${player.character.role}, compañero de aventuras leal`, journey?.worldName ?? "mundo de fantasía")} name={player.name} /> : <MultiplayerAvatarImg character={syncedCharacter} name={player.name} priority remote={Boolean(localPlayerId) && player.id !== localPlayerId} />}<span>{player.type === "bot" ? "BOT" : !localPlayerId || player.id === localPlayerId ? "TÚ" : "PARTY"}</span></div>
             <div><strong>{player.name}</strong><span>{syncedCharacter.species} · {syncedCharacter.role}</span><small>{player.status === "dead" ? "Caído trágicamente" : active ? "Turno actual" : next ? "Siguiente" : "En cola"}</small></div>
             <div className="miniMeters"><span><Heart size={13} /> {player.character.vitality}</span><span><Zap size={13} /> {player.character.energy}</span>{syncedCharacter.pet.id !== "none" && <span><NpcPortrait name={syncedCharacter.pet.name} portraitUrl={petImage(syncedCharacter.pet)} size={14} /> <span className="miniMeterName" title={syncedCharacter.pet.name}>{syncedCharacter.pet.name}</span></span>}</div>
           </article>
@@ -2760,15 +2760,15 @@ const heroPlaceholderDataUri = `data:image/svg+xml,${encodeURIComponent(`<svg xm
   <text x='110' y='253' text-anchor='middle' font-family='Georgia, serif' font-size='12' letter-spacing='2' fill='#c9a45c' fill-opacity='.85'>POR FORJAR</text>
 </svg>`)}`;
 
-function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false }: { url: string; fallbackUrl?: string; name: string; className?: string; priority?: boolean }) {
+function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false, cacheOnly = false }: { url: string; fallbackUrl?: string; name: string; className?: string; priority?: boolean; cacheOnly?: boolean }) {
   const generated = isGeneratedPortraitUrl(url);
-  const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority });
+  const { src, status } = useGeneratedPortrait(generated ? url : undefined, { priority, cacheOnly });
   // Frente depende del master Cuerpo. Mostramos el master mientras termina el
   // acercamiento 3/4, en vez de dejar un spinner.
   // El respaldo puede ser una miniatura data-URI que ya viajó por el relay: esa se
   // pinta directo, no pasa por la caché de generación (no hay nada que generar).
   const inlineFallback = fallbackUrl?.startsWith("data:") ? fallbackUrl : undefined;
-  const remoteFallback = useGeneratedPortrait(isGeneratedPortraitUrl(fallbackUrl) ? fallbackUrl : undefined, { priority });
+  const remoteFallback = useGeneratedPortrait(isGeneratedPortraitUrl(fallbackUrl) ? fallbackUrl : undefined, { priority, cacheOnly });
   const fallback = inlineFallback ? { src: inlineFallback } : remoteFallback;
   // Los avatares clásicos (gato con damero blanco horneado) quedaron retirados:
   // hasta que el look esté completo se muestra el busto dorado de "héroe por forjar".
@@ -2783,7 +2783,7 @@ function HeroAvatarImg({ url, fallbackUrl, name, className, priority = false }: 
   return <img className={`${className ?? ""} imgLoadingBg`} src={loadingSpinnerDataUri} alt={`Generando retrato de ${name}`} />;
 }
 
-function MultiplayerAvatarImg({ character, name, className, priority = false }: { character: Character; name: string; className?: string; priority?: boolean }) {
+function MultiplayerAvatarImg({ character, name, className, priority = false, remote = false }: { character: Character; name: string; className?: string; priority?: boolean; remote?: boolean }) {
   // No se sortea una toma: avatarUrl es exactamente la elección sincronizada.
   // La referencia solo permite reconstruir esa misma Frente desde su Cuerpo master.
   if (character.look?.faceUrl && character.look.fullBodyUrl) linkPortraitReference(character.look.faceUrl, character.look.fullBodyUrl);
@@ -2794,7 +2794,10 @@ function MultiplayerAvatarImg({ character, name, className, priority = false }: 
   // Sin miniatura (personaje viejo, guardado antes de esta versión) se conserva el
   // comportamiento anterior: algo se ve, aunque sea el master de cuerpo entero.
   const fallbackUrl = thumb ?? (character.avatarUrl === character.look?.faceUrl ? character.look?.fullBodyUrl : undefined);
-  return <HeroAvatarImg url={character.avatarUrl} fallbackUrl={fallbackUrl} name={name} className={className} priority={priority} />;
+  // El avatar de otro NUNCA se regenera acá: o está en esta caché, o se queda la
+  // miniatura que él mandó. Generarlo daba otra cara a los pocos segundos, porque
+  // la identidad se arma con su master de cuerpo y este navegador no lo tiene.
+  return <HeroAvatarImg url={character.avatarUrl} fallbackUrl={fallbackUrl} name={name} className={className} priority={priority} cacheOnly={remote} />;
 }
 
 function CastPanel({ sceneId, npcIds, npcs, styleHint }: { sceneId: string; npcIds: string[]; npcs: CampaignNPC[]; styleHint: string }) {
@@ -3991,7 +3994,7 @@ function MultiplayerLobbyScreen({ mode, mpState, draft, joinCodeInput, setJoinCo
     <ul className="mpPlayerList">
       {mpState.players.map((p) => (
         <li className="mpPlayerRow" key={p.id} style={{ opacity: p.connected ? 1 : 0.5 }}>
-          <MultiplayerAvatarImg character={p.character} name={p.name} className="mpPlayerAvatar" />
+          <MultiplayerAvatarImg character={p.character} name={p.name} className="mpPlayerAvatar" remote={p.id !== mpState.playerId} />
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: p.connected ? "#7fff90" : "#888", flexShrink: 0 }} />
           <strong style={{ color: "#fff" }}>{p.name}</strong>
           {p.isHost && <span style={{ color: "#ffd77b", fontSize: 12 }}>· anfitrión</span>}

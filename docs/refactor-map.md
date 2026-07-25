@@ -230,6 +230,55 @@ Dos trampas que invalidan esta prueba si se repiten:
   Bloquear por dominio deja pasar la generación real — el invitado resuelve el retrato
   grande igual, la prueba deja de probar nada y encima gasta cuota.
 
+### La sala se moría sola en producción (2026-07-24)
+
+Síntomas reportados: el anfitrión se queda en la sala de espera y no puede abrir la
+puerta ni arrancar; el invitado ve "Esperando que el anfitrión forje la historia…" y
+al rato "El anfitrión abandonó la partida". Entrar a mitad de partida, en cambio,
+funcionaba. Tres fallos encadenados, ninguno visible en local hasta buscarlos:
+
+1. **El Durable Object no cerraba su lado del socket.** Con la API de hibernación
+   (`ctx.acceptWebSocket`) el saludo de cierre NO se completa solo: hay que llamar
+   `ws.close()` dentro de `webSocketClose`. Sin eso el navegador nunca recibe su
+   evento `close`. El peor de los mundos: el servidor daba al jugador por caído y
+   arrancaba los 5 minutos para borrar la sala, mientras su pantalla seguía intacta
+   y sus clics se encolaban en `pending` sobre un socket muerto. Medido: `close`
+   tardaba **nunca**; con el arreglo, 14 ms. (1005 y 1006 no se pueden devolver.)
+2. **El anfitrión no guardaba su asiento.** Llega por `room_created`, no por
+   `room_joined`, y `saveSeat` solo estaba en el segundo. Sin asiento no hay
+   `rejoin_room` posible: el socket nuevo no era dueño de nada y el servidor le
+   contestaba `not_host` a todo.
+3. **`lobby_host` no contaba como partida viva** en `onclose`, y no había reconexión
+   automática en ningún caso. Ahora se reintenta con espera creciente hasta 15 s,
+   20 veces (~4,5 min), siempre por debajo de los 5 min de gracia del servidor.
+
+Por qué a mitad de partida no se notaba: hay tráfico constante (turnos, broadcasts) y
+la fase sí estaba en la lista de "viva", así que el corte al menos se reportaba.
+
+Verificación, dos runtimes porque el protocolo tiene dos implementaciones:
+
+- `node --test tests/multiplayer-e2e.test.mjs` — relay **Go** real. Incluye el corte
+  de socket. Ojo: los dos clientes comparten proceso, así que cada copia del módulo
+  lleva su propio `localStorage` (`SEAT_SHIM`); con un shim global se pisan el
+  asiento y el test tapa justo el bug que tiene que encontrar.
+- `node scratchpad/do-reconnect.mjs` — **Durable Object** real vía
+  `npx wrangler dev --config apps/edge-worker/wrangler.jsonc --port 8788 --local`.
+  Es el único que reproduce el fallo del saludo de cierre: el relay Go sí lo hacía
+  bien, así que el test de Go pasaba con el bug presente.
+
+### El avatar del compañero cambiaba de cara (2026-07-24)
+
+Distinto del cambio de encuadre (ver arriba): acá cambiaba la PERSONA. `HeroAvatarImg`
+llamaba a `useGeneratedPortrait(avatarUrl)`, que **genera** el retrato si no está en
+esta caché. La identidad se arma con el master de cuerpo como referencia
+(`planImage` la mete en la clave), y el compañero no tiene ese master: le salía otra
+cara a los pocos segundos, encima gastando cuota de imágenes una vez por espectador.
+
+`loadCachedPortrait()` solo lee IndexedDB. `MultiplayerAvatarImg` recibe `remote` y
+pasa `cacheOnly`: el avatar ajeno o está en caché o se queda con la miniatura que
+mandó su dueño. Sin miniatura (personaje viejo) queda el medallón procedural, que es
+peor estéticamente pero no es la cara de otra persona.
+
 ## Hard rules (violating these wastes a whole session)
 
 1. `App.tsx` is ~2500 lines. **Never read it whole.** Grep the anchor, then read ±40 lines.

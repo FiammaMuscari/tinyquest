@@ -411,8 +411,18 @@ export class RoomHub {
     await this.scheduleAlarm();
   }
 
-  async webSocketClose(ws) {
+  async webSocketClose(ws, code, reason) {
     await this.markDisconnected(ws);
+    // Hay que cerrar de ESTE lado también. Con la API de hibernación el runtime
+    // no completa el saludo de cierre solo: si no lo hacemos, el navegador nunca
+    // recibe su evento `close`. Ese era el peor de los mundos —el servidor daba
+    // al jugador por caído y arrancaba los 5 minutos para borrar la sala,
+    // mientras su pantalla seguía como si nada y sus clics se encolaban en un
+    // socket muerto. El anfitrión "estaba" en la sala de espera y no podía ni
+    // abrir la puerta ni arrancar la historia.
+    // 1005 (sin estado) y 1006 (cierre anormal) no se pueden devolver.
+    const safe = typeof code === "number" && code >= 1000 && code < 5000 && code !== 1005 && code !== 1006 ? code : 1000;
+    try { ws.close(safe, reason || "cierre confirmado"); } catch { /* ya estaba cerrado */ }
   }
 
   async webSocketError(ws) {

@@ -39,6 +39,21 @@ function waitEvent(client, event, timeout = 3000) {
   });
 }
 
+// El cliente guarda el asiento en localStorage para poder reconectar, y Node no
+// lo trae. Un shim global no alcanza: los dos clientes comparten proceso y se
+// pisarían el asiento, que es un accidente del test y no de la realidad (cada
+// jugador está en su navegador). Cada copia del módulo lleva el suyo, privado.
+const SEAT_SHIM = `const localStorage = (() => {
+  const store = new Map();
+  return {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k)
+  };
+})();
+`;
+let GuestClient;
+
 before(async () => {
   // Compilar el binario del servidor (falla ruidosamente si el Go no compila).
   const built = spawnSync(GO, ["build", "-o", join(tmpdir(), "tq-server"), "./cmd/server"], { cwd: serverDir, env });
@@ -61,9 +76,14 @@ before(async () => {
   await writeFile(join(dir, "session-style.mjs"), styleOut);
   const src = await readFile(new URL("../apps/web/src/multiplayer/ws-client.ts", import.meta.url), "utf8");
   const { outputText } = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } });
-  const out = join(dir, "ws-client.mjs");
-  await writeFile(out, outputText.replace('from "./session-style"', 'from "./session-style.mjs"'));
-  ({ MultiplayerClient } = await import(`file://${out}`));
+  const body = SEAT_SHIM + outputText.replace('from "./session-style"', 'from "./session-style.mjs"');
+  // Dos copias del módulo = dos navegadores, cada uno con su asiento guardado.
+  const hostFile = join(dir, "ws-client-a.mjs");
+  const guestFile = join(dir, "ws-client-b.mjs");
+  await writeFile(hostFile, body);
+  await writeFile(guestFile, body);
+  ({ MultiplayerClient } = await import(`file://${hostFile}`));
+  ({ MultiplayerClient: GuestClient } = await import(`file://${guestFile}`));
 });
 
 after(() => { serverProc?.kill(); });
@@ -71,7 +91,7 @@ after(() => { serverProc?.kill(); });
 test("party completa: crear → unirse → arrancar → turnos → relay", async () => {
   const url = `ws://127.0.0.1:${PORT}`;
   const host = new MultiplayerClient(url);
-  const guest = new MultiplayerClient(url);
+  const guest = new GuestClient(url);
 
   // 1) Host crea la sala.
   host.createRoom("Fiamy", { name: "Fiamy", avatarUrl: "/host-cuerpo.jpg" }, { worldId: "veldaran" });
@@ -132,6 +152,46 @@ test("party completa: crear → unirse → arrancar → turnos → relay", async
   assert.equal(chat.color, "#ff66aa");
   host.kickPlayer(guestId);
   await waitState(guest, (s) => s.kickedMessage && s.roomCode === null);
+
+  host.disconnect();
+  guest.disconnect();
+});
+
+test("al anfitrión se le corta el socket y vuelve a su asiento solo", async () => {
+  // El caso que rompió la sala en producción: un despliegue del Worker cerró todos
+  // los sockets. El anfitrión no guardaba asiento, así que su socket nuevo no era
+  // dueño de nada: el servidor le contestaba "not_host" a todo (la puerta no abría,
+  // la historia no arrancaba) y a los 5 minutos la sala se borraba sola.
+  const url = `ws://127.0.0.1:${PORT}`;
+  const host = new MultiplayerClient(url);
+  const guest = new GuestClient(url);
+
+  host.createRoom("Annie", { name: "Annie", avatarUrl: "/annie.jpg" }, { worldId: "veldaran" });
+  await waitState(host, (s) => s.roomCode && s.isHost);
+  const code = host.state.roomCode;
+  const hostId = host.state.playerId;
+
+  // El corte pasa ANTES de que entre nadie: en un proceso los dos clientes
+  // comparten localStorage, y si el invitado guarda su asiento encima tapa
+  // justamente el agujero que hay que probar (el anfitrión no guardaba el suyo).
+  // Corte brusco: como un despliegue o un wifi que parpadea. NO es una salida
+  // intencional, así que el cliente tiene que reconectar por su cuenta.
+  host.ws.close();
+  await waitState(host, (s) => /Reconect/i.test(s.errorMessage ?? ""), 4000);
+
+  // Vuelve al MISMO asiento, sigue siendo anfitrión y sigue en su sala de espera
+  // (no en la del invitado, que es desde donde no se puede arrancar).
+  await waitState(host, (s) => s.errorMessage === null && s.playerId === hostId, 8000);
+  assert.equal(host.state.isHost, true);
+  assert.equal(host.state.roomCode, code);
+  assert.equal(host.state.phase, "lobby_host");
+
+  // La sala sobrevivió y el socket nuevo manda de verdad: entra un invitado y el
+  // anfitrión abre la puerta, que es lo que antes fallaba con "not_host".
+  guest.joinRoom(code, "ernie", { name: "ernie", avatarUrl: "/ernie.jpg" });
+  await waitState(host, (s) => s.players.length === 2, 4000);
+  host.setRoomOptions(true);
+  await waitState(guest, (s) => s.allowMidJoin === true, 4000);
 
   host.disconnect();
   guest.disconnect();

@@ -620,6 +620,24 @@ export function loadPortrait(url: string, options: { priority?: boolean } = {}):
   return promise;
 }
 
+/** Solo mira ESTA caché: si el retrato no está, devuelve null y NO lo genera.
+ *
+ * Para el avatar de OTRO jugador generar es un error, no una espera: la identidad
+ * se arma con el master de cuerpo como referencia (planImage mete la referencia en
+ * la clave), y el compañero no tiene ese master. Regenerar le da otra cara —el
+ * avatar "se cambia solo" a los pocos segundos— y encima gasta cuota de imágenes
+ * una vez por cada persona que mira la sala. */
+export async function loadCachedPortrait(url: string): Promise<string | null> {
+  const ready = readyObjectUrls.get(url);
+  if (ready) return ready;
+  // El blob de IndexedDB ya está recortado (loadPortrait guarda después del crop).
+  const blob = await idbGet(url).catch(() => undefined);
+  if (!blob) return null;
+  const objectUrl = URL.createObjectURL(blob);
+  readyObjectUrls.set(url, objectUrl);
+  return objectUrl;
+}
+
 // ─── Miniatura compartible por el relay ──────────────────────────────────────
 // El retrato vive en la IndexedDB de QUIEN lo generó. Los demás jugadores solo
 // reciben la URL y tienen que volver a pedirle la imagen al generador: cuesta
@@ -701,8 +719,8 @@ export type PortraitStatus = "idle" | "loading" | "ready" | "failed";
 // reporta estado para animar "forjando retrato" y expone retry manual. Si la serie
 // de descargas falla (servicio saturado), sigue reintentando solo cada 30s mientras
 // el componente esté montado: el retrato "llega tarde" en vez de no llegar nunca.
-export function useGeneratedPortrait(url: string | undefined, options: { priority?: boolean } = {}): { src: string | null; status: PortraitStatus; retry: () => void } {
-  const { priority = false } = options;
+export function useGeneratedPortrait(url: string | undefined, options: { priority?: boolean; cacheOnly?: boolean } = {}): { src: string | null; status: PortraitStatus; retry: () => void } {
+  const { priority = false, cacheOnly = false } = options;
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<{ src: string | null; status: PortraitStatus }>({ src: null, status: url ? "loading" : "idle" });
   useEffect(() => {
@@ -712,6 +730,14 @@ export function useGeneratedPortrait(url: string | undefined, options: { priorit
     }
     let alive = true;
     let timer: number | undefined;
+    if (cacheOnly) {
+      // Sin reintentos: si no está, no va a estar. "failed" deja paso al respaldo
+      // (la miniatura que mandó el dueño) en vez de dejar el spinner girando.
+      loadCachedPortrait(url)
+        .then((src) => alive && setState(src ? { src, status: "ready" } : { src: null, status: "failed" }))
+        .catch(() => alive && setState({ src: null, status: "failed" }));
+      return () => { alive = false; };
+    }
     const run = (roundsLeft: number) => {
       setState((prev) => ({ src: prev.src, status: "loading" }));
       loadPortrait(url, { priority })
@@ -732,7 +758,7 @@ export function useGeneratedPortrait(url: string | undefined, options: { priorit
       alive = false;
       if (timer) window.clearTimeout(timer);
     };
-  }, [url, attempt, priority]);
+  }, [url, attempt, priority, cacheOnly]);
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
   return { ...state, retry };
 }
