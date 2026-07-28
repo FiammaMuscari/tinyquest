@@ -19,9 +19,11 @@ export function createCharacter(input: Partial<Character> = {}): Character {
   const selectedPet = input.pet ? (legendaryPets.find((pet) => pet.id === input.pet?.id) ?? input.pet) : defaultPet();
   // Si el llamador ya trae stats propios, respetarlos tal cual. Si no, partimos del
   // molde base y SUMAMOS el statBonus de la especie (antes declarado pero nunca aplicado).
+  // El molde gasta 7 de los 8 puntos de forja a propósito: el 8º lo aporta el linaje,
+  // así el bonus de especie entra sin pasarse del presupuesto (antes daba 9/8 → −1).
   const rolledStats: Stats = input.stats
     ? { ...baseStats, ...(input.stats as Partial<Stats>) }
-    : addStatBonus({ ...baseStats, mind: 3, charm: 2, creativity: 3, courage: 2, focus: 2, luck: 2 }, selectedSpecies.statBonus);
+    : addStatBonus({ ...baseStats, mind: 3, charm: 2, creativity: 2, courage: 2, focus: 2, luck: 2 }, selectedSpecies.statBonus);
   const stats = clampStats(rolledStats);
   const derived = deriveValues(stats);
 
